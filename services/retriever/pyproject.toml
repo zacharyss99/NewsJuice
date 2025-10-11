@@ -1,0 +1,16 @@
+[project]
+name = "newsjuice-retriever"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic>=2",
+  "psycopg[binary]>=3.1",      # Postgres client (v3)
+  "pgvector>=0.2.5",           # pgvector adapter for psycopg v3
+  "sentence-transformers>=3",  # embeddings
+  "torch>=2.2,<3.0",           # CPU torch; adjust if you pin differently
+]
+
+[tool.uv]  # optional; leave empty if you like
+
