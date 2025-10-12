@@ -9,6 +9,7 @@ services:
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
       DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
     working_dir: /app
     # change this to your actual extractor entrypoint
     command:
@@ -31,6 +32,7 @@ services:
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
       DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
       GOOGLE_CLOUD_PROJECT: "newsjuice-123456" 
       GOOGLE_CLOUD_REGION:  "us-central1"
     working_dir: /app
@@ -57,6 +59,7 @@ services:
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
       DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
     working_dir: /app
     # change this to your actual processor entrypoint
     #command: ["python", "Vector_DB_query.py", "--in", "/data/news.jsonl"]
