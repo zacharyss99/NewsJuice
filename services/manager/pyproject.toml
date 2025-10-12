@@ -1,0 +1,13 @@
+[project]
+name = "newsjuice-manager"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "httpx",
+  "pydantic>=2",
+  "python-dotenv",
+]
+
+[tool.uv]
