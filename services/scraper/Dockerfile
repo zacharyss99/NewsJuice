@@ -23,13 +23,14 @@ WORKDIR /app
 COPY pyproject.toml ./
 #COPY uv.lock
 
-RUN uv sync
+RUN uv sync \
+&& playwright install --with-deps chromium
 
 COPY . ./
 
 #ENTRYPOINT ["/bin/bash"]
 #CMD ["-c", "source /home/app/.venv/bin/activate && exec bash"]
 # Default command (Compose will override with wait_for_db + your script)
-CMD ["python", "main.py", "--out", "/data/news.jsonl"]
+CMD ["python", "scrapers.py"]
 
 # TEST
