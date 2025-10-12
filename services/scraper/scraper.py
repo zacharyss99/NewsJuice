@@ -5,6 +5,8 @@ Scraper service
 * Stores them in a jsonl file (news.jsonl) in the artifacts folder
 '''
 
+MAX_ART = 3 # (limits for testing the number of articles)
+
 #app/main.py
 import httpx
 import feedparser
@@ -149,6 +151,8 @@ def main():
         for item in items:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
             count += 1
+            if count == MAX_ART:
+                break
         print("NUMBER OF NEWS SCRAPED: ", count)    
 
 if __name__ == "__main__":
