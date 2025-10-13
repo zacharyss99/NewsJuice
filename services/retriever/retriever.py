@@ -51,7 +51,7 @@ with conn, conn.cursor() as cur:
     
     cur.execute(
         """
-        SELECT id, content, embedding <=> %s AS score
+        SELECT id, chunk, embedding <=> %s AS score
         FROM chunks_vector
         ORDER BY embedding <=> %s
         LIMIT 2;
