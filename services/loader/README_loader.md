@@ -1,6 +1,6 @@
 # Version 2: Changes
 - use the same embedder for final chunk embedding as Zac
-- load data from DB
+- load data from DB instead of from jsonl file
 (WIP)
 
 # NewsJuice Prototype Pipeline (WIP for Milestone 2)
