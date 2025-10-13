@@ -1,4 +1,9 @@
-# TEST NewsJuice Prototype Pipeline (WIP for Milestone 2)
+# Version 2: Changes
+- use the same embedder for final chunk embedding as Zac
+- load data from DB
+(WIP)
+
+# NewsJuice Prototype Pipeline (WIP for Milestone 2)
 
 This repository contains the **NewsJuice Prototype Pipeline**, a containerized system for **scraping**, **processing**, **retrieving**, and **summarizing** news content.  
 
