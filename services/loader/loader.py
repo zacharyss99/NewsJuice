@@ -1,8 +1,12 @@
-''''
+'''
 loader service
 
 takes the jsonl file `./artifacts/news.jsonl`, which contains the scraped news articles,
 chunks them, does embedding and loads the chunks into the vector database
+
+
+* chunking (semantic version) uses OpenAI api for embedding
+* but final chunks will be embedded with XYZ so it is consistent with embedding used for retrieval 
 '''
 
 import uuid
@@ -11,6 +15,7 @@ import pandas as pd
 #app/main.py
 #---import httpx
 #---import feedparser
+
 import psycopg
 
 from datetime import datetime, timezone
@@ -56,7 +61,7 @@ PATH_TO_CHUNKS = pathlib.Path("/data/chunked_articles")
 
 # Parameter for character chunking 
 CHUNK_SIZE_CHAR = 350
-CHUNK_OVERLAPP_CHAR = 20
+CHUNK_OVERLAP_CHAR = 20
 
 # Parameter for recursive chunking 
 CHUNK_SIZE_RECURSIVE = 350
@@ -98,7 +103,6 @@ class VertexEmbeddings:
     def embed_query(self, text: str) -> List[float]:
         return self._embed_one(text)
 
-
 def upload_to_gcs(bucket_name, source_file_path, destination_blob_name):
     """Uploads a file to the bucket."""
     storage_client = storage.Client()
@@ -110,174 +114,121 @@ def upload_to_gcs(bucket_name, source_file_path, destination_blob_name):
 
 # Chunking function
 
-def chunk(method='char-split'): 
-    print("chunk()")
-    
+def chunk_embed_load(method='char-split'):
+    PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
 
-    os.makedirs("/data/chunked_articles", exist_ok=True)
+    conn = psycopg.connect(DB_URL, autocommit=True)
+    cur = conn.cursor()
 
-    # Read the /data/news.jsonl" file with articles scraped
-    with PATH_TO_NEWS.open("r", encoding="utf-8") as f:
-        for i, line in enumerate(f, 1):
-            if not line.strip():
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError as e:
-                print(f"[skip] bad JSON on line {i}: {e}", file=sys.stderr)
-                continue
+    # Fetch pending articles
+    cur.execute("""
+        SELECT id, author, title, summary, content,
+               source_link, source_type, fetched_at, published_at,
+               vflag, article_id
+        FROM articles
+        WHERE vflag = 0;
+    """)
+    rows = cur.fetchall()
 
-            article_id = uuid.uuid4().hex
-            
-            content = obj.get("content", "")    
-            title = obj.get("title", "")
+    # Prepare semantic splitter once (if requested)
+    sem_splitter = None
+    if method == "semantic-split":
+        emb = VertexEmbeddings()
+        sem_splitter = SemanticChunker(embeddings=emb)
 
-            author = obj.get("author", "")
-            summary = obj.get("summary", "")
-            source_link = obj.get("source_link", "")
-            fetched_at = obj.get("fetched_at", "")
-            published_at = obj.get("published_at", "")
-            source_type = obj.get("source_type", "")
-            
+    for i, row in enumerate(rows, start=1):
+        (_id, author, title, summary, content,
+         source_link, source_type, fetched_at, published_at,
+         vflag, article_id) = row
 
-            text_chunks = None
-            if method == "char-split":
-                PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
-                # Init the splitter
-                text_splitter = CharacterTextSplitter(
-                    chunk_size=CHUNK_SIZE_CHAR, chunk_overlap=CHUNK_OVERLAPP_CHAR, separator='', strip_whitespace=False)
+        # --- Chunking ---
+        if method == "char-split":
+            text_splitter = CharacterTextSplitter(
+                chunk_size=CHUNK_SIZE_CHAR,
+                chunk_overlap=CHUNK_OVERLAP_CHAR,
+                separator=None,
+                strip_whitespace=False,
+            )
+            docs = text_splitter.create_documents([content or ""])
 
-                # Perform the splitting
-                text_chunks = text_splitter.create_documents([content])
-                text_chunks = [art.page_content for art in text_chunks]
-                print("Number of chunks:", len(text_chunks))
+        elif method == "recursive-split":
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=CHUNK_SIZE_RECURSIVE
+            )
+            docs = text_splitter.create_documents([content or ""])
 
-            elif method == "recursive-split":
-                PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
-                # Init the splitter
-                text_splitter = RecursiveCharacterTextSplitter(
-                    chunk_size=CHUNK_SIZE_RECURSIVE)
+        elif method == "semantic-split":
+            if sem_splitter is None:
+                raise RuntimeError("Semantic splitter not initialized")
+            docs = sem_splitter.create_documents([content or ""])
 
-                # Perform the splitting
-                text_chunks = text_splitter.create_documents([content])
-                text_chunks = [art.page_content for art in text_chunks]
-                print("Number of chunks:", len(text_chunks))
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
-            elif method == "semantic-split":
+        text_chunks = [d.page_content for d in docs]
+        print(f"[{i}/{len(rows)}] article_id={article_id} → {len(text_chunks)} chunks")
 
-                PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
-                emb = VertexEmbeddings()  # reads GOOGLE_API_KEY or pass api_key="..."
-                text_splitter = SemanticChunker(embeddings=emb)
-                docs = text_splitter.create_documents([content])
-                text_chunks = [d.page_content for d in docs]
-                print("Number of chunks:", len(text_chunks))
-              
+        # --- Build rows to insert ---
+        df = pd.DataFrame(text_chunks, columns=["chunk"])
+        df["author"] = author
+        df["title"] = title
+        df["summary"] = summary
+        df["content"] = content
+        df["source_link"] = source_link
+        df["source_type"] = source_type
+        df["fetched_at"] = fetched_at
+        df["published_at"] = published_at
+        df["chunk_index"] = range(len(df))
+        df["article_id"] = article_id
+        # Final embeddings (align with retrieval model)
+        df["embedding"] = [model.encode(t).tolist() for t in df["chunk"]]
 
-            if text_chunks is not None:
-                emb = VertexEmbeddings()
-                data_df = pd.DataFrame(text_chunks, columns=["chunk"])
-                data_df["article_id"] = article_id
-                data_df["chunk_index"] = range(len(data_df))
-                data_df["title"] = title
-                data_df["author"] = author
-                data_df["summary"] = summary
-                data_df["source_link"] = source_link
-                data_df["source_type"] = source_type
-                data_df["fetched_at"] = fetched_at
-                data_df["published_at"] = published_at
-                data_df["embedding"] = [emb.embed_query(t) for t in data_df["chunk"]]
+        # --- Insert chunks ---
+        inserted = 0
+        for _, r in df.iterrows():
+            cur.execute(
+                """
+                INSERT INTO chunks_vector
+                  (author, title, summary, content,
+                   source_link, source_type, fetched_at, published_at,
+                   chunk, chunk_index, embedding, article_id)
+                VALUES
+                  (%s, %s, %s, %s,
+                   %s, %s, %s, %s,
+                   %s, %s, %s, %s);
+                """,
+                (
+                    r["author"],
+                    r["title"],
+                    r["summary"],
+                    r["content"],
+                    r["source_link"],
+                    r["source_type"],
+                    r["fetched_at"],
+                    r["published_at"],
+                    r["chunk"],
+                    int(r["chunk_index"]),
+                    json.dumps(r["embedding"]),   # If pgvector VECTOR(768), pass list directly and remove dumps
+                    r["article_id"],
+                )
+            )
+            inserted += 1
+        print("Inserted chunks:", inserted)
 
-                jsonl_filename = os.path.join(
-                    PATH_TO_CHUNKS, f"chunks-{method}-{title}.jsonl")
-                with open(jsonl_filename, "w") as json_file:
-                    json_file.write(data_df.to_json(orient='records', lines=True))
+        # --- Mark this article processed (parameterized) ---
+        cur.execute(
+            "UPDATE articles SET vflag = 1 WHERE article_id = %s;",
+            (article_id,)
+        )
 
-# Embedding function
-#def embed():
-
-# Loading function
-def load():
-        
-    with psycopg.connect(DB_URL, autocommit=True) as conn:
-         with conn.cursor() as cur:
-    
-    
-            #  Connecting and confirmaing vector DB
-            cur.execute("SELECT current_database(), version();")
-            db_name, db_version = cur.fetchone()
-            print(f"[db] Connected successfully to '{db_name}'")
-            print(f"[db] Server version: {db_version}")
-
-            files = sorted(PATH_TO_CHUNKS.glob("*.jsonl"))
-
-            if not files:
-                print(f"[warn] No .jsonl files found in {PATH_TO_CHUNKS}", file=sys.stderr)
-                return
-
-            inserted = 0
-
-            for fp in files:
-                    print(f"[info] Processing {fp}")
-                    with fp.open("r", encoding="utf-8") as f:
-                        for i, line in enumerate(f, start=1):
-                            if not line.strip():
-                                continue
-                            try:
-                                obj = json.loads(line)
-                            except json.JSONDecodeError as e:
-                                print(f"[skip] {fp.name}:{i} bad JSON: {e}", file=sys.stderr)
-                                continue
-
-                            article_id = obj.get("article_id", "") 
-                            chunk_index = obj.get("chunk_index", "")
-                            chunk = obj.get("chunk", "")
-                            #content = obj.get("content", "")    
-                            title = obj.get("title", "")
-                            author = obj.get("author", "")
-                            summary = obj.get("summary", "")
-                            source_link = obj.get("source_link", "")
-                            fetched_at = obj.get("fetched_at", "")
-                            published_at = obj.get("published_at", "")
-                            source_type = obj.get("source_type", "")
-                            embedding = obj.get("embedding", "")
-                            # Embedding 
-                            #embed_np = model.encode(chunk)
-                            #embedding = embed_np.tolist()
-
-                            # Use Vertex    
-                            #emb = VertexEmbeddings()
-                            #embedding = emb.embed_query(chunk)
-
-                            # Loading into vector DB
-                            try:
-                                cur.execute(
-                                    """
-                                    INSERT INTO chunks_vector (article_id, author, title, \
-                                        summary, source_link, fetched_at, published_at, \
-                                            source_type, chunk, chunk_index, embedding)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                                    """,
-                                    (article_id, author, title, \
-                                        summary, source_link, fetched_at, published_at, \
-                                            source_type, chunk, chunk_index, embedding),
-                                )
-
-                                inserted += 1
-                                print(f"Inserting row number into vector DB: {inserted-1}")
-                
-                            except Exception as ex:
-                                print(f"[db-insert-error] {source_link} :: {ex}")
-
-            print({"Number of rows inserted into vector DB": inserted})
-        
-
+    cur.close()
+    conn.close()
 
 def main():
 
-    chunk("semantic-split")
-    load()
+    chunk_embed_load("semantic-split")
 
-    # Upload test
+    # Bucket upload test
     upload_to_gcs(
         BUCKET_NAME, 
         "/data/news.jsonl", 
@@ -286,3 +237,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
