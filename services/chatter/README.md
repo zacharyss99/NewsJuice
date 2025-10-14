@@ -18,17 +18,16 @@ A microservice that provides interactive chat functionality using Google's Gemin
 
 ## Database Schema
 
-The service creates and uses the `llm_conversations` table with the following schema:
+The service uses the `llm_conversations` table with the following schema:
 
 ```sql
 CREATE TABLE llm_conversations (
-    id SERIAL PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    question TEXT NOT NULL,
-    response TEXT,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    model_used VARCHAR(100) DEFAULT 'gemini-pro',
-    error_message TEXT
+    id bigint NOT NULL DEFAULT,
+    user_id text NOT NULL,
+    model_name text NOT NULL,
+    conversation_data jsonb NOT NULL containing fields for "error", "question", and "response",
+    created_at timestamp with time zone DEFAULT (now()),
+    updated_at timestamp with time zone DEFAULT (now())
 );
 ```
 
@@ -45,7 +44,7 @@ The service is designed to run as part of the NewsJuice pipeline:
 
 ```bash
 # From the NewsJuice-Pipeline_MS_2 directory
-docker-compose up chatter
+docker-compose run --rm chatter
 ```
 
 ### Running Standalone
@@ -81,7 +80,7 @@ docker-compose up chatter
 
 ### Google Gemini API
 
-- Uses the `gemini-pro` model by default
+- Uses the `gemini-2.5-flash` model by default
 - Handles API errors gracefully
 - Falls back to error logging when API is unavailable
 

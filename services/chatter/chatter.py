@@ -11,30 +11,31 @@ A microservice that:
 import os
 import sys
 import psycopg
-import google.generativeai as genai
 from datetime import datetime, timezone
 from typing import Optional
 import json
 from google.oauth2 import service_account
+from vertexai.generative_models import GenerativeModel
 
 # Configuration
 DB_URL = os.environ["DATABASE_URL"]
 GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get("GEMINI_SERVICE_ACCOUNT_PATH", "/run/secrets/gemini-service-account.json")
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
+GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 
-# Configure Gemini with service account
+# Configure Vertex AI with service account
 try:
     if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
-        with open(GEMINI_SERVICE_ACCOUNT_PATH, 'r') as f:
-            service_account_info = json.load(f)
-
-        credentials = service_account.Credentials.from_service_account_info(
-            service_account_info,
-            scopes=['https://www.googleapis.com/auth/cloud-platform']
+        # Set the credentials file path
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GEMINI_SERVICE_ACCOUNT_PATH
+        
+        # Initialize the model (using full model path for Vertex AI)
+        # Try gemini-2.5-flash first as it's more readily available
+        model = GenerativeModel(
+            model_name=f'projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_REGION}/publishers/google/models/gemini-2.5-flash'
         )
-
-        genai.configure(credentials=credentials)
-        model = genai.GenerativeModel('gemini-pro')
-        print("[gemini] Configured with service account authentication")
+        print("[gemini] Configured with Vertex AI service account authentication")
+        print(f"[gemini] Using model: gemini-2.5-flash in {GOOGLE_CLOUD_REGION}")
     else:
         print(f"[gemini-warning] Service account file not found at {GEMINI_SERVICE_ACCOUNT_PATH}")
         model = None
@@ -43,25 +44,25 @@ except Exception as e:
     model = None
 
 
-def create_llm_conversations_table():
-    """Create the llm_conversations table if it doesn't exist."""
+def check_llm_conversations_table():
+    """Check if the llm_conversations table exists."""
     try:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS llm_conversations (
-                        id SERIAL PRIMARY KEY,
-                        user_id VARCHAR(255) NOT NULL,
-                        question TEXT NOT NULL,
-                        response TEXT,
-                        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                        model_used VARCHAR(100) DEFAULT 'gemini-pro',
-                        error_message TEXT
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'llm_conversations'
                     );
                 """)
-                print("[db] llm_conversations table ready")
+                exists = cur.fetchone()[0]
+                if exists:
+                    print("[db] llm_conversations table found")
+                else:
+                    print("[db-warning] llm_conversations table not found")
+                return exists
     except Exception as e:
-        print(f"[db-error] Failed to create table: {e}")
+        print(f"[db-error] Failed to check table: {e}")
         raise
 
 
@@ -102,12 +103,19 @@ def call_gemini_api(question: str) -> tuple[Optional[str], Optional[str]]:
 def log_conversation(user_id: str, question: str, response: Optional[str], error_message: Optional[str]):
     """Log the conversation to the database."""
     try:
+        # Prepare conversation data as JSON
+        conversation_data = {
+            "question": question,
+            "response": response,
+            "error": error_message
+        }
+        
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO llm_conversations (user_id, question, response, error_message, timestamp)
-                    VALUES (%s, %s, %s, %s, %s);
-                """, (user_id, question, response, error_message, datetime.now(timezone.utc)))
+                    INSERT INTO llm_conversations (user_id, model_name, conversation_data)
+                    VALUES (%s, %s, %s);
+                """, (user_id, 'gemini-2.5-flash', json.dumps(conversation_data)))
                 
                 print("[db] Conversation logged successfully")
     except Exception as e:
@@ -131,8 +139,8 @@ def main():
         print(f"[db-error] Failed to connect to database: {e}")
         sys.exit(1)
     
-    # Create the llm_conversations table
-    create_llm_conversations_table()
+    # Check if the llm_conversations table exists
+    check_llm_conversations_table()
     
     print("\nGemini API Status:", "✓ Configured" if model else "✗ Not configured")
     print("=" * 40)
