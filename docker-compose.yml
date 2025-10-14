@@ -71,6 +71,32 @@ services:
       && exec /home/app/.venv/bin/python retriever.py --out /data/news.jsonl
     restart: "no"
 
+  # Step 4 — chatter: interactive chat service with Gemini API
+  chatter:
+    build: ./services/chatter
+    depends_on:
+      - dbproxy
+    volumes:
+      - ./services/chatter:/app
+      - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
+      - ../secrets/gemini-service-account.json:/run/secrets/gemini-service-account.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      GEMINI_SERVICE_ACCOUNT_PATH: /run/secrets/gemini-service-account.json
+      GOOGLE_CLOUD_PROJECT: "newsjuice-123456"
+      GOOGLE_CLOUD_REGION: "us-central1"
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    command:
+    - sh
+    - -lc
+    - >
+      /home/app/.venv/bin/python wait_for_db.py
+      && exec /home/app/.venv/bin/python chatter.py
+    restart: "no"
+    
   # Cloud SQL Auth Proxy so the processor can reach your DB
   dbproxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2
