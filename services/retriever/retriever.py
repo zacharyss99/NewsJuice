@@ -2,7 +2,7 @@
 Retriever service
 
 Asks for a user brief, does an embedding of it,
-and retrives 2 best articles from DB
+and retrieves 2 best articles from DB (and prints on screen)
 
 Inputs:
 Runtime input from user   ---- text input from prompt
@@ -10,11 +10,19 @@ Runtime input from user   ---- text input from prompt
 Outputs:
 ./artifacts/2-best.txt     --- text file with the 2 best articles
 
+
+NOTE: for testing use: VECTOR_TABLE_NAME = "chunks_vector_test"
+
 '''
+
+
+VECTOR_TABLE_NAME = "chunks_vector_test"
+#VECTOR_TABLE_NAME = "chunks_vector"
 
 # pip install psycopg2-binary pgvector
 import psycopg
 from pgvector.psycopg import register_vector, Vector
+from psycopg import sql
 
 import os
 DB_URL = os.environ["DATABASE_URL"]       
@@ -36,7 +44,7 @@ conn = psycopg.connect(DB_URL, autocommit=True)
 
 register_vector(conn)
 
-search_text = input("Search text ? : ")
+search_text = input("Please provide a search text: ")
 
 # Query embedding
 q = Vector(model.encode(search_text).tolist())
@@ -44,22 +52,25 @@ q = Vector(model.encode(search_text).tolist())
 with conn, conn.cursor() as cur:
     # Choose one distance operator:
     #   <->  Euclidean   |  <#>  Inner product  |  <=>  Cosine distance
+    
+    
     cur.execute("SELECT current_database(), version();")
     db_name, db_version = cur.fetchone()
     print(f"[db] Connected successfully to '{db_name}'")
     print(f"[db] Server version: {db_version}")    
     
-    cur.execute(
-        """
+
+    select_sql = sql.SQL("""
         SELECT id, chunk, embedding <=> %s AS score
-        FROM chunks_vector
+        FROM {}
         ORDER BY embedding <=> %s
         LIMIT 2;
-        """,
-        (q, q),
-    )
+        """).format(sql.Identifier(VECTOR_TABLE_NAME))
+    cur.execute(select_sql, (q, q))
+            
     print("\n\nTOP 2  SEARCH RESULTS = \n\n")
     with open("/data/top-2.txt", "w", encoding="utf-8") as f:
         for row in cur.fetchall():
             f.write(str(row) + "\n\n")
+            print("CHUNK: ", str(row))
 
