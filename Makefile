@@ -19,6 +19,9 @@ load:
 retrieve:
 	docker compose run --rm retriever
 
+chat:
+	docker compose run --rm chatter
+
 down:
 	docker compose down
 
