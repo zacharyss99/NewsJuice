@@ -1,65 +1,100 @@
 '''
 Retriever service
 
-Asks for a user brief, does an embedding of it,
-and retrives 2 best articles from DB
+Can be used in two ways:
+1. Standalone: Asks for user input and retrieves 2 best articles
+2. Importable: Provides search_articles() function for other services
 
 Inputs:
-Runtime input from user   ---- text input from prompt
+- Runtime input from user (standalone mode)
+- Query string parameter (function mode)
 
 Outputs:
-./artifacts/2-best.txt     --- text file with the 2 best articles
-
+- ./artifacts/top-2.txt (standalone mode)
+- List of article chunks (function mode)
 '''
 
-# pip install psycopg2-binary pgvector
 import psycopg
 from pgvector.psycopg import register_vector, Vector
-
 import os
+from sentence_transformers import SentenceTransformer
+from typing import List, Tuple, Optional
+
+# Configuration
 DB_URL = os.environ["DATABASE_URL"]       
-#DB_URL=postgresql://postgres:Newsjuice25%2B@host.docker.internal:5432/newsdb # for use with container
-#DB_URL = "postgresql://postgres:Newsjuice25%2B@127.0.0.1:5432/newsdb"  # for use standalone; run proxy as well
 TIMEOUT = 10.0
 USER_AGENT = "minimal-rag-ingest/0.1"
 
-from sentence_transformers import SentenceTransformer
+# Initialize model (this will be loaded once when module is imported)
 model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
+def get_db_connection():
+    """Get a database connection with vector support."""
+    conn = psycopg.connect(DB_URL, autocommit=True)
+    register_vector(conn)
+    return conn
 
-conn = psycopg.connect(DB_URL, autocommit=True)
-    #host="YOUR_CLOUDSQL_HOST",  # e.g. 127.0.0.1 if using Cloud SQL Proxy
-    #dbname="YOUR_DB",
-    #user="YOUR_USER",
-    #password="YOUR_PASSWORD",
-    #port=5432,)
-
-register_vector(conn)
-
-search_text = input("Search text ? : ")
-
-# Query embedding
-q = Vector(model.encode(search_text).tolist())
-
-with conn, conn.cursor() as cur:
-    # Choose one distance operator:
-    #   <->  Euclidean   |  <#>  Inner product  |  <=>  Cosine distance
-    cur.execute("SELECT current_database(), version();")
-    db_name, db_version = cur.fetchone()
-    print(f"[db] Connected successfully to '{db_name}'")
-    print(f"[db] Server version: {db_version}")    
+def search_articles(query: str, limit: int = 2) -> List[Tuple[int, str, float]]:
+    """
+    Search for articles using semantic similarity.
     
-    cur.execute(
-        """
-        SELECT id, chunk, embedding <=> %s AS score
-        FROM chunks_vector
-        ORDER BY embedding <=> %s
-        LIMIT 2;
-        """,
-        (q, q),
-    )
-    print("\n\nTOP 2  SEARCH RESULTS = \n\n")
-    with open("/data/top-2.txt", "w", encoding="utf-8") as f:
-        for row in cur.fetchall():
-            f.write(str(row) + "\n\n")
+    Args:
+        query: The search query string
+        limit: Maximum number of results to return (default: 2)
+    
+    Returns:
+        List of tuples: (id, chunk, score) for each matching article
+    """
+    try:
+        # Query embedding
+        q = Vector(model.encode(query).tolist())
+        
+        with get_db_connection() as conn, conn.cursor() as cur:
+            # Test database connection
+            cur.execute("SELECT current_database(), version();")
+            db_name, db_version = cur.fetchone()
+            print(f"[retriever] Connected to '{db_name}'")
+            
+            # Search for similar chunks
+            cur.execute(
+                """
+                SELECT id, chunk, embedding <=> %s AS score
+                FROM chunks_vector
+                ORDER BY embedding <=> %s
+                LIMIT %s;
+                """,
+                (q, q, limit),
+            )
+            
+            results = cur.fetchall()
+            print(f"[retriever] Found {len(results)} results for query: '{query[:50]}...'")
+            return results
+            
+    except Exception as e:
+        print(f"[retriever] Error searching articles: {e}")
+        return []
+
+def main():
+    """Standalone mode: Ask user for input and search articles."""
+    print("Retriever Service - Standalone Mode")
+    print("=" * 40)
+    
+    search_text = input("Search text ? : ")
+    
+    # Search for articles
+    results = search_articles(search_text, limit=2)
+    
+    if results:
+        print("\n\nTOP 2 SEARCH RESULTS = \n\n")
+        with open("/data/top-2.txt", "w", encoding="utf-8") as f:
+            for row in results:
+                print(f"ID: {row[0]}, Score: {row[2]:.4f}")
+                print(f"Chunk: {row[1][:100]}...")
+                print("-" * 50)
+                f.write(str(row) + "\n\n")
+    else:
+        print("No results found.")
+
+if __name__ == "__main__":
+    main()
 

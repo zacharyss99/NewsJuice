@@ -12,8 +12,9 @@ import os
 import sys
 import psycopg
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Tuple
 import json
+import requests
 from google.oauth2 import service_account
 from vertexai.generative_models import GenerativeModel
 
@@ -83,18 +84,54 @@ def get_user_input() -> tuple[str, str]:
     except KeyboardInterrupt:
         print("\nExiting...")
         sys.exit(0)
+    except EOFError:
+        print("\nNo more input available. Exiting...")
+        sys.exit(0)
     except Exception as e:
         print(f"Error getting input: {e}")
         return get_user_input()
 
 
-def call_gemini_api(question: str) -> tuple[Optional[str], Optional[str]]:
-    """Call Google Gemini API with the question."""
+def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
+    """Call the retriever service to get relevant articles."""
+    try:
+        # Use the retriever function directly since we're in the same environment
+        # This is a temporary solution - in production, this would be an HTTP API call
+        import sys
+        sys.path.append('/app/retriever')
+        from retriever import search_articles
+        
+        articles = search_articles(query, limit=2)
+        return articles
+    except Exception as e:
+        print(f"Error calling retriever service: {e}")
+        return []
+
+def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) -> tuple[Optional[str], Optional[str]]:
+    """Call Google Gemini API with the question and optional context articles."""
     if not model:
         return None, "Gemini API not configured"
     
     try:
-        response = model.generate_content(question)
+        # Build the prompt with context if articles are provided
+        if context_articles:
+            context_text = "\n\n".join([
+                f"Article {i+1} (Relevance Score: {score:.3f}):\n{chunk[:500]}..."
+                for i, (_, chunk, score) in enumerate(context_articles)
+            ])
+            
+            prompt = f"""Based on the following relevant news articles, please answer the user's question. If the articles don't contain enough information to answer the question, please say so.
+
+RELEVANT ARTICLES:
+{context_text}
+
+USER QUESTION: {question}
+
+Please provide a helpful response based on the articles above:"""
+        else:
+            prompt = question
+        
+        response = model.generate_content(prompt)
         return response.text, None
     except Exception as e:
         return None, str(e)
@@ -154,9 +191,23 @@ def main():
             print(f"\nProcessing question for user: {user_id}")
             print(f"Question: {question}")
             
-            # Call Gemini API
-            print("Calling Gemini API...")
-            response, error = call_gemini_api(question)
+            # Step 1: Call retriever service to get relevant articles
+            print("Calling retriever service...")
+            try:
+                relevant_articles = call_retriever_service(question)
+                if relevant_articles:
+                    print(f"Found {len(relevant_articles)} relevant articles")
+                    for i, (_, chunk, score) in enumerate(relevant_articles):
+                        print(f"  Article {i+1}: Score {score:.3f}, Preview: {chunk[:100]}...")
+                else:
+                    print("No relevant articles found")
+            except Exception as e:
+                print(f"Error calling retriever service: {e}")
+                relevant_articles = []
+            
+            # Step 2: Call Gemini API with context
+            print("Calling Gemini API with context...")
+            response, error = call_gemini_api(question, relevant_articles)
             
             if response:
                 print(f"\nGemini Response:\n{response}")
