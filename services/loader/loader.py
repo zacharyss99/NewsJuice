@@ -1,28 +1,36 @@
 '''
+
 loader service
 
-takes the jsonl file `./artifacts/news.jsonl`, which contains the scraped news articles,
-chunks them, does embedding and loads the chunks into the vector database
+* Reads from "articles" database in DB "newsbd" (all "new" articles i.e. vflag =0)
+* Chunks the articles and embeds the chunks
+* Loads to the "chunks_vector" table in the DB "newsdb"
+
+* Chunking (semantic version) uses Vertex api for embedding 
+* Final chunks will be embedded with "sentence-transformers/all-mpnet-base-v2" 
+so it the same embedding model as used for the retriever service
 
 
-* chunking (semantic version) uses OpenAI api for embedding
-* but final chunks will be embedded with XYZ so it is consistent with embedding used for retrieval 
+* NOTE: FOR TESTING USE:  
+ARTICLES_TABLE_NAME = "articles_test"
+VECTOR_TABLE_NAME = "chunks_vector_test"
 '''
 
+# ###
+#ARTICLES_TABLE_NAME = "articles"
+ARTICLES_TABLE_NAME = "articles_test"
+
+#VECTOR_TABLE_NAME = "chunks_vector"
+VECTOR_TABLE_NAME = "chunks_vector_test"
+
+
 import uuid
-
 import pandas as pd
-#app/main.py
-#---import httpx
-#---import feedparser
-
 import psycopg
-
+from psycopg import sql
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from dateutil import parser as dateparser
-
-
 
 # Vertex AI
 from google import genai
@@ -31,38 +39,39 @@ from google.genai.types import Content, Part, GenerationConfig, ToolConfig
 from google.genai import errors
 from google.genai import types
 
-from google.cloud import storage
+#from google.cloud import storage
 
-BUCKET_NAME = "newsjuice-data-exchange"
+#BUCKET_NAME = "newsjuice-data-exchange"
 
 from typing import List
 
-EMBEDDING_MODEL = "text-embedding-004"
-EMBEDDING_DIM = 768 #256
+
 # Langchain
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
+
 #from vertex_embeddings import VertexEmbeddings
-
-from langchain_openai import OpenAIEmbeddings  # or another embedding provider
-from langchain_huggingface import HuggingFaceEmbeddings
-
+#from langchain_openai import OpenAIEmbeddings  # or another embedding provider
+#from langchain_huggingface import HuggingFaceEmbeddings
 
 from sentence_transformers import SentenceTransformer
 model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 # Load the jsonl file from /data/news.jsonl
 import json, sys, pathlib
-PATH_TO_NEWS= pathlib.Path("/data/news.jsonl")  # for M2 docker-compose version
-PATH_TO_CHUNKS = pathlib.Path("/data/chunked_articles")
+#PATH_TO_NEWS= pathlib.Path("/data/news.jsonl")  # for M2 docker-compose version
+#PATH_TO_CHUNKS = pathlib.Path("/data/chunked_articles")
 #path = pathlib.Path("./news.jsonl")  # for standalone version
 
+
+EMBEDDING_MODEL = "text-embedding-004"
+GENERATIVE_MODEL = "gemini-2.0-flash-001"
+EMBEDDING_DIM = 768 #256
 
 # Parameter for character chunking 
 CHUNK_SIZE_CHAR = 350
 CHUNK_OVERLAP_CHAR = 20
-
 # Parameter for recursive chunking 
 CHUNK_SIZE_RECURSIVE = 350
 
@@ -71,12 +80,11 @@ import os
 DB_URL = os.environ["DATABASE_URL"]       
 #DB_URL= "postgresql://postgres:Newsjuice25%2B@host.docker.internal:5432/newsdb" # for use with container
 #DB_URL = "postgresql://postgres:Newsjuice25%2B@127.0.0.1:5432/newsdb"  # for use standalone; run proxy as well
-TIMEOUT = 10.0
-USER_AGENT = "minimal-rag-ingest/0.1"
+#TIMEOUT = 10.0
+#USER_AGENT = "minimal-rag-ingest/0.1"
 
-EMBEDDING_MODEL = "text-embedding-004"
-EMBEDDING_DIMENSION = 768 #256
-GENERATIVE_MODEL = "gemini-2.0-flash-001"
+from pgvector.psycopg import register_vector
+
 
 class VertexEmbeddings:
     def __init__(self):
@@ -102,32 +110,29 @@ class VertexEmbeddings:
 
     def embed_query(self, text: str) -> List[float]:
         return self._embed_one(text)
-
-def upload_to_gcs(bucket_name, source_file_path, destination_blob_name):
-    """Uploads a file to the bucket."""
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(source_file_path)
-    print(f"✅ File {source_file_path} uploaded to gs://{bucket_name}/{destination_blob_name}")
-
-
 # Chunking function
 
 def chunk_embed_load(method='char-split'):
-    PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
+    #PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
 
     conn = psycopg.connect(DB_URL, autocommit=True)
+
+    register_vector(conn)
+
     cur = conn.cursor()
 
-    # Fetch pending articles
-    cur.execute("""
-        SELECT id, author, title, summary, content,
-               source_link, source_type, fetched_at, published_at,
-               vflag, article_id
-        FROM articles
-        WHERE vflag = 0;
-    """)
+    # Fetch new articles from articles table (vflag = 0)
+    cur.execute(
+        sql.SQL("""
+            SELECT id, author, title, summary, content,
+                source_link, source_type, fetched_at, published_at,
+                vflag, article_id
+            FROM {}
+            WHERE vflag = 0;
+        """).format(sql.Identifier(ARTICLES_TABLE_NAME))
+)
+
+
     rows = cur.fetchall()
 
     # Prepare semantic splitter once (if requested)
@@ -137,9 +142,9 @@ def chunk_embed_load(method='char-split'):
         sem_splitter = SemanticChunker(embeddings=emb)
 
     for i, row in enumerate(rows, start=1):
-        (_id, author, title, summary, content,
-         source_link, source_type, fetched_at, published_at,
-         vflag, article_id) = row
+        (id, author, title, summary, content,
+            source_link, source_type, fetched_at, published_at,
+            vflag, article_id) = row
 
         # --- Chunking ---
         if method == "char-split":
@@ -181,22 +186,22 @@ def chunk_embed_load(method='char-split'):
         df["chunk_index"] = range(len(df))
         df["article_id"] = article_id
         # Final embeddings (align with retrieval model)
-        df["embedding"] = [model.encode(t).tolist() for t in df["chunk"]]
-
+        df["embedding"] = [model.encode(t).tolist() for t in df["chunk"]] # sentence-transformers/all-mpnet-base-v2
         # --- Insert chunks ---
         inserted = 0
         for _, r in df.iterrows():
+            # --- INSERT chunk row into vector table ---
+            insert_sql = sql.SQL("""
+                INSERT INTO {} (
+                    author, title, summary, content,
+                    source_link, source_type, fetched_at, published_at,
+                    chunk, chunk_index, embedding, article_id
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """).format(sql.Identifier(VECTOR_TABLE_NAME))
+
             cur.execute(
-                """
-                INSERT INTO chunks_vector
-                  (author, title, summary, content,
-                   source_link, source_type, fetched_at, published_at,
-                   chunk, chunk_index, embedding, article_id)
-                VALUES
-                  (%s, %s, %s, %s,
-                   %s, %s, %s, %s,
-                   %s, %s, %s, %s);
-                """,
+                insert_sql,
                 (
                     r["author"],
                     r["title"],
@@ -208,18 +213,19 @@ def chunk_embed_load(method='char-split'):
                     r["published_at"],
                     r["chunk"],
                     int(r["chunk_index"]),
-                    json.dumps(r["embedding"]),   # If pgvector VECTOR(768), pass list directly and remove dumps
+                    r["embedding"],     # ⚠️ pass the Python list directly if pgvector
                     r["article_id"],
                 )
             )
-            inserted += 1
-        print("Inserted chunks:", inserted)
 
-        # --- Mark this article processed (parameterized) ---
-        cur.execute(
-            "UPDATE articles SET vflag = 1 WHERE article_id = %s;",
-            (article_id,)
-        )
+        # --- UPDATE article as processed ---
+        update_sql = sql.SQL("""
+            UPDATE {} 
+            SET vflag = 1 
+            WHERE article_id = %s
+        """).format(sql.Identifier(ARTICLES_TABLE_NAME))
+
+        cur.execute(update_sql, (article_id,))
 
     cur.close()
     conn.close()
@@ -227,13 +233,6 @@ def chunk_embed_load(method='char-split'):
 def main():
 
     chunk_embed_load("semantic-split")
-
-    # Bucket upload test
-    upload_to_gcs(
-        BUCKET_NAME, 
-        "/data/news.jsonl", 
-        "news2.jsonl")
- 
 
 if __name__ == "__main__":
     main()
