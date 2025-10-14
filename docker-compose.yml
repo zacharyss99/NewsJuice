@@ -78,6 +78,7 @@ services:
       - dbproxy
     volumes:
       - ./services/chatter:/app
+      - ./services/retriever:/app/retriever
       - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
       - ../secrets/gemini-service-account.json:/run/secrets/gemini-service-account.json:ro
     environment:
