@@ -27,14 +27,20 @@ News Sources:
 '''
 
 import json
+import sys
+import argparse
 from pathlib import Path
 from gazette_scraper import GazetteArticleScraper
 from crimson_scraper import CrimsonArticleScraper
 
-out = Path("artifacts/news.jsonl") # for docker-compose
-out.parent.mkdir(parents=True, exist_ok=True)
-
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Scrape news articles')
+    parser.add_argument('--out', default='artifacts/news.jsonl', help='Output file path')
+    args = parser.parse_args()
+    
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
 
     print("\nStarting Gazette Scraper")
     gazzet_scraper = GazetteArticleScraper(test_mode=False)
