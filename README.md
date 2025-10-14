@@ -1,4 +1,4 @@
-# NewsJuice Prototype Pipeline (WIP for Milestone 2)
+# NewsJuice Prototype Pipeline (Milestone 2)
 
 This repository contains the **NewsJuice Prototype Pipeline**, a containerized system for **scraping**, **processing**, **retrieving**, and **summarizing** news content.  
 
@@ -6,9 +6,9 @@ This repository contains the **NewsJuice Prototype Pipeline**, a containerized s
 
 ## ⚙️ Pipeline Overview
 
-Here pict-> **NEEDS UPDATE**
 
-![Project logo](app-diagram.png)
+
+![Project logo](app_architectue.png)
 
 The pipeline consists of **four containers**, each responsible for a distinct stage of processing.  
 A **PostgreSQL vector database** hosted on **Google Cloud SQL (GCS)** is used for storage and exchange of information.
@@ -22,20 +22,19 @@ A **PostgreSQL vector database** hosted on **Google Cloud SQL (GCS)** is used fo
    - Stores the articles in the `articles` table of the BD
 
 2. **📥 Loader**  
-   - Loads articles from `articles` table (only entries with vflag = 0) 
+   - Loads articles from `articles` table in the DB (only entries with vflag = 0, this flag indicates which article is already chunked and vectorized) 
    - Performs **chunking & embedding**  
-   - Adds chunks to the **vector database** (table `chunks_vector`)  
+   - Adds new article chunks to the **vector DB** (table `chunks_vector`)  
 
-3. **🔍 Retriever**  **NEEDS UPDATE**
+3. **🔍 Retriever**  
    - Prompts the user for a **news briefing**  
    - Embeds the **news briefing**  
    - Retrieves top-x relevant entries from the **vector database** 
-   - Carries out a LLM query based on user preferences, news brief and retrieved top-x articles
 
-4. **📝 Summarizer** [NOT YET THERE]  
-   - Reads `top-2.txt`
-   - Calls an **LLM** to generate a **summary**  
-   - Saves output to `summary.txt`  
+4. **📝 Summarizer**  
+   - Builds an augmented **query** based on user preferences (later), interaction history (later), news brief and retrieved top-x articles
+   - Calls an LLM to generate a **summary**  
+   - Produces a pocast **audio file** from the summary
 
 ---
 
