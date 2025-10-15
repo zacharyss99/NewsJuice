@@ -95,20 +95,21 @@ def get_user_input() -> tuple[str, str]:
 def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
     """Call the retriever service to get relevant articles."""
     try:
-        # Use the retriever function directly since we're in the same environment
-        # This is a temporary solution - in production, this would be an HTTP API call
+        # Import the retriever function directly since we're in the same environment
         import sys
         sys.path.append('/app/retriever')
         from retriever import search_articles
         
+        print(f"[retriever] Searching for: '{query[:50]}...'")
         articles = search_articles(query, limit=2)
+        print(f"[retriever] Found {len(articles)} relevant chunks")
         return articles
     except Exception as e:
-        print(f"Error calling retriever service: {e}")
+        print(f"[retriever-error] Error calling retriever service: {e}")
         return []
 
 def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) -> tuple[Optional[str], Optional[str]]:
-    """Call Google Gemini API with the question and optional context articles."""
+    """Call Google Gemini API with the question and context articles to generate a podcast-style response."""
     if not model:
         return None, "Gemini API not configured"
     
@@ -116,20 +117,31 @@ def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]
         # Build the prompt with context if articles are provided
         if context_articles:
             context_text = "\n\n".join([
-                f"Article {i+1} (Relevance Score: {score:.3f}):\n{chunk[:500]}..."
+                f"News Article {i+1} (Relevance Score: {score:.3f}):\n{chunk}"
                 for i, (_, chunk, score) in enumerate(context_articles)
             ])
             
-            prompt = f"""Based on the following relevant news articles, please answer the user's question. If the articles don't contain enough information to answer the question, please say so.
+            prompt = f"""You are a news podcast host. Based on the following relevant news articles, create an engaging podcast-style response to the user's question. 
 
-RELEVANT ARTICLES:
+RELEVANT NEWS ARTICLES:
 {context_text}
 
 USER QUESTION: {question}
 
-Please provide a helpful response based on the articles above:"""
+Please create a podcast-style response that:
+1. Starts with a warm, engaging introduction
+2. Directly addresses the user's question using information from the articles
+3. Weaves together insights from the relevant news articles
+4. Maintains a conversational, podcast-like tone
+5. Ends with a thoughtful conclusion
+
+If the articles don't contain enough information to fully answer the question, acknowledge this and provide what insights you can while being transparent about limitations.
+
+Format your response as if you're speaking directly to the listener in a podcast episode."""
         else:
-            prompt = question
+            prompt = f"""You are a news podcast host. The user has asked: "{question}"
+
+However, no relevant news articles were found to provide context. Please provide a thoughtful response acknowledging this limitation and suggest how the user might find more information about their question."""
         
         response = model.generate_content(prompt)
         return response.text, None
@@ -160,9 +172,18 @@ def log_conversation(user_id: str, question: str, response: Optional[str], error
 
 
 def main():
-    """Main function."""
-    print("=== NewsJuice Chatter Service ===")
-    print("Connecting to database...")
+    """Main function implementing the complete workflow:
+    1. User provides user_id and query
+    2. Chatter calls retriever service
+    3. Retriever embeds query and searches chunks_vector_test for top 2 chunks
+    4. Retriever returns chunks to chatter
+    5. Chatter calls Gemini API with query and chunks as context
+    6. Gemini generates podcast-style response
+    """
+    print("=== NewsJuice Podcast Generator ===")
+    print("🎙️  Welcome to the NewsJuice Podcast Service!")
+    print("📰 This service will help you create personalized news podcasts")
+    print("🔗 Connecting to database...")
     
     # Test database connection and create table
     try:
@@ -192,27 +213,31 @@ def main():
             print(f"Question: {question}")
             
             # Step 1: Call retriever service to get relevant articles
-            print("Calling retriever service...")
+            print("\n🔍 Step 1: Retrieving relevant news articles...")
             try:
                 relevant_articles = call_retriever_service(question)
                 if relevant_articles:
-                    print(f"Found {len(relevant_articles)} relevant articles")
+                    print(f"✅ Found {len(relevant_articles)} relevant article chunks")
                     for i, (_, chunk, score) in enumerate(relevant_articles):
-                        print(f"  Article {i+1}: Score {score:.3f}, Preview: {chunk[:100]}...")
+                        print(f"  📰 Chunk {i+1}: Relevance Score {score:.3f}")
+                        print(f"     Preview: {chunk[:100]}...")
                 else:
-                    print("No relevant articles found")
+                    print("⚠️  No relevant articles found")
             except Exception as e:
-                print(f"Error calling retriever service: {e}")
+                print(f"❌ Error calling retriever service: {e}")
                 relevant_articles = []
             
-            # Step 2: Call Gemini API with context
-            print("Calling Gemini API with context...")
+            # Step 2: Call Gemini API with context to generate podcast
+            print(f"\n🎙️  Step 2: Generating podcast response with Gemini API...")
             response, error = call_gemini_api(question, relevant_articles)
             
             if response:
-                print(f"\nGemini Response:\n{response}")
+                print(f"\n🎧 PODCAST RESPONSE:")
+                print("=" * 60)
+                print(response)
+                print("=" * 60)
             else:
-                print(f"\nError calling Gemini API: {error}")
+                print(f"\n❌ Error generating podcast: {error}")
             
             # Log conversation
             log_conversation(user_id, question, response, error)
@@ -231,7 +256,8 @@ def main():
             print(f"Unexpected error: {e}")
             continue
     
-    print("Thank you for using NewsJuice Chatter Service!")
+    print("🎧 Thank you for using NewsJuice Podcast Generator!")
+    print("📰 Keep up with the latest news in podcast format!")
 
 
 if __name__ == "__main__":

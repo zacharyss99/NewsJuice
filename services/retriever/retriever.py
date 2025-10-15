@@ -13,11 +13,11 @@ Outputs:
 - ./artifacts/top-2.txt (standalone mode)
 - List of article chunks (function mode)
 
-NOTE: for testing use: VECTOR_TABLE_NAME = "chunks_vector_test"
+NOTE: for testing use: #VECTOR_TABLE_NAME = "chunks_vector_test"
 '''
 
-VECTOR_TABLE_NAME = "chunks_vector_test"
-#VECTOR_TABLE_NAME = "chunks_vector"
+VECTOR_TABLE_NAME = "chunks_vector"
+#VECTOR_TABLE_NAME = "chunks_vector_test"
 
 import psycopg
 from pgvector.psycopg import register_vector, Vector
@@ -78,28 +78,7 @@ def search_articles(query: str, limit: int = 2) -> List[Tuple[int, str, float]]:
         print(f"[retriever] Error searching articles: {e}")
         return []
 
-def main():
-    """Standalone mode: Ask user for input and search articles."""
-    print("Retriever Service - Standalone Mode")
-    print("=" * 40)
-    
-    search_text = input("Search text ? : ")
-    
-    # Search for articles
-    results = search_articles(search_text, limit=2)
-    
-    if results:
-        print("\n\nTOP 2 SEARCH RESULTS = \n\n")
-        with open("/data/top-2.txt", "w", encoding="utf-8") as f:
-            for row in results:
-                print(f"ID: {row[0]}, Score: {row[2]:.4f}")
-                print(f"Chunk: {row[1][:100]}...")
-                print("-" * 50)
-                f.write(str(row) + "\n\n")
-    else:
-        print("No results found.")
-
-if __name__ == "__main__":
-    main()
->>>>>>> origin/feature/retriever-chatter-no-summarizer
+# Retriever service is designed to be called by other services
+# Use search_articles(query, limit) function directly
+# No standalone mode - only function-based API
 
