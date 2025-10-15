@@ -9,6 +9,7 @@ dependencies = [
   "trafilatura>=1.9.0",
   "tqdm>=4.66.4",
   "beautifulsoup4>=4.12.2", 
-  "playwright>=1.42.0"
+  "playwright>=1.42.0",
+  "psycopg[binary]>=3.2.10",
 
 ]
