@@ -1,10 +1,10 @@
-.PHONY: run build scrape load retrieve up-proxy down clean rebuild
+.PHONY: run build scrape load chat up-proxy down clean rebuild
 
-run: build up-proxy scrape load retrieve chat
+run: build up-proxy scrape load
 	@echo "✅ Pipeline finished."
 
 build:
-	docker compose build
+	docker compose build scraper loader
 
 up-proxy:
 	docker compose up -d dbproxy
@@ -15,9 +15,6 @@ scrape:
 
 load:
 	docker compose run --rm loader
-
-retrieve:
-	docker compose run --rm retriever
 
 chat:
 	docker compose run --rm chatter
