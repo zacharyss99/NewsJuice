@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 import json
 import requests
+import subprocess
+import tempfile
 from google.oauth2 import service_account
 from vertexai.generative_models import GenerativeModel
 
@@ -108,6 +110,78 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
         print(f"[retriever-error] Error calling retriever service: {e}")
         return []
 
+def call_tts_service(text: str) -> Optional[str]:
+    """Call the TTS service to generate audio from text."""
+    try:
+        # Import the TTS function directly since we're in the same environment
+        import sys
+        sys.path.append('/app/tts')
+        from tts import generate_podcast_audio
+        
+        print(f"[tts] Generating audio for podcast...")
+        audio_path = generate_podcast_audio(text)
+        if audio_path:
+            print(f"[tts] Audio generated successfully")
+        return audio_path
+    except Exception as e:
+        print(f"[tts-error] Error calling TTS service: {e}")
+        return None
+
+def play_audio(audio_path: str) -> bool:
+    """Play audio file to user."""
+    try:
+        if not audio_path or not os.path.exists(audio_path):
+            print("[audio-error] Audio file not found")
+            return False
+        
+        print(f"🎧 Playing podcast audio...")
+        print(f"📁 Audio file: {audio_path}")
+        
+        # Try to play audio using available players
+        players = ['mpv', 'mplayer', 'play', 'aplay']
+        for player in players:
+            try:
+                subprocess.run([player, audio_path], check=True, capture_output=True)
+                print(f"[audio] Played using {player}")
+                return True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                continue
+        
+        # If no player found, try to play with system default
+        try:
+            subprocess.run(['open', audio_path], check=True)
+            print(f"[audio] Opened with system default player")
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+        
+        print("[audio-warning] No audio player found. Audio file saved but not played.")
+        print(f"[audio-info] You can manually play: {audio_path}")
+        
+        # Show local file path if it's in the mounted volume
+        if "/tmp/audio_output" in audio_path:
+            local_path = audio_path.replace("/tmp/audio_output", "./audio_output")
+            print(f"[audio-info] Local file path: {local_path}")
+            print(f"[audio-info] Run: mpv {local_path}")
+        
+        return False
+        
+    except Exception as e:
+        print(f"[audio-error] Failed to play audio: {e}")
+        return False
+
+def cleanup_audio(audio_path: str) -> None:
+    """Clean up temporary audio file."""
+    try:
+        # Don't delete files in audio_output directory - keep them for user access
+        if audio_path and os.path.exists(audio_path) and "/tmp/audio_output" not in audio_path:
+            os.remove(audio_path)
+            print(f"[audio] Cleaned up temporary audio file: {audio_path}")
+        elif "/tmp/audio_output" in audio_path:
+            print(f"[audio] Audio file saved for user access: {audio_path}")
+    except Exception as e:
+        print(f"[audio-warning] Failed to cleanup audio file: {e}")
+
 def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) -> tuple[Optional[str], Optional[str]]:
     """Call Google Gemini API with the question and context articles to generate a podcast-style response."""
     if not model:
@@ -122,6 +196,7 @@ def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]
             ])
             
             prompt = f"""You are a news podcast host. Based on the following relevant news articles, create an engaging podcast-style response to the user's question. 
+            Please limit the podcast generation to one minute at maximum.  
 
 RELEVANT NEWS ARTICLES:
 {context_text}
@@ -232,10 +307,30 @@ def main():
             response, error = call_gemini_api(question, relevant_articles)
             
             if response:
-                print(f"\n🎧 PODCAST RESPONSE:")
+                print(f"\n📝 PODCAST TEXT:")
                 print("=" * 60)
                 print(response)
                 print("=" * 60)
+                
+                # Step 3: Generate audio from podcast text
+                print(f"\n🎵 Step 3: Converting podcast to audio...")
+                audio_path = call_tts_service(response)
+                
+                if audio_path:
+                    # Step 4: Play audio to user
+                    print(f"\n🎧 Step 4: Playing podcast audio...")
+                    play_success = play_audio(audio_path)
+                    
+                    if play_success:
+                        print(f"\n✅ Podcast audio played successfully!")
+                    else:
+                        print(f"\n⚠️  Audio generated but couldn't play automatically")
+                        print(f"📁 Audio file saved at: {audio_path}")
+                    
+                    # Cleanup audio file
+                    cleanup_audio(audio_path)
+                else:
+                    print(f"\n❌ Failed to generate audio")
             else:
                 print(f"\n❌ Error generating podcast: {error}")
             

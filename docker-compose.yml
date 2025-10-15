@@ -71,7 +71,7 @@ services:
       && exec /home/app/.venv/bin/python retriever.py --out /data/news.jsonl
     restart: "no"
 
-  # Step 4 — chatter: interactive chat service with Gemini API
+  # Step 4 — chatter: interactive chat service with Gemini API and TTS
   chatter:
     build: ./services/chatter
     depends_on:
@@ -79,12 +79,15 @@ services:
     volumes:
       - ./services/chatter:/app
       - ./services/retriever:/app/retriever
-      - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
+      - ./services/tts:/app/tts
+      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
       - ../secrets/gemini-service-account.json:/run/secrets/gemini-service-account.json:ro
+      - ./audio_output:/tmp/audio_output
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
       DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
       GEMINI_SERVICE_ACCOUNT_PATH: /run/secrets/gemini-service-account.json
+      TTS_SERVICE_ACCOUNT_PATH: /run/secrets/gcp.json
       GOOGLE_CLOUD_PROJECT: "newsjuice-123456"
       GOOGLE_CLOUD_REGION: "us-central1"
     working_dir: /app
@@ -96,6 +99,29 @@ services:
     - >
       /home/app/.venv/bin/python wait_for_db.py
       && exec /home/app/.venv/bin/python chatter.py
+    restart: "no"
+
+  # TTS service for text-to-speech conversion
+  tts:
+    build: ./services/tts
+    depends_on:
+      - dbproxy
+    volumes:
+      - ./services/tts:/app
+      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      TTS_SERVICE_ACCOUNT_PATH: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      GOOGLE_CLOUD_PROJECT: "newsjuice-123456"
+      GOOGLE_CLOUD_REGION: "us-central1"
+    working_dir: /app
+    command:
+    - sh
+    - -lc
+    - >
+      python3 wait_for_db.py
+      && exec python3 tts.py
     restart: "no"
     
   # Cloud SQL Auth Proxy so the processor can reach your DB
