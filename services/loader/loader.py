@@ -16,21 +16,21 @@ ARTICLES_TABLE_NAME = "articles_test"
 VECTOR_TABLE_NAME = "chunks_vector_test"
 '''
 
-# ###
+# Set the table name used
 ARTICLES_TABLE_NAME = "articles"
 #ARTICLES_TABLE_NAME = "articles_test"
-
 VECTOR_TABLE_NAME = "chunks_vector"
 #VECTOR_TABLE_NAME = "chunks_vector_test"
 
 
-import uuid
 import pandas as pd
 import psycopg
 from psycopg import sql
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from dateutil import parser as dateparser
+from typing import List
+import json, sys, pathlib
 
 # Vertex AI
 from google import genai
@@ -39,40 +39,23 @@ from google.genai.types import Content, Part, GenerationConfig, ToolConfig
 from google.genai import errors
 from google.genai import types
 
-#from google.cloud import storage
-
-#BUCKET_NAME = "newsjuice-data-exchange"
-
-from typing import List
-
-
 # Langchain
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
-
-#from vertex_embeddings import VertexEmbeddings
-#from langchain_openai import OpenAIEmbeddings  # or another embedding provider
-#from langchain_huggingface import HuggingFaceEmbeddings
-
 from sentence_transformers import SentenceTransformer
-model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
-# Load the jsonl file from /data/news.jsonl
-import json, sys, pathlib
-#PATH_TO_NEWS= pathlib.Path("/data/news.jsonl")  # for M2 docker-compose version
-#PATH_TO_CHUNKS = pathlib.Path("/data/chunked_articles")
-#path = pathlib.Path("./news.jsonl")  # for standalone version
+
+model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 
 EMBEDDING_MODEL = "text-embedding-004"
 GENERATIVE_MODEL = "gemini-2.0-flash-001"
 EMBEDDING_DIM = 768 #256
 
-# Parameter for character chunking 
+# Parameter for chunking 
 CHUNK_SIZE_CHAR = 350
 CHUNK_OVERLAP_CHAR = 20
-# Parameter for recursive chunking 
 CHUNK_SIZE_RECURSIVE = 350
 
 
@@ -80,7 +63,6 @@ import os
 DB_URL = os.environ["DATABASE_URL"]       
 #DB_URL= "postgresql://postgres:Newsjuice25%2B@host.docker.internal:5432/newsdb" # for use with container
 #DB_URL = "postgresql://postgres:Newsjuice25%2B@127.0.0.1:5432/newsdb"  # for use standalone; run proxy as well
-#TIMEOUT = 10.0
 #USER_AGENT = "minimal-rag-ingest/0.1"
 
 from pgvector.psycopg import register_vector
@@ -110,10 +92,9 @@ class VertexEmbeddings:
 
     def embed_query(self, text: str) -> List[float]:
         return self._embed_one(text)
-# Chunking function
 
+# Chunking function
 def chunk_embed_load(method='char-split'):
-    #PATH_TO_CHUNKS.mkdir(parents=True, exist_ok=True)
 
     conn = psycopg.connect(DB_URL, autocommit=True)
 
@@ -130,8 +111,7 @@ def chunk_embed_load(method='char-split'):
             FROM {}
             WHERE vflag = 0;
         """).format(sql.Identifier(ARTICLES_TABLE_NAME))
-)
-
+    )
 
     rows = cur.fetchall()
 
@@ -213,12 +193,12 @@ def chunk_embed_load(method='char-split'):
                     r["published_at"],
                     r["chunk"],
                     int(r["chunk_index"]),
-                    r["embedding"],     # ⚠️ pass the Python list directly if pgvector
+                    r["embedding"],     
                     r["article_id"],
                 )
             )
 
-        # --- UPDATE article as processed ---
+        # UPDATE article as processed
         update_sql = sql.SQL("""
             UPDATE {} 
             SET vflag = 1 
