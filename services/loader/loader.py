@@ -2,7 +2,7 @@
 
 loader service
 
-* Reads from "articles" database in DB "newsbd" (all "new" articles i.e. vflag =0)
+* Reads from "articles" table in DB "newsbd" (all new articles i.e. vflag =0)
 * Chunks the articles and embeds the chunks
 * Loads to the "chunks_vector" table in the DB "newsdb"
 
