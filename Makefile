@@ -17,7 +17,10 @@ load:
 
 # retrieve:  # Retriever is called by chatter service, not run standalone
 
-chat:  ## Start interactive podcast generation with Gemini (includes retrieval)
+tts:  ## Test TTS service
+	docker compose run --rm tts
+
+chat:  ## Start interactive podcast generation with Gemini and TTS (includes retrieval)
 	docker compose run --rm chatter
 
 down:
