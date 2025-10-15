@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from dateutil import parser as dateparser
 from datetime import timezone, datetime
+from db_manager import PostgresDBManager
 
 """
 Need to use Playwright instead of requests because some of the content such as "date" is rendered in the browser
@@ -17,6 +18,7 @@ class CrimsonArticleScraper:
         self.headless = headless
         self.test_mode = test_mode   #"single_topic", "all_topics", False
         self.wait_ms = wait_ms
+        self.db_manager = PostgresDBManager(url_column="source_link")
         self.topic_urls =[
             "https://www.thecrimson.com/section/news/",
             "https://www.thecrimson.com/tag/editorials/",   #falls under Opinion
@@ -122,9 +124,6 @@ class CrimsonArticleScraper:
                 soup = BeautifulSoup(page.content(), 'html.parser')
                 topic_article_urls = self.extract_article_links(soup)
                 print(f"Found {len(topic_article_urls)} in the topic {topic_url}")
-                if self.test_mode:
-                    topic_article_urls = [topic_article_urls[10]]
-                    print("Example Article URL in topic: ", topic_article_urls)
                 
                 article_urls.extend(topic_article_urls)
 
@@ -134,14 +133,25 @@ class CrimsonArticleScraper:
 
 
 
+            # Normalize URLs to full format
+            normalized_urls = []
+            for url in article_urls:
+                if "https://www.thecrimson.com" not in url:
+                    normalized_urls.append("https://www.thecrimson.com" + url)
+                else:
+                    normalized_urls.append(url)
+            
+            # Filter to only new URLs not in database
+            new_urls = set(self.db_manager.filter_new_urls(normalized_urls))
+            print(f"Found {len(new_urls)} new articles (out of {len(normalized_urls)} total)")
+            
             if self.test_mode:
-                print(len(article_urls))
-                print(f"Articles to test: {article_urls}")
+                print(len(new_urls))
+                print(f"Articles to test: {list(new_urls)[:10]}")
 
             ## Using the article URLs extracted, Navigate to the indevidual articles and extract the main content from it
-            for article_url in tqdm(article_urls):
-                if "https://www.thecrimson.com" not in article_url:        #most of the article URLs dont have the domain name in them
-                    article_url = "https://www.thecrimson.com" + article_url
+            for article_url in tqdm(list(new_urls)):
+                # URL already normalized above
                 page.goto(article_url, wait_until="domcontentloaded")
                 page.wait_for_timeout(1000)
                 html = page.content()
@@ -163,13 +173,6 @@ class CrimsonArticleScraper:
 
                 print()
                 self.all_articles_details.append(article_details)
-
-                if self.test_mode:
-                    print(f"Article URL: {article_details['article_url']}")
-                    print(f"Article Title: {article_details['article_title']}")
-                    print(f"Article Author: {article_details['article_author']}")
-                    print(f"Article Publish Date: {article_details['article_publish_date']}")
-                    print(f"Article Content (first 200 chars): {article_details['article_content'][:200]}")
                     
                 page.wait_for_timeout(200)
 

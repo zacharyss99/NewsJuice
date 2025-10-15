@@ -1,16 +1,15 @@
 .PHONY: run build scrape load retrieve up-proxy down clean rebuild
 
-run: build up-proxy load retrieve  ## Build images, start proxy, run both steps
+run: build up-proxy scrape #load retrieve  ## Build images, start proxy, run both steps
 	@echo "✅ Pipeline finished."
 
 build:
-	docker compose build
+	docker compose build scraper dbproxy
 
 up-proxy:
 	docker compose up -d dbproxy
 
 scrape:
-	mkdir -p artifacts
 	docker compose run --rm scraper
 
 load:
