@@ -12,8 +12,8 @@ so it the same embedding model as used for the retriever service
 
 
 * NOTE: FOR TESTING USE:  
-ARTICLES_TABLE_NAME = "articles_test"
-VECTOR_TABLE_NAME = "chunks_vector_test"
+#ARTICLES_TABLE_NAME = "articles_test"
+#VECTOR_TABLE_NAME = "chunks_vector_test"
 '''
 
 # Set the table name used
