@@ -10,6 +10,5 @@ dependencies = [
   "tqdm>=4.66.4",
   "beautifulsoup4>=4.12.2", 
   "playwright>=1.42.0",
-  "psycopg[binary]>=3.2.10",
-
+  "psycopg[binary]>=3.2.10"
 ]
