@@ -27,31 +27,56 @@ News Sources:
 '''
 
 import json
+import uuid
 from pathlib import Path
 from gazette_scraper import GazetteArticleScraper
 from crimson_scraper import CrimsonArticleScraper
+from db_manager import PostgresDBManager
 
-out = Path("artifacts/news.jsonl") # for docker-compose
-out.parent.mkdir(parents=True, exist_ok=True)
+# out = Path("artifacts/news.jsonl") # for docker-compose
+# out.parent.mkdir(parents=True, exist_ok=True)
 
 def main():
+    db_manager = PostgresDBManager(url_column="source_link")
 
     print("\nStarting Gazette Scraper")
     gazzet_scraper = GazetteArticleScraper(test_mode=False)
     gazzet_details = gazzet_scraper.scrape()
 
     print("\nStarting Crimson Scraper")
-    crimson_scraper = CrimsonArticleScraper(headless=True, test_mode="all_topics", wait_ms=1000)
+    crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     crimson_details = crimson_scraper.scrape()
 
-    all_articles = gazzet_details +crimson_details
+    all_articles = gazzet_details + crimson_details
+    
+    # Map scraper field names to database column names
+    db_records = []
+    for article in all_articles:
+        db_record = {
+            "author": article.get("article_author", ""),
+            "title": article.get("article_title", ""),
+            "summary": article.get("summary", ""),
+            "content": article.get("article_content", ""),
+            "source_link": article.get("article_url", ""),
+            "source_type": article.get("source_type", ""),
+            "fetched_at": article.get("fetched_at"),
+            "published_at": article.get("article_publish_date"),
+            "vflag": 0,  # 0 = new/unprocessed
+            "article_id": str(uuid.uuid4()),  # Generate unique ID
+        }
+        db_records.append(db_record)
+    
+    # Insert into database
+    inserted_count = db_manager.insert_records(db_records)
+    print(f"\n✅ Inserted {inserted_count} new articles into the database.")
+    print(f"Total articles scraped: {len(all_articles)}")
+    print(f"Skipped (already in DB): {len(all_articles) - inserted_count}")
+    
+    # # Optional: still write to JSONL for backup
+    # with out.open("w", encoding="utf-8") as f:
+    #     for article in all_articles:
+    #         f.write(json.dumps(article, ensure_ascii=False) + "\n")    
 
-    with out.open("w", encoding="utf-8") as f:
-        count = 0
-        for article in all_articles:
-            f.write(json.dumps(article, ensure_ascii=False) + "\n")
-            count += 1
-        print("NUMBER OF NEWS SCRAPED: ", count)    
 
 if __name__ == "__main__":
     main()

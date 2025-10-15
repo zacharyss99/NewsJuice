@@ -5,6 +5,7 @@ from time import sleep
 from tqdm import tqdm
 from datetime import datetime, timezone
 from dateutil import parser as dateparser
+from db_manager import PostgresDBManager
 
 class GazetteArticleScraper:
     def __init__(self, test_mode=False):
@@ -13,6 +14,7 @@ class GazetteArticleScraper:
         self.FEED_URL = "https://news.harvard.edu/gazette/feed/"            
         self.TIMEOUT = 10.0
         self.USER_AGENT = "newsjuice-scraper/0.2 (+https://newsjuiceapp.com)"
+        self.db_manager = PostgresDBManager(url_column="source_link")
 
     def fetch_feed(self, url):
         r = httpx.get(
@@ -91,15 +93,23 @@ class GazetteArticleScraper:
         print(f"scraping {len(feed_entries)} articles")
 
         if self.test_mode:
-            feed_entries = [feed_entries[0]]
+            feed_entries = feed_entries[0:10]
 
+        # Extract all URLs from feed
+        all_urls = [self.extract_article_link(entry) for entry in feed_entries]
+        all_urls = [url for url in all_urls if url]  # filter None
+        
+        # Filter to only new URLs not in database
+        new_urls = set(self.db_manager.filter_new_urls(all_urls))
+        print(f"Found {len(new_urls)} new articles (out of {len(all_urls)} total)")
+        
         all_articles_details = []
         for entry in tqdm(feed_entries):
             article_details={}
 
             # Get all the article URLs from the feed
             url = self.extract_article_link(entry)
-            if not url:
+            if not url or url not in new_urls:
                 continue
 
             #the content is hard to extract from the data feed, pull the html to extract it
