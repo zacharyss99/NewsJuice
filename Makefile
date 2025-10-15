@@ -1,7 +1,7 @@
 .PHONY: run build scrape load retrieve up-proxy down clean rebuild
 
-run: build up-proxy scrape load  ## Build images, start proxy, run both steps
-	@echo "✅ Pipeline finished. Use 'make chat' to start interactive chat."
+run: build up-proxy scrape load  ## Build images, start proxy, scrape articles, and load them into vector DB
+	@echo "✅ Data ingestion pipeline finished. Use 'make chat' to start interactive podcast generation."
 
 build:
 	docker compose build scraper dbproxy
@@ -15,10 +15,9 @@ scrape:
 load:
 	docker compose run --rm loader
 
-retrieve:
-	docker compose run --rm retriever
+# retrieve:  # Retriever is called by chatter service, not run standalone
 
-chat:  ## Start interactive chat with Gemini (includes retrieval)
+chat:  ## Start interactive podcast generation with Gemini (includes retrieval)
 	docker compose run --rm chatter
 
 down:
