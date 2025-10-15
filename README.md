@@ -6,10 +6,10 @@
 
 ## 👥 Team
 
-- **Khaled**  
-- **Zac**  
-- **Josh**  
-- **Chris**
+- **Khaled Aly**  
+- **Zac Sardi-Santos**  
+- **Joshua Rosenblum**  
+- **Christian Michel**
 
 **Team name:** `NewsJuice`
 
@@ -59,15 +59,15 @@ A **PostgreSQL vector database** (on **Google Cloud SQL**) serves as the central
    - Stores them in the `articles` table of the PostgreSQL database `newsdb`
 
 2. **📥 Loader**  
-   - Loads unprocessed articles (`vflag = 0`) from the `articles` table of the PostgreSQL database
+   - Loads unprocessed articles (`vflag = 0`) from the `articles` table of `newsdb`
    - Performs **chunking** and **embedding**  
-   - Stores the chunks in the `chunks_vector` table  of the PostgreSQL database `newsdb`
+   - Stores the chunks in the `chunks_vector` table of `newsdb`
 
 3. **🔍 Chatter**  
    - Accepts a user’s **news briefing** via user interface
-   - Embeds the briefing and retrieves the most relevant chunks (top-n)
-   - Combines retrieved content with briefing and user preferences  
-   - Generates a concise summary via an LLM from the augmented prompt
+   - **Embeds** the briefing and **retrieves the most relevant chunks** (top-n)
+   - **Combines** retrieved chunks with the briefing and user preferences (**promt augmentation**) 
+   - Generates a summary via an **LLM** from the augmented prompt
    - Produces an **audio podcast file** (MP3) from the summary via text-to-speech conversion
    - The chat history is stored in the `newsbd`
 
@@ -90,13 +90,6 @@ docker compose build \
   && docker compose run --rm summarizer
 ```
 
-**Option 2: Makefile**
-```bash
-make run
-```
-
----
-
 ### 🪜 Step-by-Step Execution
 
 ```bash
@@ -107,6 +100,16 @@ docker compose run --rm loader
 docker compose run --rm retriever
 docker compose run --rm summarizer
 ```
+
+**Option 2: MakefileBatch** for a scraper - loader bacth cycle
+
+
+```bash
+make -f MakefileBatchrun
+```
+
+---
+
 
 To stop all services:
 ```bash
