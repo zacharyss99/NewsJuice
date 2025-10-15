@@ -17,11 +17,11 @@ VECTOR_TABLE_NAME = "chunks_vector_test"
 '''
 
 # ###
-#ARTICLES_TABLE_NAME = "articles"
-ARTICLES_TABLE_NAME = "articles_test"
+ARTICLES_TABLE_NAME = "articles"
+#ARTICLES_TABLE_NAME = "articles_test"
 
-#VECTOR_TABLE_NAME = "chunks_vector"
-VECTOR_TABLE_NAME = "chunks_vector_test"
+VECTOR_TABLE_NAME = "chunks_vector"
+#VECTOR_TABLE_NAME = "chunks_vector_test"
 
 
 import uuid

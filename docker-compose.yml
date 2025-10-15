@@ -1,5 +1,5 @@
 services:
-  # Step 1 — extractor: writes the latest news to the articles table in the db
+  # Step 1 — extractor: writes /data/news.jsonl then exits 0
   scraper:
     build: ./services/scraper
     container_name: scraper
@@ -20,8 +20,6 @@ services:
       /home/app/.venv/bin/python wait_for_db.py
       && exec /home/app/.venv/bin/python scrapers.py
     restart: "no"
-    command: 
-      sh -c "echo 'Running scraper...'; sleep 5; echo 'scraper done.'"
 
   # Step 2 — loader: reads the /data/news.jsonl file, chunks, embeds and loads to vector DB
   loader:
@@ -39,7 +37,7 @@ services:
       GOOGLE_CLOUD_PROJECT: "newsjuice-123456" 
       GOOGLE_CLOUD_REGION:  "us-central1"
     working_dir: /app
-    # change this to your actual processor entrypoint
+    #change this to your actual processor entrypoint
     #command: ["python", "Vector_DB_query.py", "--in", "/data/news.jsonl"]
     command:
     - sh
@@ -48,8 +46,6 @@ services:
       /home/app/.venv/bin/python wait_for_db.py
       && exec /home/app/.venv/bin/python loader.py --out /data/news.jsonl
     restart: "no"
-    command: 
-      sh -c "while docker inspect -f '{{.State.Running}}' scraper | grep true; do sleep 1; done; echo 'loader starts after scraper is done!'"
 
 # Step 3 — retriever: asks for briefung and retrieves top 2 from vector DB
   retriever:
