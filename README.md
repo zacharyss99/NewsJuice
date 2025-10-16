@@ -33,15 +33,19 @@ Users can:
 In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pipeline with the following features:
 
 1. **Scraping:** Collect Harvard-related news (RSS/Atom feeds, websites, etc.)  
-2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP)  
+2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP). Specifically, we load the scraped articles into our articles table. 
 3. **Processing:**  
-   - Semantic chunking (using Vertex AI)  
-   - Text embedding (using `sentence-transformers/all-mpnet-base-v2`)  
-4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database  
-5. **Retrieval & Summarization:**  
-   - Retrieve the most relevant news from our database based on user query
-   - Generate a summary of the relevant news with an LLM  
-   - Convert it to audio (mp3) via TTS  
+   - Semantic chunking (using Vertex AI). The chunks are stored in our chunks_vector table.
+   - Text embedding (using `sentence-transformers/all-mpnet-base-v2`). The text embeddings are used for embedding the chunks, AND also for embedding the user query for retrieval.
+4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database table, titled chunks_vector. 
+5. **Input Query & User_ID** Collect the unique user identification and the specific user query for podcast generation. 
+6. **Retrieval**  
+   - Retrieve the most relevant news chunks from our database based on embedded user query
+7. **LLM Podcast Generation**
+    - Generate a text summary of the relevant news chunks with an LLM API call (Google Gemini). 
+    - Convert the text summary to audio (mp3) via TTS API call (Google Cloud Text-To-Speech API)
+8. **Chat Log History**
+    - Model text output and user identification pair saved to PostgreSQL database table, titled llm-conversations
 
 ---
 
@@ -49,83 +53,171 @@ In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pip
 
 ![Project Architecture](app_architecture.png)
 
-The pipeline consists of **five containers**, each responsible for a specific stage.  
-A **PostgreSQL vector database** (on **Google Cloud SQL**) serves as the central data store.
+The pipeline consists of **three standalone containers** plus **volume-mounted Python modules**, with a **PostgreSQL vector database** (on **Google Cloud SQL**) serving as the central data store.
 
-### 🧱 Containers
+### 🧱 Standalone Containers
 
 1. **🕸️ Scraper**  
    - Fetches news articles from multiple Harvard-related sources on the web 
    - Stores them in the `articles` table of the PostgreSQL database `newsdb`
+   - **Runs standalone**: `make -f MakefileChatter scrape`
 
 2. **📥 Loader**  
    - Loads unprocessed articles (`vflag = 0`) from the `articles` table of `newsdb`
-   - Performs **chunking** and **embedding**  
+   - Performs **chunking** and **embedding** using Vertex AI and sentence-transformers
    - Stores the chunks in the `chunks_vector` table of `newsdb`
+   - **Runs standalone**: `make -f MakefileChatter load`
 
-3. **💬 Chatter**  
-   - Accepts a user’s **query** via user interface
-   - Passes the user's query to the retriever
-   - Recieves a podcast script from the retriever and passes it to TTS for conversion into an audio file
-   - Saves the chat history in the `newsdb` inside of the llm_conversations table
+3. **💬 Chatter** (Orchestration Hub)
+   - Accepts a user's **query** and **user_id** via interactive interface
+   - **Integrates retriever and TTS as volume-mounted Python modules**
+   - Orchestrates the complete RAG pipeline: Query → Retrieve → Generate → Convert to Audio
+   - Saves conversation history in the `llm_conversations` table
+   - **Runs standalone**: `make -f MakefileChatter chat`
 
-4. **🔍 Retriever**
-    - Receives and **Embeds** the user's query
-    - **Retrieves the most relevant chunks** (top-n)
-    - **Combines** retrieved chunks with the query and user preferences (**promt augmentation**) 
-    - Generates a summary in podcast script form via an **LLM** based on the augmented prompt
-    - Passes the podcast script back to the chatter
+### 🔧 Volume-Mounted Services
 
-5. **🗣️ TTS**
-    - Receives a podcast transcript from chatter 
-    - Produces an **audio podcast file** (MP3) from the summary via the Google text-to-speech api
-    - Saves the podcast to the audio_output folder locally (in the future, it will be saved to a GCS bucket)
+4. **🔍 Retriever** (Python Module)
+    - **Volume-mounted** into chatter container at `/app/retriever`
+    - Embeds user queries using `sentence-transformers/all-mpnet-base-v2`
+    - Performs cosine similarity search on `chunks_vector` table
+    - Returns top 2 most relevant chunks with similarity scores
+    - **Not run standalone** - called by chatter service
+
+5. **🗣️ TTS** (Python Module)
+    - **Volume-mounted** into chatter container at `/app/tts`
+    - Converts podcast text to audio using Google Cloud Text-to-Speech
+    - Uses `en-US-Neural2-J` voice for high-quality output
+    - Saves MP3 files to `audio_output/` directory
+    - **Not run standalone** - called by chatter service
+
+### 🏗️ Architecture Diagram
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────────┐
+│   Scraper   │───▶│   articles  │───▶│     Loader      │
+└─────────────┘    └─────────────┘    └─────────────────┘
+                                                     │
+                                                     ▼
+┌─────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Chatter   │◀───│    Retriever    │◀───│ chunks_vector   │
+│ (Orchestr.) │    │ (Volume-Mounted)│    └─────────────────┘
+└─────────────┘    └─────────────────┘
+       │                    │
+       ▼                    ▼
+┌─────────────┐    ┌─────────────────┐
+│ Gemini API  │    │  Google Cloud   │
+│ (Vertex AI) │    │      TTS        │
+└─────────────┘    └─────────────────┘
+```
 
 ---
 
 ## 🚀 Usage
 
-This project supports both **one-line execution** and **step-by-step** runs using `docker-compose` and `Makefile`.
+This project supports both **one-line execution** and **step-by-step** runs using `Makefile` commands.
 
-### ▶️ Quick Start (One-line)
+### ▶️ Quick Start (Recommended)
 
-**Option 1: Makefile** for a scraper - loader batch cycle and for a chatter cycle
-
+**Complete Pipeline (Data Ingestion + Podcast Generation):**
 ```bash
-make -f MakefileBatch run
-make -f MakefileChatter run
+# Step 1: Scrape and load data
+make -f MakefileChatter scrape  # Scrape Harvard news articles
+make -f MakefileChatter load    # Process and embed articles
 
+# Step 2: Generate podcasts interactively
+make -f MakefileChatter chat    # Start interactive podcast generation
 ```
 
-**Option 2: Docker Compose**
-
-**one command**
-
+**Individual Services:**
 ```bash
-docker compose build \
-  && docker compose up -d dbproxy \
-  && docker compose run --rm scraper \
-  && docker compose run --rm loader \
-  && docker compose run --rm chatter
+# Data ingestion only
+make -f MakefileChatter scrape  # Scrape articles to database
+make -f MakefileChatter load    # Process articles into vector chunks
+
+# Podcast generation only (requires pre-loaded data)
+make -f MakefileChatter chat    # Interactive podcast generation
 ```
 
-**step by step**
+### 🔄 Complete Workflow
 
+#### Phase 1: Data Ingestion
+1. **Scrape Articles**: `make -f MakefileChatter scrape`
+   - Fetches Harvard Gazette and Crimson articles
+   - Stores in `articles` table with duplicate detection
+   
+2. **Process & Embed**: `make -f MakefileChatter load`
+   - Chunks articles using semantic chunking (Vertex AI)
+   - Embeds chunks using `sentence-transformers/all-mpnet-base-v2`
+   - Stores in `chunks_vector` table with pgvector
+
+#### Phase 2: Podcast Generation
+3. **Interactive Mode**: `make -f MakefileChatter chat`
+   - Prompts for user ID and question
+   - Retrieves top 2 relevant chunks via vector similarity
+   - Generates podcast script using Gemini API
+   - Converts to audio using Google Cloud TTS
+   - Saves conversation to `llm_conversations` table
+
+### 🛠️ Service Management
+
+**Start Database Proxy:**
 ```bash
-docker compose build
-docker compose up -d dbproxy
-docker compose run --rm scraper
-docker compose run --rm loader
-docker compose run --rm chatter
+make -f MakefileChatter up-proxy
+```
+
+**Stop All Services:**
+```bash
+make -f MakefileChatter down
+```
+
+**Build Images:**
+```bash
+make -f MakefileChatter build
 ```
 
 ---
 
+## 🗄️ Database Schema
 
-To stop all services:
-```bash
-docker compose down
-```
+### `articles` Table
+Stores raw scraped articles from Harvard sources:
+- `id` - Primary key
+- `author` - Article author
+- `title` - Article title
+- `summary` - Article summary
+- `content` - Full article content
+- `source_link` - Original article URL
+- `source_type` - Source identifier (gazette, crimson)
+- `fetched_at` - Timestamp when scraped
+- `published_at` - Original publication date
+- `vflag` - Processing flag (0=unprocessed, 1=processed)
+- `article_id` - Unique article identifier
+
+### `chunks_vector` Table
+Stores processed article chunks with vector embeddings:
+- `id` - Primary key
+- `author` - Article author
+- `title` - Article title
+- `summary` - Article summary
+- `content` - Full article content
+- `source_link` - Original article URL
+- `source_type` - Source identifier
+- `fetched_at` - Timestamp when scraped
+- `published_at` - Original publication date
+- `chunk` - Text chunk content
+- `chunk_index` - Chunk position within article
+- `embedding` - Vector embedding (pgvector)
+- `article_id` - Reference to original article
+
+### `llm_conversations` Table
+Stores user interactions and AI responses:
+- `id` - Primary key
+- `user_id` - User identifier
+- `model_name` - AI model used (gemini-2.5-flash)
+- `conversation_data` - JSON containing question, response, and metadata
+- `created_at` - Timestamp of conversation
+- `updated_at` - Last update timestamp
 
 ---
 
@@ -150,6 +242,52 @@ Service account:
 `newsjuice-proxy@newsjuice-123456.iam.gserviceaccount.com`
 
 The SQL proxy runs automatically via `docker-compose`, opening a local port (`5432`) that connects securely to the Cloud SQL instance.
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Failed**
+   - Ensure the Cloud SQL proxy is running: `make -f MakefileChatter up-proxy`
+   - Verify DATABASE_URL is correctly set in environment
+   - Check network connectivity to Google Cloud
+
+2. **Gemini API Not Working**
+   - Verify service account credentials are properly mounted
+   - Check Vertex AI API is enabled in Google Cloud Console
+   - Ensure service account has `roles/aiplatform.user` role
+
+3. **TTS Service Not Working**
+   - Verify Cloud Text-to-Speech API is enabled
+   - Check service account has `roles/cloudtts.serviceAgent` role
+   - Ensure audio output directory is writable
+
+4. **Vector Search Not Working**
+   - Verify `chunks_vector` table exists and has data
+   - Check if loader service has been run: `make -f MakefileChatter load`
+   - Ensure pgvector extension is installed in PostgreSQL
+
+5. **Audio Playback Issues**
+   - Install `mpv` locally: `brew install mpv` (macOS) or `apt install mpv` (Linux)
+   - Check audio files are saved in `audio_output/` directory
+   - Verify audio file permissions
+
+6. **No Articles Found**
+   - Run scraper first: `make -f MakefileChatter scrape`
+   - Check if articles were successfully stored in `articles` table
+   - Verify scraper service account has proper permissions
+
+### Service Logs
+
+The services provide detailed logging for:
+- Database connection status and vector search results
+- Gemini API call results and response generation
+- TTS service calls and audio file generation
+- Retriever service calls and similarity scores
+- Error messages and stack traces
+- User interaction flow and conversation logging
 
 ---
 
@@ -243,7 +381,6 @@ updated_at TIMESTAMPTZ
 ---
 
 ## In future milestones, we plan to:
-- Combine the `chatter`, `retriever`, and `TTS` into one large container since their work is highly interconnected.
 - Summarize the `conversation_data` that we store in the `llm_conversations` table as context for future user queries to get a sense of the user's preferences and provide the history of past conversations for better podcast generation.
 - Transition to interacting with the model with only speech rather than typing in the command line.
 - Build the interactive component of our model so that the user can interupt the podcast and ask followup questions.
@@ -256,3 +393,4 @@ For this project we have used ChatGPT, Gemini and tools like app.eraser.io for l
 
 This project is part of the **NewsJuice** prototype.  
 All rights reserved.
+
