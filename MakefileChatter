@@ -16,9 +16,7 @@ load:
 	docker compose run --rm loader
 
 # retrieve:  # Retriever is called by chatter service, not run standalone
-
-tts:  ## Test TTS service
-	docker compose run --rm tts
+# tts:  # TTS is called by chatter service, not run standalone
 
 chat:  ## Start interactive podcast generation with Gemini and TTS (includes retrieval)
 	docker compose run --rm chatter

@@ -47,29 +47,8 @@ services:
       && exec /home/app/.venv/bin/python loader.py --out /data/news.jsonl
     restart: "no"
 
-# Step 3 — retriever: asks for briefung and retrieves top 2 from vector DB
-  retriever:
-    build: ./services/retriever
-    depends_on:
-      - dbproxy
-    volumes:
-      - ./services/retriever:/app
-      - ./artifacts:/data
-      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
-    environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
-      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
-      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
-    working_dir: /app
-    # change this to your actual processor entrypoint
-    #command: ["python", "Vector_DB_query.py", "--in", "/data/news.jsonl"]
-    command:
-    - sh
-    - -lc
-    - >
-      /home/app/.venv/bin/python wait_for_db.py
-      && exec /home/app/.venv/bin/python retriever.py --out /data/news.jsonl
-    restart: "no"
+# Step 3 — retriever: code is volume-mounted into chatter service
+  # retriever:  # Not run as standalone container - code mounted into chatter
 
   # Step 4 — chatter: interactive chat service with Gemini API and TTS
   chatter:
@@ -101,28 +80,8 @@ services:
       && exec /home/app/.venv/bin/python chatter.py
     restart: "no"
 
-  # TTS service for text-to-speech conversion
-  tts:
-    build: ./services/tts
-    depends_on:
-      - dbproxy
-    volumes:
-      - ./services/tts:/app
-      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
-    environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
-      TTS_SERVICE_ACCOUNT_PATH: /run/secrets/gcp.json
-      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
-      GOOGLE_CLOUD_PROJECT: "newsjuice-123456"
-      GOOGLE_CLOUD_REGION: "us-central1"
-    working_dir: /app
-    command:
-    - sh
-    - -lc
-    - >
-      python3 wait_for_db.py
-      && exec python3 tts.py
-    restart: "no"
+  # TTS service: code is volume-mounted into chatter service
+  # tts:  # Not run as standalone container - code mounted into chatter
     
   # Cloud SQL Auth Proxy so the processor can reach your DB
   dbproxy:

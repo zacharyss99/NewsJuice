@@ -33,15 +33,19 @@ Users can:
 In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pipeline with the following features:
 
 1. **Scraping:** Collect Harvard-related news (RSS/Atom feeds, websites, etc.)  
-2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP)  
+2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP). Specifically, we load the scraped articles into our articles table. 
 3. **Processing:**  
-   - Semantic chunking (using Vertex AI)  
-   - Text embedding (using `sentence-transformers/all-mpnet-base-v2`)  
-4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database  
-5. **Retrieval & Summarization:**  
-   - Retrieve the most relevant news from our database based on user query
-   - Generate a summary of the relevant news with an LLM  
-   - Convert it to audio (mp3) via TTS  
+   - Semantic chunking (using Vertex AI). The chunks are stored in our chunks_vector table.
+   - Text embedding (using `sentence-transformers/all-mpnet-base-v2`). The text embeddings are used for embedding the chunks, AND also for embedding the user query for retrieval.
+4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database table, titled chunks_vector. 
+5. **Input Query & User_ID** Collect the unique user identification and the specific user query for podcast generation. 
+6. **Retrieval**  
+   - Retrieve the most relevant news chunks from our database based on embedded user query
+7. **LLM Podcast Generation**
+    - Generate a text summary of the relevant news chunks with an LLM API call (Google Gemini). 
+    - Convert the text summary to audio (mp3) via TTS API call (Google Cloud Text-To-Speech API)
+8. **Chat Log History**
+    - Model text output and user identification pair saved to PostgreSQL database table, titled llm-conversations
 
 ---
 
@@ -64,7 +68,7 @@ A **PostgreSQL vector database** (on **Google Cloud SQL**) serves as the central
    - Stores the chunks in the `chunks_vector` table of `newsdb`
 
 3. **💬 Chatter**  
-   - Accepts a user’s **query** via user interface
+   - Accepts a user’s **query** and **user_id** via user interface
    - Passes the user's query to the retriever
    - Recieves a podcast script from the retriever and passes it to TTS for conversion into an audio file
    - Saves the chat history in the `newsdb` inside of the llm_conversations table
@@ -243,7 +247,6 @@ updated_at TIMESTAMPTZ
 ---
 
 ## In future milestones, we plan to:
-- Combine the `chatter`, `retriever`, and `TTS` into one large container since their work is highly interconnected.
 - Summarize the `conversation_data` that we store in the `llm_conversations` table as context for future user queries to get a sense of the user's preferences and provide the history of past conversations for better podcast generation.
 - Transition to interacting with the model with only speech rather than typing in the command line.
 - Build the interactive component of our model so that the user can interupt the podcast and ask followup questions.
@@ -256,3 +259,4 @@ For this project we have used ChatGPT, Gemini and tools like app.eraser.io for l
 
 This project is part of the **NewsJuice** prototype.  
 All rights reserved.
+
