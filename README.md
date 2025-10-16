@@ -106,7 +106,7 @@ This project supports both **one-line execution** and **step-by-step** runs usin
 **Complete Pipeline (Data Ingestion + Podcast Generation):**
 ```bash
 # Step 1: Scrape and load data
-make run -f Makefilebatch  # Scrape and load Harvard news articles
+make run -f MakefileBatch  # Scrape and load Harvard news articles
 
 # Step 2: Generate podcasts interactively
 make run -f MakefileChatter    # Start interactive podcast generation
@@ -115,8 +115,8 @@ make run -f MakefileChatter    # Start interactive podcast generation
 **Individual Services:**
 ```bash
 # Data ingestion only
-make run -f MakefileChatter scrape  # Scrape articles to database
-make run -f MakefileChatter load   # Process articles into vector chunks
+make run -f MakefileBatch scrape  # Scrape articles to database
+make run -f MakefileBatch load   # Process articles into vector chunks
 
 # Podcast generation only (requires pre-loaded data)
 make run -f MakefileChatter   # Interactive podcast generation
@@ -125,17 +125,17 @@ make run -f MakefileChatter   # Interactive podcast generation
 ### 🔄 Complete Workflow
 
 #### Phase 1: Data Ingestion
-1. **Scrape Articles**: `make -f MakefileChatter scrape`
+1. **Scrape Articles**: `make run -f MakefileBatch scrape`
    - Fetches Harvard Gazette and Crimson articles
    - Stores in `articles` table with duplicate detection
    
-2. **Process & Embed**: `make -f MakefileChatter load`
+2. **Process & Embed**: `make run -f MakefileBatch load`
    - Chunks articles using semantic chunking (Vertex AI)
    - Embeds chunks using `sentence-transformers/all-mpnet-base-v2`
    - Stores in `chunks_vector` table with pgvector
 
 #### Phase 2: Podcast Generation
-3. **Interactive Mode**: `make -f MakefileChatter chat`
+3. **Interactive Mode**: `make run -f MakefileChatter chat`
    - Prompts for user ID and question
    - Retrieves top 2 relevant chunks via vector similarity
    - Generates podcast script using Gemini API
@@ -146,17 +146,17 @@ make run -f MakefileChatter   # Interactive podcast generation
 
 **Start Database Proxy:**
 ```bash
-make -f MakefileChatter up-proxy
+make run -f MakefileChatter up-proxy
 ```
 
 **Stop All Services:**
 ```bash
-make -f MakefileChatter down
+make run -f MakefileChatter down
 ```
 
 **Build Images:**
 ```bash
-make -f MakefileChatter build
+make run -f MakefileChatter build
 ```
 
 ---
@@ -219,7 +219,7 @@ brew install google-cloud-sdk
 2. **Service Account Key**  
    Place your GCP service account key file here:
 ```
-../secrets/sa-key.json
+../secrets/gcp.json
 ```
 Service account:  
 `newsjuice-proxy@newsjuice-123456.iam.gserviceaccount.com`
@@ -233,7 +233,7 @@ The SQL proxy runs automatically via `docker-compose`, opening a local port (`54
 ### Common Issues
 
 1. **Database Connection Failed**
-   - Ensure the Cloud SQL proxy is running: `make -f MakefileChatter up-proxy`
+   - Ensure the Cloud SQL proxy is running: `make run -f MakefileChatter up-proxy`
    - Verify DATABASE_URL is correctly set in environment
    - Check network connectivity to Google Cloud
 
@@ -249,7 +249,7 @@ The SQL proxy runs automatically via `docker-compose`, opening a local port (`54
 
 4. **Vector Search Not Working**
    - Verify `chunks_vector` table exists and has data
-   - Check if loader service has been run: `make -f MakefileChatter load`
+   - Check if loader service has been run: `make run -f MakefileChatter load`
    - Ensure pgvector extension is installed in PostgreSQL
 
 5. **Audio Playback Issues**
@@ -258,7 +258,7 @@ The SQL proxy runs automatically via `docker-compose`, opening a local port (`54
    - Verify audio file permissions
 
 6. **No Articles Found**
-   - Run scraper first: `make -f MakefileChatter scrape`
+   - Run scraper first: `make run -f MakefileChatter scrape`
    - Check if articles were successfully stored in `articles` table
    - Verify scraper service account has proper permissions
 
@@ -307,7 +307,7 @@ The services provide detailed logging for:
 - **Database:** `newsdb` (PostgreSQL 15)  
 - **Tables:** `articles`, `chunks_vector`  
 
-> ⚠️ **Note:** The above identifiers are for documentation and environment setup. Do not commit actual secrets to version control.
+> ⚠️ **Note:** The above identifiers are for documentation and environment setup.
 
 ---
 
@@ -370,7 +370,7 @@ updated_at TIMESTAMPTZ
 
 ## References
 
-For this project we have used ChatGPT, Gemini and tools like Figma, app.eraser.io for learrning purposes.
+For this project we have used ChatGPT, Gemini and tools like Figma, app.eraser.io for learning purposes.
 
 ## 📜 License
 
