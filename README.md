@@ -55,6 +55,10 @@ In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pip
 
 The pipeline consists of **three standalone containers** plus **volume-mounted Python modules**, with a **PostgreSQL vector database** (on **Google Cloud SQL**) serving as the central data store.
 
+### App Screen Design
+
+To see the app screen, please see the file "NewsJuice screen flow.pdf" 
+
 ### 🧱 Standalone Containers
 
 1. **🕸️ Scraper**  
@@ -91,26 +95,6 @@ The pipeline consists of **three standalone containers** plus **volume-mounted P
     - Saves MP3 files to `audio_output/` directory
     - **Not run standalone** - called by chatter service
 
-### 🏗️ Architecture Diagram
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────────┐
-│   Scraper   │───▶│   articles  │───▶│     Loader      │
-└─────────────┘    └─────────────┘    └─────────────────┘
-                                                     │
-                                                     ▼
-┌─────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Chatter   │◀───│    Retriever    │◀───│ chunks_vector   │
-│ (Orchestr.) │    │ (Volume-Mounted)│    └─────────────────┘
-└─────────────┘    └─────────────────┘
-       │                    │
-       ▼                    ▼
-┌─────────────┐    ┌─────────────────┐
-│ Gemini API  │    │  Google Cloud   │
-│ (Vertex AI) │    │      TTS        │
-└─────────────┘    └─────────────────┘
-```
-
 ---
 
 ## 🚀 Usage
@@ -122,21 +106,20 @@ This project supports both **one-line execution** and **step-by-step** runs usin
 **Complete Pipeline (Data Ingestion + Podcast Generation):**
 ```bash
 # Step 1: Scrape and load data
-make -f MakefileChatter scrape  # Scrape Harvard news articles
-make -f MakefileChatter load    # Process and embed articles
+make run -f Makefilebatch  # Scrape and load Harvard news articles
 
 # Step 2: Generate podcasts interactively
-make -f MakefileChatter chat    # Start interactive podcast generation
+make run -f MakefileChatter    # Start interactive podcast generation
 ```
 
 **Individual Services:**
 ```bash
 # Data ingestion only
-make -f MakefileChatter scrape  # Scrape articles to database
-make -f MakefileChatter load    # Process articles into vector chunks
+make -f MakefileChatter scrape run  # Scrape articles to database
+make -f MakefileChatter load run   # Process articles into vector chunks
 
 # Podcast generation only (requires pre-loaded data)
-make -f MakefileChatter chat    # Interactive podcast generation
+make -f MakefileChatter run   # Interactive podcast generation
 ```
 
 ### 🔄 Complete Workflow
@@ -387,7 +370,7 @@ updated_at TIMESTAMPTZ
 
 ## References
 
-For this project we have used ChatGPT, Gemini and tools like app.eraser.io for learrning purposes.
+For this project we have used ChatGPT, Gemini and tools like Figma, app.eraser.io for learrning purposes.
 
 ## 📜 License
 
