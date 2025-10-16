@@ -115,11 +115,11 @@ make run -f MakefileChatter    # Start interactive podcast generation
 **Individual Services:**
 ```bash
 # Data ingestion only
-make -f MakefileChatter scrape run  # Scrape articles to database
-make -f MakefileChatter load run   # Process articles into vector chunks
+make run -f MakefileChatter scrape  # Scrape articles to database
+make run -f MakefileChatter load   # Process articles into vector chunks
 
 # Podcast generation only (requires pre-loaded data)
-make -f MakefileChatter run   # Interactive podcast generation
+make run -f MakefileChatter   # Interactive podcast generation
 ```
 
 ### 🔄 Complete Workflow
