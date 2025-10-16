@@ -39,8 +39,8 @@ In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pip
    - Text embedding (using `sentence-transformers/all-mpnet-base-v2`)  
 4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database  
 5. **Retrieval & Summarization:**  
-   - Retrieve the most relevant news based on user brief  
-   - Generate a summary with an LLM  
+   - Retrieve the most relevant news from our database based on user query
+   - Generate a summary of the relevant news with an LLM  
    - Convert it to audio (mp3) via TTS  
 
 ---
@@ -49,7 +49,7 @@ In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pip
 
 ![Project Architecture](app_architecture.png)
 
-The pipeline consists of **three containers**, each responsible for a specific stage.  
+The pipeline consists of **five containers**, each responsible for a specific stage.  
 A **PostgreSQL vector database** (on **Google Cloud SQL**) serves as the central data store.
 
 ### 🧱 Containers
@@ -63,14 +63,23 @@ A **PostgreSQL vector database** (on **Google Cloud SQL**) serves as the central
    - Performs **chunking** and **embedding**  
    - Stores the chunks in the `chunks_vector` table of `newsdb`
 
-3. **🔍 Chatter**  
-   - Accepts a user’s **news briefing** via user interface
-   - **Embeds** the briefing and **retrieves the most relevant chunks** (top-n)
-   - **Combines** retrieved chunks with the briefing and user preferences (**promt augmentation**) 
-   - Generates a summary via an **LLM** from the augmented prompt
-   - Produces an **audio podcast file** (MP3) from the summary via text-to-speech conversion
-   - The chat history is stored in the `newsdb`
+3. **💬 Chatter**  
+   - Accepts a user’s **query** via user interface
+   - Passes the user's query to the retriever
+   - Recieves a podcast script from the retriever and passes it to TTS for conversion into an audio file
+   - Saves the chat history in the `newsdb` inside of the llm_conversations table
 
+4. **🔍 Retriever**
+    - Receives and **Embeds** the user's query
+    - **Retrieves the most relevant chunks** (top-n)
+    - **Combines** retrieved chunks with the query and user preferences (**promt augmentation**) 
+    - Generates a summary in podcast script form via an **LLM** based on the augmented prompt
+    - Passes the podcast script back to the chatter
+
+5. **🗣️ TTS**
+    - Receives a podcast transcript from chatter 
+    - Produces an **audio podcast file** (MP3) from the summary via the Google text-to-speech api
+    - Saves the podcast to the audio_output folder locally (in the future, it will be saved to a GCS bucket)
 
 ---
 
@@ -148,9 +157,9 @@ The SQL proxy runs automatically via `docker-compose`, opening a local port (`54
 
 **News Sources:** (WIP)
 
-✅ The Harvard Gazette
+- ✅ The Harvard Gazette
     https://news.harvard.edu/gazette/feed/
-✅ The Harvard Crimson
+- ✅ The Harvard Crimson
     https://www.thecrimson.com/
 - Harvard Magazine
     https://www.harvardmagazine.com/harvard-headlines
@@ -219,20 +228,25 @@ embedding VECTOR(768),
 article_id TEXT
 ```
 
-### 🧠 Table: `llm conversations`
+### 🧠 Table: `llm_conversations`
 Stores the history of conversations
 
 ```sql
 id BIGSERIAL PRIMARY KEY,
-user_id
-model_name
-conversation_date
-created_at
-updated_at
+user_id TEXT,
+model_name TEXT,
+conversation_data JSON,
+created_at TIMESTAMPTZ,
+updated_at TIMESTAMPTZ
 ```
 
 ---
 
+## In future milestones, we plan to:
+- Combine the `chatter`, `retriever`, and `TTS` into one large container since their work is highly interconnected.
+- Summarize the `conversation_data` that we store in the `llm_conversations` table as context for future user queries to get a sense of the user's preferences and provide the history of past conversations for better podcast generation.
+- Transition to interacting with the model with only speech rather than typing in the command line.
+- Build the interactive component of our model so that the user can interupt the podcast and ask followup questions.
 
 ## References
 
