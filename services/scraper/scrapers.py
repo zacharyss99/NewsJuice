@@ -26,13 +26,12 @@ News Sources:
 
 '''
 
-import json
 import uuid
-import sys
 import argparse
 from pathlib import Path
 from gazette_scraper import GazetteArticleScraper
 from crimson_scraper import CrimsonArticleScraper
+from harvard_magazine_scraper import HarvardMagazineArticleScraper
 from db_manager import PostgresDBManager
 
 def main():
@@ -55,7 +54,11 @@ def main():
     crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     crimson_details = crimson_scraper.scrape()
 
-    all_articles = gazzet_details + crimson_details
+    print("\nStarting Harvard Magazine Scraper")
+    harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    harvard_magazine_details = harvard_magazine_scraper.scrape()  
+
+    all_articles = gazzet_details + crimson_details + harvard_magazine_details
     
     # Map scraper field names to database column names
     db_records = []
