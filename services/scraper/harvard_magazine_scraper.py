@@ -161,7 +161,7 @@ class HarvardMagazineArticleScraper:
             print(f"Found {len(new_urls)} new articles (out of {len(article_urls)} total unique articles)")
 
             ## Using the article URLs extracted, Navigate to the indevidual articles and extract the main content from it
-            for article_url in tqdm(list(article_urls)):
+            for article_url in tqdm(list(new_urls)):
                 # URL already normalized above
                 page.goto(article_url, wait_until="domcontentloaded")
                 page.wait_for_timeout(1000)
