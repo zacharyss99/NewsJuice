@@ -16,9 +16,7 @@ services:
     command:
     - sh
     - -lc
-    - >
-      /home/app/.venv/bin/python wait_for_db.py
-      && exec /home/app/.venv/bin/python scrapers.py --out /data/news.jsonl
+    - exec /home/app/.venv/bin/python scrapers.py
     restart: "no"
 
   # Step 2 — loader: reads the /data/news.jsonl file, chunks, embeds and loads to vector DB
