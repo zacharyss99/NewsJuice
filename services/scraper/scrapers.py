@@ -9,9 +9,9 @@ News Sources:
     https://news.harvard.edu/gazette/feed/
 ✅ The Harvard Crimson
     https://www.thecrimson.com/
-- Harvard Magazine
+✅ Harvard Magazine
     https://www.harvardmagazine.com/harvard-headlines
-- Colloquy: The alumni newsletter for the Graduate School of Arts and Sciences.
+✅ Colloquy: The alumni newsletter for the Graduate School of Arts and Sciences.
     https://gsas.harvard.edu/news/all
 - Harvard Business School Communications Office: Publishes news and research from the business school.
     https://www.hbs.edu/news/Pages/browse.aspx
@@ -19,6 +19,10 @@ News Sources:
     https://hls.harvard.edu/today/
 - Harvard Medical School Office of Communications and External Relations - News: Disseminates news from the medical school.
     https://hms.harvard.edu/news
+- Harvard Kennedy School
+    https://www.hks.harvard.edu/news-announcements
+- Harvard School of Engineering
+    https://seas.harvard.edu/news
 
     # And more
 
@@ -32,6 +36,7 @@ from pathlib import Path
 from gazette_scraper import GazetteArticleScraper
 from crimson_scraper import CrimsonArticleScraper
 from harvard_magazine_scraper import HarvardMagazineArticleScraper
+from gsas_scraper import GsasArticleScraper
 from db_manager import PostgresDBManager
 
 def main():
@@ -46,19 +51,28 @@ def main():
     # Initialize database manager
     db_manager = PostgresDBManager(url_column="source_link")
 
-    print("\nStarting Gazette Scraper")
-    gazzet_scraper = GazetteArticleScraper(test_mode=False)
-    gazzet_details = gazzet_scraper.scrape()
+    # print("\nStarting Gazette Scraper")
+    # gazzet_scraper = GazetteArticleScraper(test_mode=False)
+    # gazzet_details = gazzet_scraper.scrape()
 
-    print("\nStarting Crimson Scraper")
-    crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    crimson_details = crimson_scraper.scrape()
+    # print("\nStarting Crimson Scraper")
+    # crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    # crimson_details = crimson_scraper.scrape()
 
     print("\nStarting Harvard Magazine Scraper")
     harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     harvard_magazine_details = harvard_magazine_scraper.scrape()  
 
-    all_articles = gazzet_details + crimson_details + harvard_magazine_details
+    print("\nGSAS News Scraper")
+    gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    gsas_news_details = gsas_news_scraper.scrape()  
+
+    all_articles = [
+                    # *gazzet_details,
+                    # *crimson_details,
+                    *harvard_magazine_details,
+                    *gsas_news_details,
+                    ]
     
     # Map scraper field names to database column names
     db_records = []
