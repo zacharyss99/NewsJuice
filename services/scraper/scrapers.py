@@ -53,29 +53,29 @@ def main():
     # Initialize database manager
     db_manager = PostgresDBManager(url_column="source_link")
 
-    # print("\nStarting Gazette Scraper")
-    # gazzet_scraper = GazetteArticleScraper(test_mode=False)
-    # gazzet_details = gazzet_scraper.scrape()
+    print("\nStarting Gazette Scraper")
+    gazzet_scraper = GazetteArticleScraper(test_mode=False)
+    gazzet_details = gazzet_scraper.scrape()
 
-    # print("\nStarting Crimson Scraper")
-    # crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    # crimson_details = crimson_scraper.scrape()
+    print("\nStarting Crimson Scraper")
+    crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    crimson_details = crimson_scraper.scrape()
 
-    # print("\nStarting Harvard Magazine Scraper")
-    # harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    # harvard_magazine_details = harvard_magazine_scraper.scrape()  
+    print("\nStarting Harvard Magazine Scraper")
+    harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    harvard_magazine_details = harvard_magazine_scraper.scrape()  
 
-    # print("\nGSAS News Scraper")
-    # gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    # gsas_news_details = gsas_news_scraper.scrape()  
+    print("\nGSAS News Scraper")
+    gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    gsas_news_details = gsas_news_scraper.scrape()  
 
-    # print("\nHBS  News Scraper")
-    # hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    # hbs_news_details = hbs_news_scraper.scrape()
+    print("\nHBS  News Scraper")
+    hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    hbs_news_details = hbs_news_scraper.scrape()
         
-    # print("\nHLS  News Scraper")
-    # hls_news_scraper = HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    # hls_news_details = hls_news_scraper.scrape()
+    print("\nHLS  News Scraper")
+    hls_news_scraper = HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    hls_news_details = hls_news_scraper.scrape()
 
     print("\nHMS  News Scraper")
     hms_news_scraper = HmsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
@@ -90,12 +90,12 @@ def main():
     seas_news_details = seas_news_scraper.scrape()
 
     all_articles = [
-                    # *gazzet_details,
-                    # *crimson_details,
-                    # *harvard_magazine_details,
-                    # *gsas_news_details,
-                    # *hbs_news_details,
-                    # *hls_news_details,
+                    *gazzet_details,
+                    *crimson_details,
+                    *harvard_magazine_details,
+                    *gsas_news_details,
+                    *hbs_news_details,
+                    *hls_news_details,
                     *hms_news_details,
                     *hks_news_details,
                     *seas_news_details
