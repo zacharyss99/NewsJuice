@@ -15,9 +15,9 @@ News Sources:
     https://gsas.harvard.edu/news/all
 ✅ Harvard Business School Communications Office: Publishes news and research from the business school.
     https://www.hbs.edu/news/Pages/browse.aspx?format=Article&source=Harvard%20Business%20School
-- Harvard Law Today: The news hub for Harvard Law School.
+✅ Harvard Law Today: The news hub for Harvard Law School.
     https://hls.harvard.edu/today/
-- Harvard Medical School Office of Communications and External Relations - News: Disseminates news from the medical school.
+✅ Harvard Medical School Office of Communications and External Relations - News: Disseminates news from the medical school.
     https://hms.harvard.edu/news
 - Harvard Kennedy School
     https://www.hks.harvard.edu/news-announcements
@@ -35,6 +35,8 @@ from crimson_scraper import CrimsonArticleScraper
 from harvard_magazine_scraper import HarvardMagazineArticleScraper
 from gsas_scraper import GsasArticleScraper
 from hbs_scraper import HbsArticleScraper
+from hls_scraper import HlsArticleScraper
+from hms_scraper import HmsArticleScraper
 from db_manager import PostgresDBManager
 
 def main():
@@ -68,6 +70,14 @@ def main():
     print("\nHBS  News Scraper")
     hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     hbs_news_details = hbs_news_scraper.scrape()
+        
+    print("\nHLS  News Scraper")
+    hls_news_scraper = HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    hls_news_details = hls_news_scraper.scrape()
+
+    print("\nHMS  News Scraper")
+    hms_news_scraper = HmsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    hms_news_details = hms_news_scraper.scrape()
 
 
     all_articles = [
@@ -76,6 +86,8 @@ def main():
                     # *harvard_magazine_details,
                     # *gsas_news_details,
                     *hbs_news_details,
+                    *hls_news_details,
+                    *hms_news_details,
                     ]
     
     # Map scraper field names to database column names
