@@ -19,7 +19,7 @@ News Sources:
     https://hls.harvard.edu/today/
 ✅ Harvard Medical School Office of Communications and External Relations - News: Disseminates news from the medical school.
     https://hms.harvard.edu/news
-- Harvard Kennedy School
+✅ Harvard Kennedy School
     https://www.hks.harvard.edu/news-announcements
 - Harvard School of Engineering
     https://seas.harvard.edu/news
@@ -38,6 +38,7 @@ from hbs_scraper import HbsArticleScraper
 from hls_scraper import HlsArticleScraper
 from hms_scraper import HmsArticleScraper
 from hks_scraper import HksArticleScraper
+from seas_scraper import SeasArticleScraper
 from db_manager import PostgresDBManager
 
 def main():
@@ -80,9 +81,13 @@ def main():
     hms_news_scraper = HmsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     hms_news_details = hms_news_scraper.scrape()
 
-    print("\nHkS  News Scraper")
+    print("\nHKS  News Scraper")
     hks_news_scraper = HksArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     hks_news_details = hks_news_scraper.scrape()
+
+    print("\nSEAS  News Scraper")
+    seas_news_scraper = SeasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    seas_news_details = seas_news_scraper.scrape()
 
     all_articles = [
                     # *gazzet_details,
@@ -92,7 +97,8 @@ def main():
                     # *hbs_news_details,
                     # *hls_news_details,
                     *hms_news_details,
-                    *hks_news_details
+                    *hks_news_details,
+                    *seas_news_details
                     ]
     
     # Map scraper field names to database column names
