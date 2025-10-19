@@ -13,8 +13,8 @@ News Sources:
     https://www.harvardmagazine.com/harvard-headlines
 ✅ Colloquy: The alumni newsletter for the Graduate School of Arts and Sciences.
     https://gsas.harvard.edu/news/all
-- Harvard Business School Communications Office: Publishes news and research from the business school.
-    https://www.hbs.edu/news/Pages/browse.aspx
+✅ Harvard Business School Communications Office: Publishes news and research from the business school.
+    https://www.hbs.edu/news/Pages/browse.aspx?format=Article&source=Harvard%20Business%20School
 - Harvard Law Today: The news hub for Harvard Law School.
     https://hls.harvard.edu/today/
 - Harvard Medical School Office of Communications and External Relations - News: Disseminates news from the medical school.
@@ -23,9 +23,6 @@ News Sources:
     https://www.hks.harvard.edu/news-announcements
 - Harvard School of Engineering
     https://seas.harvard.edu/news
-
-    # And more
-
 
 
 '''
@@ -37,6 +34,7 @@ from gazette_scraper import GazetteArticleScraper
 from crimson_scraper import CrimsonArticleScraper
 from harvard_magazine_scraper import HarvardMagazineArticleScraper
 from gsas_scraper import GsasArticleScraper
+from hbs_scraper import HbsArticleScraper
 from db_manager import PostgresDBManager
 
 def main():
@@ -59,19 +57,25 @@ def main():
     # crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     # crimson_details = crimson_scraper.scrape()
 
-    print("\nStarting Harvard Magazine Scraper")
-    harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    harvard_magazine_details = harvard_magazine_scraper.scrape()  
+    # print("\nStarting Harvard Magazine Scraper")
+    # harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    # harvard_magazine_details = harvard_magazine_scraper.scrape()  
 
-    print("\nGSAS News Scraper")
-    gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    gsas_news_details = gsas_news_scraper.scrape()  
+    # print("\nGSAS News Scraper")
+    # gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    # gsas_news_details = gsas_news_scraper.scrape()  
+
+    print("\nHBS  News Scraper")
+    hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    hbs_news_details = hbs_news_scraper.scrape()
+
 
     all_articles = [
                     # *gazzet_details,
                     # *crimson_details,
-                    *harvard_magazine_details,
-                    *gsas_news_details,
+                    # *harvard_magazine_details,
+                    # *gsas_news_details,
+                    *hbs_news_details,
                     ]
     
     # Map scraper field names to database column names

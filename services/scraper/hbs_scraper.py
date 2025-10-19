@@ -4,34 +4,18 @@ from playwright.sync_api import sync_playwright
 from dateutil import parser as dateparser
 from datetime import timezone, datetime
 from db_manager import PostgresDBManager
+from time import sleep
 
-class GsasArticleScraper:
+class HbsArticleScraper:
     def __init__(self, headless=True, test_mode=False, wait_ms=1000):
 
         self.headless = headless
         self.test_mode = test_mode   #"single_topic", "all_topics", False
         self.wait_ms = wait_ms
-        self.db_manager = PostgresDBManager(url_column="source_link")
+        if not self.test_mode:
+            self.db_manager = PostgresDBManager(url_column="source_link")
         self.topic_urls =[
-            "https://gsas.harvard.edu/news/topic/commencement",    # Need to run 3 pages because each page is showing only 7 articles
-            "https://gsas.harvard.edu/news/topic/commencement?page=1",
-            "https://gsas.harvard.edu/news/topic/commencement?page=2",
-            "https://gsas.harvard.edu/news/topic/alumni",   
-            "https://gsas.harvard.edu/news/topic/alumni?page=1", 
-            "https://gsas.harvard.edu/news/topic/alumni?page=2", 
-            "https://gsas.harvard.edu/news/topic/research",  
-            "https://gsas.harvard.edu/news/topic/research?page=1", 
-            "https://gsas.harvard.edu/news/topic/research?page=2",   
-            "https://gsas.harvard.edu/news/topic/climate",  
-            "https://gsas.harvard.edu/news/topic/climate?page=1",
-            "https://gsas.harvard.edu/news/topic/climate?page=2",  
-            "https://gsas.harvard.edu/news/topic/voices", 
-            "https://gsas.harvard.edu/news/topic/voices?page=1",
-            "https://gsas.harvard.edu/news/topic/voices?page=2",
-            "https://gsas.harvard.edu/news/topic/leadership", 
-            "https://gsas.harvard.edu/news/topic/leadership?page=1",
-            "https://gsas.harvard.edu/news/topic/leadership?page=2",
-
+            "https://www.hbs.edu/news/Pages/browse.aspx?format=Article&source=Harvard%20Business%20School",    
         ]
         self.all_articles_details = []
 
@@ -42,21 +26,25 @@ class GsasArticleScraper:
         for a in soup.find_all('a'):
             href = a.get('href')
             if (href 
-                and "/news/" in href 
-                and "/news/topic/" not in href
-                and "https://" not in href
-                and "/news/search" not in href):
+            and "https://www.hbs.edu/news/" in href
+            and "https://www.hbs.edu/news/Pages/" not in href):
                 article_urls.append(href)
 
-        # print(article_urls)
         return article_urls
 
     def extract_article_content(self, soup):
-        content_div = soup.find('div', {'class': "field field--node-field-content field--name-field-content field--type-entity-reference-revisions field--label-hidden field__items"})
+        content_div = soup.find('table', {'class': 'body-html-fix'})
         if content_div:
             # Only get <p> tags that don't have a class attribute
             paragraphs = content_div.find_all('p', class_=False)
-            content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+            if paragraphs:
+                first_text = paragraphs[0].get_text(strip=True)
+                if first_text.lower().startswith('by '):
+                    paragraphs = paragraphs[1:]
+            if paragraphs:
+                content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+            else:
+                content = None
         else:
             content = None
             print("Content div not found")
@@ -71,14 +59,23 @@ class GsasArticleScraper:
 
     def extract_article_author(self, soup):
 
-        spans = soup.find_all('span', {'class': 'field field--node-field-author field--name-field-author field--type-entity-reference field--label-hidden field__item'})
-        if spans:    
-            text_list = [span.get_text() for span in spans]
-            return ', '.join(text_list)
+        author_div = soup.find('table', {'class': 'body-html-fix'})
+        if not author_div:
+            return None
+
+        author_tag = author_div.find('p')
+        if not author_tag:
+            return None
+
+        author_text = author_tag.get_text(strip=True)
+        if author_text.lower().startswith('by '):
+            return author_text[3:].strip()
+
+        return None
 
 
     def extract_article_publish_date(self, soup):
-        date_tag = soup.find("div", {"class":"field field--node-field-publication-date field--name-field-publication-date field--type-datetime field--label-hidden field__item"})
+        date_tag = soup.find("span", {"style":"text-transform:uppercase;"})
         try:
             if not date_tag:
                 return None
@@ -104,6 +101,7 @@ class GsasArticleScraper:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=self.headless)
             page = browser.new_page()
+            
 
             if self.test_mode=="single_topic":
                 self.topic_urls = [self.topic_urls[0]]
@@ -112,6 +110,7 @@ class GsasArticleScraper:
             article_urls = []
             for topic_url in self.topic_urls:
                 page.goto(topic_url, wait_until="domcontentloaded")
+                sleep(1)  # sleep needed to avoid bot detection
                 soup = BeautifulSoup(page.content(), 'html.parser')
                 topic_article_urls = self.extract_article_links(soup)
                 print(f"Found {len(topic_article_urls)} in the topic {topic_url}")
@@ -119,30 +118,27 @@ class GsasArticleScraper:
                 article_urls.extend(topic_article_urls)
 
                 page.wait_for_timeout(200)
-
-            # Normalize URLs to full format
-            normalized_urls = []
-            for url in article_urls:
-                if "https://gsas.harvard.edu" not in url:
-                    normalized_urls.append("https://gsas.harvard.edu" + url)
-                else:
-                    normalized_urls.append(url)
             
             # Filter to only new URLs not in database
-            normalized_urls = list(dict.fromkeys(normalized_urls))
-            new_urls = set(self.db_manager.filter_new_urls(normalized_urls))
-            print(f"Found {len(new_urls)} new articles (out of {len(normalized_urls)} total)")
+            article_urls = list(dict.fromkeys(article_urls))
+            if not self.test_mode:
+                article_urls = set(self.db_manager.filter_new_urls(article_urls))
+                print(f"Found {len(article_urls)} new articles (out of {len(article_urls)} total)")
             
             if self.test_mode:
-                print(len(new_urls))
-                print(f"Articles to test: {list(new_urls)[:10]}")
+                print(len(article_urls))
+                print(f"Articles to test: {list(article_urls)[:10]}")
+                article_urls=article_urls[:10]
 
             ## Using the article URLs extracted, Navigate to the indevidual articles and extract the main content from it
-            for article_url in tqdm(list(new_urls)):
+            for article_url in tqdm(list(article_urls)):
                 # URL already normalized above
                 page.goto(article_url, wait_until="domcontentloaded")
                 page.wait_for_timeout(1000)
                 html = page.content()
+
+                if self.test_mode:
+                    print(article_url)
 
                 soup = BeautifulSoup(html, 'html.parser')
                 article_details = {
@@ -152,14 +148,12 @@ class GsasArticleScraper:
                 "article_publish_date": self.extract_article_publish_date(soup),
                 "article_content": self.extract_article_content(soup),
                 "fetched_at": self.fetched_at_date_formatted(), 
-                "source_type": "Harvard Crimson",
+                "source_type": "Harvard Business School",
                 "summary":""
                 }
 
                 if self.test_mode:
-                    print(article_url)
                     print(article_details)
-
                 self.all_articles_details.append(article_details)
                     
                 page.wait_for_timeout(200)
@@ -169,7 +163,7 @@ class GsasArticleScraper:
         return self.all_articles_details
 
 if __name__=="__main__":
-    scraper = GsasArticleScraper(headless=False, test_mode="all_topics", wait_ms=1000)
+    scraper = HbsArticleScraper(headless=False, test_mode="all_topics", wait_ms=1000)
     details = scraper.scrape()
 
     print("GSAS News Scraper Summary")
