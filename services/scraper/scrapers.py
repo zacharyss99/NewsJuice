@@ -37,6 +37,7 @@ from gsas_scraper import GsasArticleScraper
 from hbs_scraper import HbsArticleScraper
 from hls_scraper import HlsArticleScraper
 from hms_scraper import HmsArticleScraper
+from hks_scraper import HksArticleScraper
 from db_manager import PostgresDBManager
 
 def main():
@@ -67,27 +68,31 @@ def main():
     # gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     # gsas_news_details = gsas_news_scraper.scrape()  
 
-    print("\nHBS  News Scraper")
-    hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    hbs_news_details = hbs_news_scraper.scrape()
+    # print("\nHBS  News Scraper")
+    # hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    # hbs_news_details = hbs_news_scraper.scrape()
         
-    print("\nHLS  News Scraper")
-    hls_news_scraper = HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    hls_news_details = hls_news_scraper.scrape()
+    # print("\nHLS  News Scraper")
+    # hls_news_scraper = HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    # hls_news_details = hls_news_scraper.scrape()
 
     print("\nHMS  News Scraper")
     hms_news_scraper = HmsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
     hms_news_details = hms_news_scraper.scrape()
 
+    print("\nHkS  News Scraper")
+    hks_news_scraper = HksArticleScraper(headless=True, test_mode=False, wait_ms=1000)
+    hks_news_details = hks_news_scraper.scrape()
 
     all_articles = [
                     # *gazzet_details,
                     # *crimson_details,
                     # *harvard_magazine_details,
                     # *gsas_news_details,
-                    *hbs_news_details,
-                    *hls_news_details,
+                    # *hbs_news_details,
+                    # *hls_news_details,
                     *hms_news_details,
+                    *hks_news_details
                     ]
     
     # Map scraper field names to database column names
