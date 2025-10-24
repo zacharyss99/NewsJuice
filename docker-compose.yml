@@ -89,6 +89,8 @@ services:
       - "--address=0.0.0.0"
       - "--credentials-file=/run/secrets/gcp.json"
       - "newsjuice-123456:us-central1:newsdb-instance"
+    ports:
+      - "5432:5432"
     volumes:
       - ../secrets/gcp.json:/run/secrets/gcp.json:ro
     restart: unless-stopped
