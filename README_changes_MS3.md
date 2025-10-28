@@ -16,7 +16,7 @@
 
 
 - Added finetuning service
-
+- Added 8 more scrapers, completeing the scrapers for Harvard News Sources
 - Added chatter_deployed and frontend_deployed services in "Services" folder (first version of all with frontend and fully deployed with Cloud Run), accessible: at *www.newsjuiceapp.com*). See README files inside the folcer
 
 - OTHERS ??
