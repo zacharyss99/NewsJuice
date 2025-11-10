@@ -9,7 +9,7 @@ services:
       - "--port=5432"
       - "newsjuice-123456:us-central1:newsdb-instance"
     volumes:
-      - ./secrets/sa-key.json:/secrets/sa-key.json:ro
+      - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
     ports:
@@ -24,6 +24,8 @@ services:
       context: .
       args:
         HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
+    env_file:
+      - .env.local  # Use .env.local for local development
     ports:
       - "8080:8080"
     depends_on:
@@ -42,6 +44,8 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
       - GEMINI_SERVICE_ACCOUNT_PATH=/secrets/gemini-service-account.json
       
+      # Google AI API (for Live API - loaded from .env.local via env_file)
+      
       # GCS
       - AUDIO_BUCKET=ac215-audio-bucket
       - GCS_PREFIX=podcasts/
@@ -58,8 +62,8 @@ services:
     
     volumes:
       # Mount service account keys (read-only)
-      - ../secrets/sa-key.json:/app/sa-key.json:ro
-      - ../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
+      - ../../../secrets/sa-key.json:/app/sa-key.json:ro
+      - ../../../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
       
       # Optional: Mount code for hot-reload during development
       # Uncomment these lines if you want to edit code without rebuilding
