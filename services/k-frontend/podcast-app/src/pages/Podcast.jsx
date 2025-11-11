@@ -12,20 +12,16 @@ function Podcast() {
   const [statusMessage, setStatusMessage] = useState("Go ahead, I'm listening")
   const [menuOpen, setMenuOpen] = useState(false)
   const [showOrbSelector, setShowOrbSelector] = useState(false)
-  const [selectedOrb, setSelectedOrb] = useState(1) // Default to original orb
-  const mediaRecorderRef = useRef(null)
-  const audioChunksRef = useRef([])
-  const playbackTimeoutRef = useRef(null)
-  const speechSynthesisRef = useRef(null)
+  const [selectedOrb, setSelectedOrb] = useState(1)
 
-  // Simulated AI responses
-  const aiResponses = [
-    "That's a great question! Let me share some insights about that topic...",
-    "Interesting point! Based on recent developments, I can tell you that...",
-    "I understand what you're asking. Here's what you need to know...",
-    "Excellent question! Let me break this down for you...",
-    "That's fascinating! From my knowledge, I can explain that..."
-  ]
+  // WebSocket and audio refs
+  const wsRef = useRef(null)
+  const audioContextRef = useRef(null)
+  const mediaStreamRef = useRef(null)
+  const processorRef = useRef(null)
+  const audioBufferRef = useRef([])
+  const audioPlayerRef = useRef(null)
+  const isStreamingAudioRef = useRef(false)
 
   const newsTopics = [
     "Women's Volleyball",
@@ -50,21 +46,161 @@ function Podcast() {
     }
   ]
 
-  useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      if (playbackTimeoutRef.current) {
-        clearTimeout(playbackTimeoutRef.current)
+  // WebSocket URL
+  const getWebSocketUrl = () => {
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    const protocol = isProduction ? 'wss' : 'ws'
+    const host = isProduction 
+      ? 'chatter-919568151211.us-central1.run.app'
+      : 'localhost:8080'
+    const token = localStorage.getItem('auth_token')
+    return `${protocol}://${host}/ws/chat${token ? `?token=${token}` : ''}`
+  }
+
+  // Connect WebSocket
+  const connectWebSocket = () => {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(getWebSocketUrl())
+      
+      ws.onopen = () => {
+        console.log("[ws] Connected")
+        wsRef.current = ws
+        resolve()
       }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop()
+      
+      ws.onerror = (error) => {
+        console.error("[ws] Error:", error)
+        reject(error)
       }
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel()
+      
+      ws.onclose = () => {
+        console.log("[ws] Disconnected")
+        wsRef.current = null
+      }
+      
+      ws.onmessage = async (event) => {
+        if (event.data instanceof Blob) {
+          // Received audio bytes
+          handleAudioChunk(event.data)
+        } else {
+          // Received JSON status message
+          try {
+            const data = JSON.parse(event.data)
+            handleStatusMessage(data)
+          } catch (e) {
+            console.error("[ws] Failed to parse message:", e)
+          }
+        }
+      }
+    })
+  }
+
+  // Handle status messages from backend
+  const handleStatusMessage = (data) => {
+    const status = data.status
+    
+    switch(status) {
+      case "chunk_received":
+        break
+      case "transcribing":
+        setStatusMessage("🎤 Transcribing your voice...")
+        break
+      case "transcribed":
+        setStatusMessage(`✅ Transcribed: "${data.text}"`)
+        break
+      case "retrieving":
+        setStatusMessage("🔍 Finding relevant news articles...")
+        break
+      case "generating":
+        setStatusMessage("✨ Generating podcast response...")
+        break
+      case "podcast_generated":
+        setStatusMessage("📝 Podcast text ready!")
+        break
+      case "converting_to_audio":
+        setStatusMessage("🔊 Converting to audio...")
+        break
+      case "streaming_audio":
+        setStatusMessage("📡 Receiving audio stream...")
+        audioBufferRef.current = []
+        isStreamingAudioRef.current = false
+        break
+      case "complete":
+        setStatusMessage("✅ Complete! Playing podcast...")
+        finalizeAudio()
+        break
+      case "error":
+        setStatusMessage(`❌ Error: ${data.error}`)
+        setIsRecording(false)
+        break
+      default:
+        console.log("[ws] Status:", data)
+    }
+  }
+
+  // Handle audio chunks from backend
+  const handleAudioChunk = (chunk) => {
+    if (!isStreamingAudioRef.current) {
+      console.log("[audio] Starting to accumulate audio chunks")
+      isStreamingAudioRef.current = true
+    }
+    
+    audioBufferRef.current.push(chunk)
+    console.log(`[audio] Accumulated ${audioBufferRef.current.length} chunks (${chunk.size} bytes)`)
+  }
+
+  // Finalize and play audio
+  const finalizeAudio = () => {
+    if (audioBufferRef.current.length === 0) {
+      console.warn("[audio] No audio chunks to finalize")
+      return
+    }
+    
+    console.log(`[audio] Finalizing audio: ${audioBufferRef.current.length} chunks`)
+    
+    const mimeTypes = ['audio/wav', 'audio/wave', 'audio/x-wav']
+    
+    for (const mimeType of mimeTypes) {
+      try {
+        const audioBlob = new Blob(audioBufferRef.current, { type: mimeType })
+        const audioUrl = URL.createObjectURL(audioBlob)
+        
+        // Create audio element if it doesn't exist
+        if (!audioPlayerRef.current) {
+          audioPlayerRef.current = new Audio()
+        }
+        
+        audioPlayerRef.current.src = audioUrl
+        audioPlayerRef.current.oncanplay = () => {
+          console.log("[audio] Audio can play, attempting autoplay")
+          setIsPlaying(true)
+          audioPlayerRef.current.play().catch((err) => {
+            console.warn("[audio] Autoplay blocked:", err)
+          })
+        }
+        
+        audioPlayerRef.current.onended = () => {
+          setIsPlaying(false)
+          setStatusMessage("Go ahead, I'm listening")
+          URL.revokeObjectURL(audioUrl)
+        }
+        
+        audioPlayerRef.current.onerror = (e) => {
+          console.error(`[audio] Error playing audio with ${mimeType}:`, e)
+        }
+        
+        break
+      } catch (e) {
+        console.warn(`[audio] Failed to create blob with ${mimeType}:`, e)
       }
     }
-  }, [])
+    
+    // Reset for next recording
+    audioBufferRef.current = []
+    isStreamingAudioRef.current = false
+  }
 
+  // Start recording
   const startRecording = async () => {
     try {
       // Stop any ongoing playback
@@ -72,87 +208,103 @@ function Podcast() {
         stopPlayback()
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorderRef.current = new MediaRecorder(stream)
-      audioChunksRef.current = []
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data)
+      // Connect WebSocket
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        setStatusMessage("Connecting...")
+        await connectWebSocket()
       }
 
-      mediaRecorderRef.current.onstop = () => {
-        // When recording stops, simulate AI response playback
-        simulateAIResponse()
-        stream.getTracks().forEach(track => track.stop())
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: { ideal: 44100 },
+          channelCount: { ideal: 1 }
+        }
+      })
+
+      mediaStreamRef.current = stream
+
+      // Create AudioContext
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+
+      const source = audioContext.createMediaStreamSource(stream)
+
+      // Create ScriptProcessorNode to capture audio
+      const bufferSize = 4096
+      const processor = audioContext.createScriptProcessor(bufferSize, 1, 1)
+
+      processor.onaudioprocess = (e) => {
+        if (!isRecording || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          return
+        }
+
+        const inputData = e.inputBuffer.getChannelData(0)
+        const pcmData = new Int16Array(inputData.length)
+
+        // Convert float32 to int16 PCM
+        for (let i = 0; i < inputData.length; i++) {
+          const sample = Math.max(-1, Math.min(1, inputData[i]))
+          pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF
+        }
+
+        // Send audio chunk to backend
+        wsRef.current.send(pcmData.buffer)
       }
 
-      mediaRecorderRef.current.start()
+      processorRef.current = processor
+      source.connect(processor)
+      processor.connect(audioContext.destination)
+
       setIsRecording(true)
       setStatusMessage("Listening...")
     } catch (error) {
-      console.error('Error accessing microphone:', error)
-      setStatusMessage("Microphone access denied")
+      console.error('Error starting recording:', error)
+      setStatusMessage("Error: " + error.message)
     }
   }
 
+  // Stop recording
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current = null
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+
+    setIsRecording(false)
+
+    // Send complete signal to backend
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "complete" }))
+      setStatusMessage("Processing...")
     }
   }
 
-  const simulateAIResponse = () => {
-    // Simulate processing time
-    setStatusMessage("Processing...")
-    
-    setTimeout(() => {
-      // Pick a random AI response
-      const response = aiResponses[Math.floor(Math.random() * aiResponses.length)]
-      setStatusMessage(response)
-      setIsPlaying(true)
-
-      // Use Web Speech API to actually speak the response
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(response)
-        utterance.rate = 1.0
-        utterance.pitch = 1.0
-        utterance.volume = 1.0
-        
-        // When speech ends, return to listening state
-        utterance.onend = () => {
-          stopPlayback()
-        }
-        
-        utterance.onerror = (event) => {
-          console.error('Speech synthesis error:', event)
-          stopPlayback()
-        }
-        
-        speechSynthesisRef.current = utterance
-        window.speechSynthesis.speak(utterance)
-      } else {
-        // Fallback if speech synthesis not available
-        const duration = 3000 + Math.random() * 2000
-        playbackTimeoutRef.current = setTimeout(() => {
-          stopPlayback()
-        }, duration)
-      }
-    }, 500)
-  }
-
+  // Stop playback
   const stopPlayback = () => {
-    if (playbackTimeoutRef.current) {
-      clearTimeout(playbackTimeoutRef.current)
-    }
-    // Cancel any ongoing speech
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel()
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      audioPlayerRef.current.currentTime = 0
     }
     setIsPlaying(false)
     setStatusMessage("Go ahead, I'm listening")
   }
 
+  // Handle call button
   const handleCallButton = () => {
     if (isRecording) {
       stopRecording()
@@ -164,6 +316,27 @@ function Podcast() {
     }
   }
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+      if (processorRef.current) {
+        processorRef.current.disconnect()
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause()
+      }
+    }
+  }, [])
+
   const handleOrbSelection = (orbId) => {
     if (orbId !== null) {
       setSelectedOrb(orbId)
@@ -173,16 +346,8 @@ function Podcast() {
 
   const getOrbComponent = () => {
     const orbMap = {
-      1: OrbStyle1,
-      2: OrbStyle2,
-      3: OrbStyle3,
-      4: OrbStyle4,
-      5: OrbStyle5,
-      6: OrbStyle6,
-      7: OrbStyle7,
-      8: OrbStyle8,
-      9: OrbStyle9,
-      10: OrbStyle10,
+      1: OrbStyle1, 2: OrbStyle2, 3: OrbStyle3, 4: OrbStyle4, 5: OrbStyle5,
+      6: OrbStyle6, 7: OrbStyle7, 8: OrbStyle8, 9: OrbStyle9, 10: OrbStyle10,
     }
     return orbMap[selectedOrb] || OrbStyle1
   }
@@ -253,6 +418,8 @@ function Podcast() {
               </button>
               <button
                 onClick={() => {
+                  localStorage.removeItem('auth_token')
+                  localStorage.removeItem('user_id')
                   navigate('/login')
                   setMenuOpen(false)
                 }}
@@ -268,7 +435,7 @@ function Podcast() {
 
       {/* Main Content - Split Screen Layout */}
       <div className="relative z-10 flex flex-col lg:flex-row lg:h-[calc(100vh-80px)]">
-        {/* Right Half - Orb and Controls (First on mobile, Right on desktop) */}
+        {/* Right Half - Orb and Controls */}
         <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-6 py-6 lg:py-12 relative lg:order-2 min-h-[80vh] lg:min-h-0">
           {/* Status Message */}
           <motion.div
@@ -302,7 +469,10 @@ function Podcast() {
             </motion.button>
 
             <motion.button
-              onMouseDown={handleCallButton}
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onTouchStart={startRecording}
+              onTouchEnd={stopRecording}
               whileTap={{ scale: 0.95 }}
               className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${
                 isRecording
@@ -327,7 +497,7 @@ function Podcast() {
           </div>
         </div>
 
-        {/* Left Half - News and Sources (Second on mobile, Left on desktop) */}
+        {/* Left Half - News and Sources */}
         <div className="w-full lg:w-1/2 px-6 py-6 overflow-y-auto lg:order-1">
           {/* News Topics */}
           <div className="mb-8">

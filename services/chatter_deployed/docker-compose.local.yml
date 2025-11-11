@@ -52,7 +52,8 @@ services:
       - CACHE_CONTROL=public, max-age=3600
       
       # CORS
-      - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000
+      # - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000
+      - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000,http://localhost:5173
       
       # Server
       - PORT=8080

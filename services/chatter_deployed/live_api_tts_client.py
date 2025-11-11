@@ -10,7 +10,8 @@ from typing import AsyncIterator, Optional
 from google import genai
 from google.genai import types
 
-
+#text_to_audio_stream converts text to audio using LiveAPI and streams audio chunks to WebSocket
+#text_to_audio_stream(text: str, websocket)
 async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
     """
     Convert text to audio using LiveAPI and stream audio chunks to WebSocket.
@@ -25,17 +26,18 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
     try:
         print(f"[live-api-tts] Starting text-to-audio conversion, text length: {len(text)} chars")
         
-        # Get API key
+        #get API key for Google
         api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
         if not api_key:
             print("[live-api-tts-error] GOOGLE_API_KEY not set")
             return None
         
-        # Initialize client
+        #initialize liveAPI client, client = genai.Client(api_key=api_key)
         client = genai.Client(api_key=api_key)
+        #half-cascade model, this model is used for production
         model = "gemini-live-2.5-flash-preview"
         
-        # Configure for audio output (not text)
+        # response_modalities has to equal audio because we are outputting audio
         config = {"response_modalities": ["AUDIO"]}  # Request audio output
         
         print(f"[live-api-tts] Connecting to Live API with model: {model}")
@@ -43,18 +45,18 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
         async with client.aio.live.connect(model=model, config=config) as session:
             print("[live-api-tts] Connected, sending text...")
             
-            # Send text to LiveAPI (split into chunks if too long, or send all at once)
+            # send text to LIVEAPI via session.send_realtime_input(text=text)
             # LiveAPI expects text input, not text_stream_end
             await session.send_realtime_input(text=text)
             
             print("[live-api-tts] Text sent, receiving audio stream...")
             
-            # Stream audio chunks as they arrive
+            # initialize the audio chunk buffers to 0
             audio_chunk_count = 0
             total_audio_bytes = 0
             all_audio_chunks = []  # Accumulate all chunks to convert to WAV
             
-            # Add timeout for receiving responses
+            # here we collect the audio chunks in the respective buffers as they are created by LiveAPI
             try:
                 async def collect_audio():
                     nonlocal audio_chunk_count, total_audio_bytes, all_audio_chunks
@@ -84,7 +86,7 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
                             
                             print(f"[live-api-tts] Received audio chunk {audio_chunk_count} ({len(audio_data)} bytes)")
                         
-                        # Check if stream is complete
+                        # check if the stream is complete
                         if hasattr(response, 'server_content') and response.server_content:
                             if hasattr(response.server_content, 'generation_complete') and response.server_content.generation_complete:
                                 print(f"[live-api-tts] Generation complete")
@@ -101,7 +103,7 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
             
             print(f"[live-api-tts] Audio stream complete: {audio_chunk_count} chunks, {total_audio_bytes} total bytes")
             
-            # Convert PCM to WAV format before sending
+            # convert PCM (analog) to WAV because that is the audio input the frontend takes
             if all_audio_chunks:
                 print(f"[live-api-tts] Converting {len(all_audio_chunks)} PCM chunks to WAV format...")
                 pcm_data = b''.join(all_audio_chunks)
@@ -109,7 +111,7 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
                 
                 print(f"[live-api-tts] Converted to WAV: {len(pcm_data)} bytes PCM -> {len(wav_data)} bytes WAV")
                 
-                # Stream WAV in chunks to frontend
+                # stream WAV chunks to frontend via websocket.send_bytes(chunk)
                 chunk_size = 8192
                 for i in range(0, len(wav_data), chunk_size):
                     chunk = wav_data[i:i + chunk_size]
