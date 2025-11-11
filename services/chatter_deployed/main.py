@@ -33,6 +33,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import json
 import base64
 from typing import Optional 
+from firebase_auth import initialize_firebase_admin, verify_token
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request, HTTPException
+from user_db import create_user, get_user_preferences, save_user_preferences, save_audio_history, get_audio_history
 
 #importing helper functions
 from chatter_handler import chatter
@@ -58,7 +62,14 @@ app.add_middleware(
     allow_origins=ORIGINS,
     allow_methods=["POST", "OPTIONS", "GET"],
     allow_headers=["*"],
+    allow_credentials=True,  # Required for Authorization header
 )
+try:
+    initialize_firebase_admin()
+except Exception as e:
+    print(f"[firebase-admin-warning] Firebase Admin not initialized: {e}")
+    print("[firebase-admin-warning] Authentication will not work until Firebase Admin is configured")
+
 
 # --------------------------
 # Health
@@ -83,6 +94,28 @@ async def websocket_chatter(websocket: WebSocket):
     - Backend streams audio response as bytes
     """
     await websocket.accept()
+
+    #get token from query params
+    token = websocket.query_params.get("token")
+    user_id = None
+    
+    if token:
+        try:
+            decoded_token = verify_token(token)
+            user_id = decoded_token['uid']
+            print(f"[websocket] Authenticated user: {user_id}")
+        except Exception as e:
+            await websocket.send_json({"error": "Invalid token"})
+            await websocket.close()
+            return
+    else:
+        print("[websocket-warning] No token provided, proceeding without auth")
+    
+    # Now you have user_id available for the rest of the WebSocket handler
+    # Use it to save to CloudSQL:
+    # - Save audio history with user_id
+    # - Load user preferences with user_id
+    
     audio_buffer = bytearray()
     tts_client = OpenAI()  # Initialize once, reuse in loop
 
@@ -116,7 +149,11 @@ async def websocket_chatter(websocket: WebSocket):
                             print("[websocket] Starting transcription...")
                             
                             try:
+                                #audio_to_text again is the speech_to_text_client.py file, that converts our frontend
+                                #audio to text. the transcribed text is the output from audio_to_text.
                                 text = await audio_to_text(bytes(audio_buffer))
+                                #I think this is what shows up in the backend terminal once the transcription is complete
+                                #so we can monitor progress
                                 print(f"[websocket] Transcription complete, text: {text[:100] if text else 'None'}...")
                             except Exception as e:
                                 print(f"[websocket] Transcription error: {e}")
@@ -128,17 +165,26 @@ async def websocket_chatter(websocket: WebSocket):
                                 await websocket.send_json({"error": "Failed to transcribe audio (empty response)"})
                                 audio_buffer.clear()
                                 continue
-                            
+                            #websocket.send_json updates the frontend, status message via websocket
+                            #frontend receives this and updates the UI
                             await websocket.send_json({"status": "transcribed", "text": text})
                             
-                            # Step 2: Retrieve relevant chunks
+                            #step2: once the audio is transcribed, we call the retriever using the transcribed text
+                            #nothing has changed from the call_retriever_service
+                            #still searches vector detabase 
                             await websocket.send_json({"status": "retrieving"})
                             chunks = call_retriever_service(text) ##THIS IS WHERE THE RETIREVAL STEP HAPPENS 
+                            ##this returns most relevant chunks based on 
+                            # SELECT id, chunk, embedding <=> %s AS score
+                             # FROM {}
+                             # ORDER BY embedding <=> %s
+                            # LIMIT %s;
                             
                             if not chunks:
                                 await websocket.send_json({"warning": "No relevant articles found"})
                             
-                            # Step 3: Generate podcast text
+                            #step 3: call_gemini_api to actually generate podcast text based on the text, chunks, model
+                            #podcast_text = call_gemini_api(text,chunks,model)
                             await websocket.send_json({"status": "generating"})
                             podcast_text, error = call_gemini_api(text, chunks, model)
                             
@@ -149,7 +195,7 @@ async def websocket_chatter(websocket: WebSocket):
                             
                             await websocket.send_json({"status": "podcast_generated", "text": podcast_text})
                             
-                            # Step 4: Stream text-to-audio using LiveAPI
+                            #step4: call_gemini_api gives us a podcast text output, which then we convert to audio
                             await websocket.send_json({"status": "converting_to_audio"})
                             try:
                                 # Signal that we're starting to stream audio
@@ -165,7 +211,17 @@ async def websocket_chatter(websocket: WebSocket):
                                 
                                 # Signal completion
                                 await websocket.send_json({"status": "complete"})
-                                
+
+                                # Save audio history if user is authenticated
+                                if user_id:
+                                    save_audio_history(
+                                        user_id=user_id,
+                                        question_text=text,  # The transcribed question
+                                        podcast_text=podcast_text,  # The generated podcast text
+                                        audio_url=None  # Optional: add if you store audio files
+                                    )
+                                    print(f"[websocket] Audio history saved for user: {user_id}")
+                            
                             except Exception as e:
                                 await websocket.send_json({"error": f"TTS failed: {str(e)}"})
                                 audio_buffer.clear()
@@ -188,6 +244,8 @@ async def websocket_chatter(websocket: WebSocket):
                         await websocket.send_json({"error": "Invalid JSON"})
                     except Exception as e:
                         await websocket.send_json({"error": str(e)})
+        
+
     except WebSocketDisconnect:
         print("[websocket] Client disconnected")
     except Exception as e:
@@ -196,7 +254,8 @@ async def websocket_chatter(websocket: WebSocket):
             await websocket.send_json({"error": str(e)})
         except:
             pass
-
+    
+         
             
 
 # --------------------------
@@ -206,3 +265,93 @@ async def websocket_chatter(websocket: WebSocket):
 async def chatter_endpoint(payload: Dict[str, Any] = Body(...)):
     return await chatter(payload)
 
+
+# ----------------------
+# Firebase middleware class
+# ----------------------
+class FirebaseAuthMiddleware(BaseHTTPMiddleware):
+    """Middleware to validate Firebase tokens for protected routes."""
+    
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth for OPTIONS (CORS preflight) requests
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
+        # Skip auth for health check and public endpoints
+        if request.url.path in ["/", "/healthz", "/docs", "/openapi.json"]:
+            return await call_next(request)
+        
+        # WebSocket handles auth separately (see below)
+        if request.url.path.startswith("/ws/"):
+            return await call_next(request)
+        
+        # Get token from header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+        
+        token = auth_header.split("Bearer ")[1]
+        
+        try:
+            # Verify token
+            decoded_token = verify_token(token)
+            user_id = decoded_token['uid']
+            
+            # Attach user info to request state
+            request.state.user_id = user_id
+            request.state.user_email = decoded_token.get('email')
+            
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+        
+        return await call_next(request)
+
+# Add middleware to app
+app.add_middleware(FirebaseAuthMiddleware)
+
+@app.post("/api/user/create")
+async def create_user_endpoint(request: Request):
+    "create new user in CloudSQL after FIrebase registration"
+    try:
+        user_id = request.state.user_id
+        user_email = request.state.user_email
+        success = create_user(user_id, user_email)
+        if success:
+            return{"status":"success", "user_id":user_id}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+@app.get("/api/user/preferences")
+async def get_preferences_endpoint(request: Request):
+    """Get user preferences."""
+    try:
+        user_id = request.state.user_id
+        preferences = get_user_preferences(user_id)
+        return {"status": "success", "preferences": preferences}
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+@app.post("/api/user/preferences")
+async def save_preferences_endpoint(request: Request, preferences: Dict[str, Any] = Body(...)):
+    """Save user preferences."""
+    try:
+        user_id = request.state.user_id
+        success = save_user_preferences(user_id, preferences)
+        if success:
+            return {"status": "success", "message": "Preferences saved"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save preferences")
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+@app.get("/api/user/history")
+async def get_history_endpoint(request: Request, limit: int = 10):
+    """Get user's audio history."""
+    try:
+        user_id = request.state.user_id
+        history = get_audio_history(user_id, limit)
+        return {"status": "success", "history": history}
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")

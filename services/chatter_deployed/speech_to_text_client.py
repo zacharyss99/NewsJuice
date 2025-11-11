@@ -7,20 +7,13 @@ for reliable batch transcription of audio.
 import os
 from typing import Optional
 
-# Try Google Cloud Speech-to-Text first (preferred)
+# Try google cloud speech to text in order to transcribe audio
 try:
     from google.cloud import speech
     GOOGLE_SPEECH_AVAILABLE = True
 except ImportError:
     GOOGLE_SPEECH_AVAILABLE = False
-    print("[speech-to-text] google-cloud-speech not available, will try OpenAI Whisper")
-
-# Fallback to OpenAI Whisper if Google Speech not available
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+    print("[speech-to-text] google-cloud-speech not available")
 
 
 async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
@@ -28,7 +21,7 @@ async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
     Convert audio bytes (PCM 16kHz mono) to text using Speech-to-Text API.
     
     Args:
-        audio_bytes: Raw audio data in PCM 16kHz mono format
+        audio_bytes: Raw audio data in PCM 16kHz mono format that come FROM THE FRONTEND
         
     Returns:
         Transcribed text string, or None if transcription fails
@@ -36,13 +29,11 @@ async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
     try:
         print(f"[speech-to-text] Starting transcription, audio size: {len(audio_bytes)} bytes")
         
-        # Try Google Cloud Speech-to-Text first
-        if GOOGLE_SPEECH_AVAILABLE:
-            return await _transcribe_with_google_speech(audio_bytes)
         
-        # Fallback to OpenAI Whisper
-        elif OPENAI_AVAILABLE:
-            return await _transcribe_with_openai_whisper(audio_bytes)
+        if GOOGLE_SPEECH_AVAILABLE:
+            #transcribe_with_google_speech is defined below
+            return await _transcribe_with_google_speech(audio_bytes)
+    
         
         else:
             print("[speech-to-text-error] No speech-to-text library available")
@@ -56,21 +47,25 @@ async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
 
 
 async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
-    """Transcribe using Google Cloud Speech-to-Text API."""
+    """Transcribe the audio from frontend using the Google Speech to Text API."""
     try:
-        # Initialize client (uses GOOGLE_APPLICATION_CREDENTIALS from env)
+        #initialize the client, which uses GOOGLE_APPLICATION_CREDENTIALS from env
         client = speech.SpeechClient()
         
-        # Create audio object
+        # create the audio object. This wraps raw audio bytes into a RecognitionAudio object for the Google
+        # Cloud Speech-to-Text. Tells the API the audio data to transcribe.
         audio = speech.RecognitionAudio(content=audio_bytes)
         
-        # Try multiple sample rates (browsers often use 44.1kHz or 48kHz, not 16kHz)
+        # have to try multiple sample rates in case there is something funky from the frontend
+        #but usually audio streamed from a browser is 44100 Hz
+        #sample rate is how many audio samples per second, so higher = better quality, larger files. It's like frames per second.
         sample_rates_to_try = [44100, 48000, 16000, 22050, 32000]
         
         print("[speech-to-text] Trying multiple sample rates...")
         
         for sample_rate in sample_rates_to_try:
             # Configure recognition
+            #configure recognition tries to recognize the sample rate of the audio
             config = speech.RecognitionConfig(
                 encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
                 sample_rate_hertz=sample_rate,
@@ -84,12 +79,16 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
             
             try:
                 # Perform transcription
+                #.recognize is what the Google Cloud Speech  to Text API uses to understand audio, in order for transcription
                 response = client.recognize(config=config, audio=audio)
         
                 # Debug: Print full response
                 print(f"[speech-to-text] Response received: {len(response.results)} results")
                 
-                # Extract transcript from response
+                # Here we actually transcript the text in the event the response is recognized.
+                #processes phrase/sentence segments (response.results is multiple transcription segments)
+                #alternatives[0] = best interpretation of that segment. alternatives is a list of potential phrases
+                #the given audio segment could be. confidence reflects confidence for entire segment.
                 transcript_parts = []
                 for i, result in enumerate(response.results):
                     if result.alternatives:
@@ -119,41 +118,3 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
     except Exception as e:
         print(f"[speech-to-text-error] Google Speech-to-Text error: {e}")
         raise
-
-
-async def _transcribe_with_openai_whisper(audio_bytes: bytes) -> Optional[str]:
-    """Transcribe using OpenAI Whisper API (fallback)."""
-    try:
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            print("[speech-to-text-error] OPENAI_API_KEY not set")
-            return None
-        
-        client = OpenAI(api_key=api_key)
-        
-        print("[speech-to-text] Sending audio to OpenAI Whisper...")
-        
-        # OpenAI Whisper expects a file-like object
-        import io
-        audio_file = io.BytesIO(audio_bytes)
-        audio_file.name = "audio.pcm"  # Give it a name
-        
-        # Call Whisper API
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            language="en",
-            response_format="text"
-        )
-        
-        if transcript:
-            print(f"[speech-to-text] Transcription successful: {transcript[:100]}...")
-            return transcript.strip()
-        else:
-            print("[speech-to-text] No transcript returned from OpenAI Whisper")
-            return None
-            
-    except Exception as e:
-        print(f"[speech-to-text-error] OpenAI Whisper error: {e}")
-        raise
-
