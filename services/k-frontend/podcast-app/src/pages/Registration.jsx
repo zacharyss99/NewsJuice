@@ -4,6 +4,10 @@ import { auth } from '../firebase/config';
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 
+"How this works"
+"1. User fills out registration form (on Registration.jsx) "
+"2. Firebase Authenticates their form data, user email and pwd with the createUserWithEmailandPassword() helper"
+
 function Registration() {
   const [formData, setFormData] = useState({
     fullName: '',

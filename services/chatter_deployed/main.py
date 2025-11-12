@@ -118,6 +118,7 @@ async def websocket_chatter(websocket: WebSocket):
     
     audio_buffer = bytearray()
     tts_client = OpenAI()  # Initialize once, reuse in loop
+    is_processing = False  # Track if we're currently processing a request
 
     try: 
         while True:
@@ -128,20 +129,34 @@ async def websocket_chatter(websocket: WebSocket):
             if message["type"] == "websocket.receive":
                 # Handle raw audio bytes
                 if "bytes" in message:
+                    # If we're processing a previous request, ignore new audio chunks
+                    if is_processing:
+                        print(f"[websocket] Ignoring audio chunk - still processing previous request")
+                        continue
+                    chunk_size = len(message["bytes"])
                     audio_buffer.extend(message["bytes"])
+                    print(f"[websocket] Received audio chunk: {chunk_size} bytes, total buffer: {len(audio_buffer)} bytes")
                     await websocket.send_json({"status": "chunk_received", "size": len(audio_buffer)})
                 
                 # Handle JSON control messages
                 elif "text" in message:
                     try:
                         data = json.loads(message["text"])
+                        print(f"[websocket] Received JSON message: {data}")
 
                         if data.get("type") == "complete":
+                            # Check if we're already processing
+                            if is_processing:
+                                print("[websocket] Already processing a request, ignoring new complete signal")
+                                continue
+                            
                             # Check if we have audio to process
                             if len(audio_buffer) == 0:
+                                print("[websocket] ERROR: No audio received in buffer!")
                                 await websocket.send_json({"error": "No audio received"})
                                 continue
                             
+                            is_processing = True
                             print(f"[websocket] Received complete signal, audio buffer size: {len(audio_buffer)} bytes")
                             
                             # Step 1: Convert audio to text
@@ -159,11 +174,13 @@ async def websocket_chatter(websocket: WebSocket):
                                 print(f"[websocket] Transcription error: {e}")
                                 await websocket.send_json({"error": f"Transcription failed: {str(e)}"})
                                 audio_buffer.clear()
+                                is_processing = False
                                 continue
                             
                             if not text:
                                 await websocket.send_json({"error": "Failed to transcribe audio (empty response)"})
                                 audio_buffer.clear()
+                                is_processing = False
                                 continue
                             #websocket.send_json updates the frontend, status message via websocket
                             #frontend receives this and updates the UI
@@ -191,6 +208,7 @@ async def websocket_chatter(websocket: WebSocket):
                             if error or not podcast_text:
                                 await websocket.send_json({"error": f"LLM error: {error}"})
                                 audio_buffer.clear()
+                                is_processing = False
                                 continue
                             
                             await websocket.send_json({"status": "podcast_generated", "text": podcast_text})
@@ -225,10 +243,13 @@ async def websocket_chatter(websocket: WebSocket):
                             except Exception as e:
                                 await websocket.send_json({"error": f"TTS failed: {str(e)}"})
                                 audio_buffer.clear()
+                                is_processing = False
                                 continue
                             
                             # Reset buffer for next request
                             audio_buffer.clear()
+                            is_processing = False
+                            print("[websocket] Request processing complete, ready for next recording")
                             
                         elif data.get("type") == "audio":
                             # JSON with base64 audio data
@@ -238,7 +259,9 @@ async def websocket_chatter(websocket: WebSocket):
                         elif data.get("type") == "reset":
                             # Frontend wants to reset
                             audio_buffer.clear()
+                            is_processing = False
                             await websocket.send_json({"status": "reset"})
+                            print("[websocket] Reset signal received, cleared buffer and processing flag")
                             
                     except json.JSONDecodeError:
                         await websocket.send_json({"error": "Invalid JSON"})

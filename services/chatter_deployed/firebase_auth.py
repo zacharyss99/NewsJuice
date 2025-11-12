@@ -12,7 +12,7 @@ def initialize_firebase_admin():
         print("[firebase-admin] Already initialized")
         return
     
-    # Option 1: Use service account JSON file (for local dev)
+    # service account JSON file for the local development
     service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
     if service_account_path and os.path.exists(service_account_path):
         cred = credentials.Certificate(service_account_path)
@@ -20,7 +20,7 @@ def initialize_firebase_admin():
         print("[firebase-admin] Initialized with service account file")
         return
    
-    # Option 2: Use default credentials (for Cloud Run with Workload Identity)
+    # this is firebase authorization for the cloud deployment
     try:
         firebase_admin.initialize_app()
         print("[firebase-admin] Initialized with default credentials")
