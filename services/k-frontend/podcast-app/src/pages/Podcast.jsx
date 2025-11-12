@@ -22,6 +22,7 @@ function Podcast() {
   const audioBufferRef = useRef([])
   const audioPlayerRef = useRef(null)
   const isStreamingAudioRef = useRef(false)
+  const isRecordingRef = useRef(false) // Use ref for audio processor to avoid state timing issues
 
   const newsTopics = [
     "Women's Volleyball",
@@ -202,10 +203,23 @@ function Podcast() {
 
   // Start recording
   const startRecording = async () => {
+    // Prevent starting a new recording if already recording (check both state and ref)
+    if (isRecording || isRecordingRef.current) {
+      console.log("[recording] Already recording, ignoring start request")
+      return
+    }
+    
     try {
       // Stop any ongoing playback
       if (isPlaying) {
         stopPlayback()
+      }
+
+      // If WebSocket exists but is not open, close it and create a new one
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.OPEN) {
+        console.log("[recording] WebSocket not open, closing and reconnecting...")
+        wsRef.current.close()
+        wsRef.current = null
       }
 
       // Connect WebSocket
@@ -239,7 +253,8 @@ function Podcast() {
       const processor = audioContext.createScriptProcessor(bufferSize, 1, 1)
 
       processor.onaudioprocess = (e) => {
-        if (!isRecording || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        // Use ref instead of state to avoid timing issues
+        if (!isRecordingRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
           return
         }
 
@@ -253,15 +268,23 @@ function Podcast() {
         }
 
         // Send audio chunk to backend
-        wsRef.current.send(pcmData.buffer)
+        try {
+          wsRef.current.send(pcmData.buffer)
+          console.log(`[recording] Sent audio chunk: ${pcmData.buffer.byteLength} bytes`)
+        } catch (error) {
+          console.error("[recording] Error sending audio chunk:", error)
+        }
       }
 
       processorRef.current = processor
       source.connect(processor)
       processor.connect(audioContext.destination)
 
+      // Set both state and ref
+      isRecordingRef.current = true
       setIsRecording(true)
       setStatusMessage("Listening...")
+      console.log("[recording] Started recording, audio processor active")
     } catch (error) {
       console.error('Error starting recording:', error)
       setStatusMessage("Error: " + error.message)
@@ -270,28 +293,47 @@ function Podcast() {
 
   // Stop recording
   const stopRecording = () => {
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
+    console.log("[recording] Stopping recording...")
+    
+    // Wait a bit to ensure last chunks are sent before stopping
+    setTimeout(() => {
+      // Stop the recording flag (ref) to stop sending new chunks
+      isRecordingRef.current = false
+      
+      // Wait a bit more for any in-flight chunks to be sent
+      setTimeout(() => {
+        // Disconnect processor to stop audio capture
+        if (processorRef.current) {
+          processorRef.current.disconnect()
+          processorRef.current = null
+        }
 
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop())
-      mediaStreamRef.current = null
-    }
+        // Stop media stream
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop())
+          mediaStreamRef.current = null
+        }
 
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
+        // Close audio context
+        if (audioContextRef.current) {
+          audioContextRef.current.close()
+          audioContextRef.current = null
+        }
 
-    setIsRecording(false)
+        // Update UI state
+        setIsRecording(false)
 
-    // Send complete signal to backend
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "complete" }))
-      setStatusMessage("Processing...")
-    }
+        // Send complete signal to backend
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          console.log("[recording] Sending complete signal to backend")
+          wsRef.current.send(JSON.stringify({ type: "complete" }))
+          setStatusMessage("Processing...")
+        } else {
+          console.error("[recording] WebSocket not ready! State:", wsRef.current?.readyState)
+          setStatusMessage("Error: Connection not ready")
+        }
+      }, 200) // Additional delay for in-flight chunks
+    }, 200) // Initial delay before stopping recording flag
   }
 
   // Stop playback

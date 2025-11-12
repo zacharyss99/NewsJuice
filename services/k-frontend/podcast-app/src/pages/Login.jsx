@@ -11,6 +11,7 @@ function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  //below is the main login function with firebase user auth
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
