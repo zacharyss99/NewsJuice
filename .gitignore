@@ -6,3 +6,5 @@ secrets/
 .env
 __pycache__/
 *.pyc
+logs/*.log
+.env.local
