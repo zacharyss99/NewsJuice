@@ -24,3 +24,40 @@ Database Information
 - Service account used for all GC services in this module (PosgresSQL, VertexAI) = 
 
 
+## Usage 
+```bash
+make -f MakefileLoader_new run (ups SQL proxy, builds and runs)  
+```
+```bash
+docker compose run --rm loader (just run)  
+```
+
+
+
+# APPENDIX
+
+##E mbedding used:  
+
+Library: google-genai is Google’s official Python SDK for interacting with the Gemini family of generative AI models (like gemini-1.5-pro, gemini-2.0-flash, etc.).  
+It lets your code talk directly to Google’s GenAI API, which can be accessed in two ways:  
+- **Directly** via Google AI Studio (using an API key)  
+- **Via Vertex** AI (in Google Cloud) — using a GCP project and service account  
+Here: We are accessing Google’s Gemini models through Vertex AI’s managed GenAI service rather than through the lightweight public API key route.  
+
+The google-genai library:
+- Handles all the API calls to Gemini models
+- Authenticates automatically (with a Google Cloud project or API key)
+- Provides simple methods for: 
+text generation (generate_content)
+chat (start_chat, send_message)
+embeddings (embed_content)
+multimodal inputs (text + image)
+streaming responses
+
+vertexai=True in your client:
+tells the library to:
+- Send requests to Vertex AI’s managed Gemini endpoint
+
+- Use your GCP project billing, IAM permissions, and regional deployment
+
+- Integrate with other Vertex services (data, tuning, monitoring)

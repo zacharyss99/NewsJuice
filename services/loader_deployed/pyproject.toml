@@ -24,4 +24,6 @@ dependencies = [
   "langchain-text-splitters>=0.0.1",
   "fastapi>=0.104.1",
   "uvicorn[standard]>=0.24.0",
+  "dvc>=3.63.0",
+  "dvc-gs>=3.0.2",
 ]
