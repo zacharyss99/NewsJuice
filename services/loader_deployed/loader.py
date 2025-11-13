@@ -168,8 +168,8 @@ def chunk_embed_load(method='char-split'):
         logger.info("Semantic splitter initialized successfully")
         # ==========================================================
 
-        # FE - Use this when using VERTEX AI for final embedding
-        vertex_embedder = VertexEmbeddings()
+    # FE - Use this when using VERTEX AI for final embedding
+    vertex_embedder = VertexEmbeddings()
 
     '''
     Process now article by article
