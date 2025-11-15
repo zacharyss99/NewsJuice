@@ -26,7 +26,8 @@ Just follow the below WORKFLOW to switch between both. Make sure in LOCAL DEVELO
 ### Secrets 
 
 - Deployment/productionoyment: Service Account Keys: Workload Identity
-- Local Development: Mounted JSON service account files
+- Local Development: Mounted JSON service account files. MAKE SURE IN docker-compose.local YOU HAVE THE RIGHTG PATHS IN THE MOUNT (local secrets folder is in ../../../secrets)
+
 You can download them, e.g.
 ```yaml
 mkdir -p secrets

@@ -1,17 +1,7 @@
 '''
-==================
 Retriever service (to be imported by main.py)
-==================
-
-In this version the embedding model is switched to 
-* text-embedding-004 from VertexAI
-Changes are marked with "FE" and comments
-
-Steps:
 * get_db_connection
-* embed the query
-* search_articles in the vector database by similarity
-* return chunks
+* search_articles
 
 
 NOTE: for testing use: #VECTOR_TABLE_NAME = "chunks_vector_test"
@@ -25,6 +15,7 @@ import os
 if os.path.exists('.env'):
     from dotenv import load_dotenv
     load_dotenv()
+
 
 
 print(f"[retriever-debug] DATABASE_URL = {os.getenv('DATABASE_URL')}")
@@ -53,52 +44,11 @@ USER_AGENT = "minimal-rag-ingest/0.1"
 #model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 #model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")  # 768-D
 
-# ======== FE 15-11-25 - Commented out: for embedding model switch========
-#from sentence_transformers import SentenceTransformer
-#MODEL_PATH = os.getenv("SENTENCE_MODEL_PATH", "sentence-transformers/all-mpnet-base-v2")
-#model = SentenceTransformer(MODEL_PATH)  # loads local path baked into the image
-#======================================END
+from sentence_transformers import SentenceTransformer
 
-# ======== FE 15-11-25  - Added: Parameter for final embedding using Vertex AI
-EMBEDDING_MODEL = "text-embedding-004"
-#GENERATIVE_MODEL = "gemini-2.0-flash-001"
-EMBEDDING_DIM = 768 #256
-#======================================END
+MODEL_PATH = os.getenv("SENTENCE_MODEL_PATH", "sentence-transformers/all-mpnet-base-v2")
+model = SentenceTransformer(MODEL_PATH)  # loads local path baked into the image
 
-# ====FE 15-11-25 ADDED: embedding model switch
-from google import genai
-from google.genai import types
-import logging
-logger = logging.getLogger(__name__) 
-
-class VertexEmbeddings:
-    def __init__(self):
-        project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-        location = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
-        if not project:
-            raise RuntimeError("Need to set GOOGLE_CLOUD_PROJECT")
-        # Uses ADC via GOOGLE_APPLICATION_CREDENTIALS or gcloud
-        self.client = genai.Client(vertexai=True, project=project, location=location)
-        self.model = EMBEDDING_MODEL
-        self.dim = EMBEDDING_DIM
-        # ============== CHANGE 2: LOG INITIALIZATION ==============
-        logger.info(f"VertexEmbeddings initialized - Project: {project}, Location: {location}, Model: {self.model}, Dim: {self.dim}")
-        # ==========================================================
-
-    def _embed_one(self, text: str) -> List[float]:
-        resp = self.client.models.embed_content(
-            model=self.model,
-            contents=[text],  # one at a time to avoid 20k token limit
-            config=types.EmbedContentConfig(output_dimensionality=self.dim),
-        )
-        return resp.embeddings[0].values
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return [self._embed_one(t) for t in texts]
-
-    def embed_query(self, text: str) -> List[float]:
-        return self._embed_one(text)
-#==========END
 
 
 
@@ -124,21 +74,8 @@ def search_articles(query: str, limit: int = 2) -> List[Tuple[int, str, float]]:
     """
     try:
         # Query embedding
-
-        # ======= FE 15-11-25 Added: for new emnbedding model
-        vertex_embedder = VertexEmbeddings()
-        #============END
-
-        # ======= FE 15-11-25 Commented out: for new emnbedding model
-        #q = Vector(model.encode(query).tolist())
-        # ==============END
-
-
-        # ======= FE 15-11-25 Added: for new emnbedding model
-        #q = vertex_embedder.embed_documents(query.tolist())
-        q = Vector(vertex_embedder.embed_query(query))
-        # ========END
-
+        q = Vector(model.encode(query).tolist())
+        
         with get_db_connection() as conn, conn.cursor() as cur:
             # Test database connection
             cur.execute("SELECT current_database(), version();")
