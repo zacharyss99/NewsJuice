@@ -2,6 +2,15 @@
 
 This replaces live_api_client.py and uses Google Cloud Speech-to-Text API
 for reliable batch transcription of audio.
+
+
+FUNCTIONS CONTAINED:
+
+async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
+(Convert audio bytes (PCM 16kHz mono) to text using Speech-to-Text API.)
+
+async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
+(Transcribe the audio from frontend using the Google Speech to Text API.)
 """
 
 import os

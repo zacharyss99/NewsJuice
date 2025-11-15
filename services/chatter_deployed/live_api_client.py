@@ -1,7 +1,13 @@
 """This client is used to encapsulate the live API WebSocket connection logic!!"""
 
 """This function below is defining: the transition from user audio input on the frontend, to converted text (VIA
-LIVE API) so our backend cn process it correctly"""
+LIVE API) so our backend can process it correctly"""
+
+"""
+FUNCTION CONTAINED:
+async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
+"""
+
 import asyncio
 import os
 from pathlib import Path
