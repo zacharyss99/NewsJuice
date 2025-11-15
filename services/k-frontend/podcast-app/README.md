@@ -34,7 +34,7 @@ An interactive podcast application built with React, featuring voice interaction
 cd podcast-app
 ```
 
-2. Install dependencies:
+2. Install dependencies: [CM: if not installed yet: brew install node]
 ```bash
 npm install
 ```
