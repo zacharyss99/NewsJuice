@@ -1,5 +1,13 @@
 """Firebase Admin SDK initialization and token verification."""
 
+"""
+FUNCTIONS CONTAINED:
+
+initialize_firebase_admin()   ---- called by main.py
+verify_token(token: str) -> Dict --- called by main.py
+
+"""
+
 import os
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -13,6 +21,7 @@ def initialize_firebase_admin():
         return
     
     # service account JSON file for the local development
+    # [CM] strange that his works? the path in .env.local seems a dummy
     service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
     if service_account_path and os.path.exists(service_account_path):
         cred = credentials.Certificate(service_account_path)

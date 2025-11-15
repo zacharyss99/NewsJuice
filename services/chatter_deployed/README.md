@@ -150,6 +150,8 @@ FIREBASE_SERVICE_ACCOUNT_PATH=../secrets/firebase-service-account.json
 
 The backend runs in Docker Compose with Cloud SQL Proxy:
 
+[CM:] Move to the chatter_deployed subfolder
+
 ```bash
 # Build and start all services (Cloud SQL Proxy + API)
 docker-compose -f docker-compose.local.yml --env-file .env.local up --build

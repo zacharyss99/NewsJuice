@@ -1,6 +1,15 @@
 """LiveAPI Text-to-Audio streaming client.
 
 Converts text to audio using Google's LiveAPI and streams audio chunks in real-time.
+
+
+FUNCTION CONTAINED:
+
+async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
+
+def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int = 2) -> bytes:
+(Convert raw PCM audio data to WAV format.)
+
 """
 
 import asyncio
