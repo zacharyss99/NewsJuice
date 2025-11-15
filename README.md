@@ -1,6 +1,6 @@
-# 📆 NewsJuice (AC215 - Milestone 2)
+# 📆 NewsJuice (AC215 - Milestone 3)
 
-> Personalized daily podcast summaries of Harvard-related news — built with a scalable RAG pipeline.
+> Personalized daily podcast summaries of Harvard-related news — built with a scalable RAG pipeline, real-time voice interaction, and user authentication.
 
 ---
 
@@ -28,24 +28,41 @@ Users can:
 
 ---
 
-## 🎯 Milestone 2 — Prototype Scope
+## 🎯 Milestone 3 — Current Status
 
-In Milestone 2, we built a complete **RAG (Retrieval-Augmented Generation)** pipeline with the following features:
+**NewsJuice** has evolved into a fully deployed web application with real-time voice interaction, user authentication, and personalized podcast generation.
 
-1. **Scraping:** Collect Harvard-related news (RSS/Atom feeds, websites, etc.)  
-2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP). Specifically, we load the scraped articles into our articles table. 
+### Core Features
+
+1. **Scraping:** Collect Harvard-related news from 10+ sources (RSS/Atom feeds, websites, etc.)  
+2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP Cloud SQL). Articles are stored in the `articles` table. 
 3. **Processing:**  
-   - Semantic chunking (using Vertex AI). The chunks are stored in our chunks_vector table.
+   - Semantic chunking (using Vertex AI). The chunks are stored in our `chunks_vector` table.
    - Text embedding (using `sentence-transformers/all-mpnet-base-v2`). The text embeddings are used for embedding the chunks, AND also for embedding the user query for retrieval.
-4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database table, titled chunks_vector. 
-5. **Input Query & User_ID** Collect the unique user identification and the specific user query for podcast generation. 
-6. **Retrieval**  
+4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database table, titled `chunks_vector`. 
+5. **User Authentication:** Firebase Authentication for secure user login and registration
+6. **Real-Time Voice Interaction:** WebSocket-based audio streaming for voice input and real-time podcast generation
+7. **Retrieval**  
    - Retrieve the most relevant news chunks from our database based on embedded user query
-7. **LLM Podcast Generation**
+8. **LLM Podcast Generation**
     - Generate a text summary of the relevant news chunks with an LLM API call (Google Gemini). 
-    - Convert the text summary to audio (mp3) via TTS API call (Google Cloud Text-To-Speech API)
-8. **Chat Log History**
-    - Model text output and user identification pair saved to PostgreSQL database table, titled llm-conversations
+    - Convert the text summary to audio via streaming TTS (OpenAI Live API)
+9. **User Preferences & History**
+    - User preferences stored in Cloud SQL
+    - Audio history tracking for personalized experiences
+    - Conversation history saved to `llm_conversations` table
+
+### Milestone 3 Enhancements
+
+- ✅ **Deployed Web Application**: Fully functional web app at `www.newsjuiceapp.com`
+- ✅ **React Frontend**: Modern React-based UI with voice recording, animated visualizations, and responsive design
+- ✅ **Firebase Authentication**: Secure user authentication and authorization
+- ✅ **WebSocket Streaming**: Real-time audio streaming for voice input and podcast playback
+- ✅ **User Preferences**: Personalized settings and topic preferences
+- ✅ **Audio History**: Track user interactions and podcast history
+- ✅ **Cloud Run Deployment**: Backend API deployed on Google Cloud Run
+- ✅ **Expanded Scrapers**: 10+ Harvard news sources (Gazette, Crimson, HBS, HLS, HMS, GSAS, SEAS, Harvard Magazine, etc.)
+- ✅ **Fine-Tuning Pipeline**: Teacher/student approach for model optimization (in progress)
 
 ---
 
@@ -99,34 +116,46 @@ To see the app screen, please see the file "NewsJuice screen flow.pdf"
 
 ## 🚀 Usage
 
-This project supports both **one-line execution** and **step-by-step** runs using `Makefile` commands.
+### 🌐 Production Deployment
 
-### ▶️ Quick Start (Recommended)
+The application is **live and deployed** at:
+- **Frontend**: https://www.newsjuiceapp.com
+- **Backend API**: https://chatter-919568151211.us-central1.run.app
 
-**Complete Pipeline (Data Ingestion + Podcast Generation):**
+### 💻 Local Development
+
+For local development, see the detailed instructions in:
+- **Backend**: `services/chatter_deployed/README.md`
+- **Frontend**: `services/k-frontend/podcast-app/README.md`
+
+#### Quick Start (Local Development)
+
+**1. Backend Setup:**
 ```bash
-# Step 1: Scrape and load data
-make run -f MakefileBatch  # Scrape and load Harvard news articles
-
-# Step 2: Generate podcasts interactively
-make run -f MakefileChatter    # Start interactive podcast generation
+cd services/chatter_deployed
+# Follow instructions in README.md for setting up .env.local
+docker-compose -f docker-compose.local.yml --env-file .env.local up --build
 ```
 
-**Individual Services:**
+**2. Frontend Setup:**
 ```bash
-# Data ingestion only
-make run -f MakefileBatch scrape  # Scrape articles to database
-make run -f MakefileBatch load   # Process articles into vector chunks
+cd services/k-frontend/podcast-app
+npm install
+npm run dev
+# Frontend runs on http://localhost:5173
+```
 
-# Podcast generation only (requires pre-loaded data)
-make run -f MakefileChatter   # Interactive podcast generation
+**3. Data Ingestion (Legacy Pipeline):**
+```bash
+# Scrape and load data
+make run -f MakefileBatch  # Scrape and load Harvard news articles
 ```
 
 ### 🔄 Complete Workflow
 
 #### Phase 1: Data Ingestion
 1. **Scrape Articles**: `make run -f MakefileBatch scrape`
-   - Fetches Harvard Gazette and Crimson articles
+   - Fetches articles from 10+ Harvard news sources
    - Stores in `articles` table with duplicate detection
    
 2. **Process & Embed**: `make run -f MakefileBatch load`
@@ -134,15 +163,14 @@ make run -f MakefileChatter   # Interactive podcast generation
    - Embeds chunks using `sentence-transformers/all-mpnet-base-v2`
    - Stores in `chunks_vector` table with pgvector
 
-#### Phase 2: Podcast Generation
-3. **Interactive Mode**: `make run -f MakefileChatter chat`
-   - Prompts for user ID and question
-   - Retrieves top 2 relevant chunks via vector similarity
-   - Generates podcast script using Gemini API
-   - Converts to audio using Google Cloud TTS
-   - Saves conversation to `llm_conversations` table
+#### Phase 2: Web Application
+3. **Access Web App**: Visit `www.newsjuiceapp.com` or run locally
+   - Register/Login with Firebase Authentication
+   - Record voice queries via WebSocket
+   - Receive real-time podcast responses
+   - Manage preferences and view history
 
-### 🛠️ Service Management
+### 🛠️ Service Management (Legacy)
 
 **Start Database Proxy:**
 ```bash
@@ -363,10 +391,14 @@ updated_at TIMESTAMPTZ
 
 ---
 
-## In future milestones, we plan to:
-- Summarize the `conversation_data` that we store in the `llm_conversations` table as context for future user queries to get a sense of the user's preferences and provide the history of past conversations for better podcast generation.
-- Transition to interacting with the model with only speech rather than typing in the command line.
-- Build the interactive component of our model so that the user can interupt the podcast and ask followup questions.
+## 🚧 Future Enhancements
+
+- **Conversation Context**: Use `conversation_data` from `llm_conversations` table as context for future user queries to personalize podcast generation
+- **Fine-Tuned Models**: Complete fine-tuning pipeline to reduce LLM costs using teacher/student approach
+- **Interactive Podcasts**: Allow users to interrupt podcasts and ask follow-up questions in real-time
+- **Advanced Personalization**: Leverage user preferences and history for more tailored content
+- **Multi-modal Input**: Support text input as alternative to voice-only interaction
+- **Podcast Sharing**: Enable users to share and save favorite podcasts
 
 ## References
 
