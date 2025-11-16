@@ -29,7 +29,7 @@ News Sources:
 
 import json
 import uuid
-import argparse
+#import argparse
 from pathlib import Path
 from tqdm import tqdm
 from gazette_scraper import GazetteArticleScraper
@@ -44,27 +44,34 @@ from seas_scraper import SeasArticleScraper
 from db_manager import PostgresDBManager
 from article_tags_builder import call_gemini_api
 
-
-# ============== ADD LOGGING ==============
+# ============== SETUP LOGGING ==============
 import logging
+import sys
+from datetime import datetime
+import os
+
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_file = os.path.join(log_dir, f"scraper_{timestamp}.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
-# ===================================================
+logger.info(f"Logging to file: {log_file}")
+# ============================================================
+
 
 
 def scrape_tag_load():
-
-    # ============== LOG FUNCTION START ==============
-    logger.info(f"=== Starting scrape_tag_load  ===")
-    # ==========================================================
-
-
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Scrape news articles')
-    parser.add_argument('--out', default='artifacts/news.jsonl', help='Output file path')
-    args = parser.parse_args()
     
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"=== Starting scrape_tag_load  ===")
     
     # Initialize database manager
     db_manager = PostgresDBManager(url_column="source_link")
@@ -148,14 +155,7 @@ def scrape_tag_load():
                 "processed": total_inserted,
                 "total_found": total_scraped
             }
-
-
-    # # Optional: still write to JSONL for backup
-    # with out.open("w", encoding="utf-8") as f:
-    #     for article in all_articles:
-    #         f.write(json.dumps(article, ensure_ascii=False) + "\n")    
-
-
+ 
 def main():
     # ============== CHANGE 16: LOG MAIN START ==============
     logger.info("Starting scraper main function")
