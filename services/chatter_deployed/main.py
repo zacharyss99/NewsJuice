@@ -5,13 +5,27 @@ main.py
 
 Main app file for chatter service as a FastAPI
 
-Endpoints:
+ENDPOINTS CONTAINED:
 
-* /healthz
+@app.get("/healthz")
 For checking whether the app works
 
-* /api/chatter
+@app.post("/api/chatter")
 Main chatter endpoint: calls the chatter() function.
+
+@app.websocket("/ws/chat") 
+
+@app.post("/api/user/create")
+
+@app.get("/api/user/preferences")
+
+@app.post("/api/user/preferences")
+
+@app.get("/api/user/history")
+
+class FirebaseAuthMiddleware(BaseHTTPMiddleware):
+
+
 
 '''
 
