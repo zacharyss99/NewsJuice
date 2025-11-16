@@ -23,9 +23,15 @@ cat .env.local
 docker ps
 ```
 
+Make sure port if free, otherwise close other containers using it
+```bash
+lsof -i :5432
+````
+
+
 4. Start with logs visible (Note: we use .env.local and docker-compose.local.yml)
 ```bash
-docker-compose -f docker-compose.local.yml --env-file .env.local up --build
+docker compose -f docker-compose.local.yml --env-file .env.local up --build
 ```
 
 ## LOCAL TESTING
