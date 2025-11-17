@@ -42,7 +42,7 @@ from hms_scraper import HmsArticleScraper
 from hks_scraper import HksArticleScraper
 from seas_scraper import SeasArticleScraper
 from db_manager import PostgresDBManager
-from article_tags_builder import call_gemini_api
+#from article_tags_builder import call_gemini_api
 
 # ============== SETUP LOGGING ==============
 import logging
@@ -109,17 +109,17 @@ def scrape_tag_load():
             summary_value = article.get("summary", "")
             content = article.get("article_content", "") or ""
 
-            prompt_source = content.strip()
-            if prompt_source:
-                tags_payload, error = call_gemini_api(prompt_source)
-                if error:
-                    print(f"[tags-error] {label} article tagging failed: {error}")
-                    
-                    #======= LOGGING ======================================
-                    logger.info(f"[tags-error] {label} article tagging failed: {error}")
-                    #==================================================================    
-                else:
-                    summary_value = json.dumps(tags_payload, ensure_ascii=False)
+            #prompt_source = content.strip()
+            #if prompt_source:
+            #    tags_payload, error = call_gemini_api(prompt_source)
+            #    if error:
+            #        print(f"[tags-error] {label} article tagging failed: {error}")
+            #        
+            #        #======= LOGGING ======================================
+            #        logger.info(f"[tags-error] {label} article tagging failed: {error}")
+            #        #==================================================================    
+            #    else:
+            #      summary_value = json.dumps(tags_payload, ensure_ascii=False)
 
             db_record = {
                 "author": article.get("article_author", ""),
