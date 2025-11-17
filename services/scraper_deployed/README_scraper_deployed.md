@@ -59,9 +59,9 @@ docker compose -f docker-compose.local.yml up
 
 ## Deployment
 
-As no service account is specified, Cloud Run will use the default Compute Engine service account for this; format:
+As no service account is specified, Cloud Run will use the default Compute Engine service account for this:
 ```bash
-PROJECT_NUMBER-compute@developer.gserviceaccount.com
+cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com
 ```
 
 Make sure you have the deploy.sh and the env.yaml files.
@@ -138,4 +138,30 @@ Test scheduler manually:
 gcloud scheduler jobs run article-scraper-job \
   --location us-central1 \
   --project newsjuice-123456
-``
+```
+
+Change schedule, .e.g.:
+
+```bash
+  gcloud scheduler jobs update http article-scraper-job \
+  --location us-central1 \
+  --schedule="0 0 * * *"
+```
+
+Force a run:
+
+```bash
+  gcloud scheduler jobs run article-scraper-job \
+  --location us-central1
+```
+
+
+### EXTRAS
+
+How see what schduler jobs are on cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com:
+
+```bash
+gcloud scheduler jobs list \
+  --location=us-central1 \
+  --project=newsjuice-123456
+  ```
