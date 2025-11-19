@@ -240,7 +240,10 @@ async def websocket_chatter(websocket: WebSocket):
             user_id = decoded_token['uid']
             print(f"[websocket] Authenticated user: {user_id}")
         except Exception as e:
-            await websocket.send_json({"error": "Invalid token"})
+            print(f"[websocket-error] Token verification failed: {e}")
+            import traceback
+            traceback.print_exc()
+            await websocket.send_json({"error": f"Invalid token: {str(e)}"})
             await websocket.close()
             return
     else:
