@@ -1,0 +1,49 @@
+2025-11-19 23:10:40,649 - main - INFO - Logging to file: logs/loader_20251119_231040.log
+2025-11-19 23:10:57,177 - main - INFO - === Starting background article processing ===
+2025-11-19 23:10:57,177 - main - INFO - Background task queued successfully
+2025-11-19 23:10:57,177 - loader - INFO - === Starting chunk_embed_load - Method: recursive-split ===
+2025-11-19 23:10:57,178 - loader - INFO - Using tables - Articles: articles_test, Vectors: chunks_vector_test
+2025-11-19 23:10:57,897 - loader - INFO - Connected to database
+2025-11-19 23:10:59,487 - loader - INFO - Fetched 3 articles with vflag=0
+2025-11-19 23:10:59,600 - loader - INFO - VertexEmbeddings initialized - Project: newsjuice-123456, Location: us-central1, Model: text-embedding-004, Dim: 768
+2025-11-19 23:10:59,600 - loader - INFO - [1/3] Processing article_id=DUMMY-1, title='Time for mandatory retirement ages for lawmakers, ...'
+2025-11-19 23:10:59,600 - loader - INFO - [1/3] Created 6 chunks for article_id=DUMMY-1
+2025-11-19 23:10:59,605 - loader - INFO - [1/3] Starting embedding for 6 chunks
+2025-11-19 23:11:00,760 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:01,199 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:01,574 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:01,984 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:02,393 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:02,805 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:02,809 - loader - INFO - [1/3] Embedding completed for article_id=DUMMY-1
+2025-11-19 23:11:03,953 - loader - INFO - [1/3] Inserted 6 chunks into chunks_vector_test
+2025-11-19 23:11:04,068 - loader - INFO - [1/3] Updated vflag=1 for article_id=DUMMY-1
+2025-11-19 23:11:04,069 - loader - INFO - [1/3] ✓ Article DUMMY-1 completed in 4.47s
+2025-11-19 23:11:04,070 - loader - INFO - [2/3] Processing article_id=DUMMY-2, title='In dogs, as in humans, a harsh past might bare its...'
+2025-11-19 23:11:04,071 - loader - INFO - [2/3] Created 5 chunks for article_id=DUMMY-2
+2025-11-19 23:11:04,075 - loader - INFO - [2/3] Starting embedding for 5 chunks
+2025-11-19 23:11:04,317 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:04,957 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:05,466 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:05,774 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:06,018 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:06,026 - loader - INFO - [2/3] Embedding completed for article_id=DUMMY-2
+2025-11-19 23:11:06,672 - loader - INFO - [2/3] Inserted 5 chunks into chunks_vector_test
+2025-11-19 23:11:06,782 - loader - INFO - [2/3] Updated vflag=1 for article_id=DUMMY-2
+2025-11-19 23:11:06,782 - loader - INFO - [2/3] ✓ Article DUMMY-2 completed in 2.71s
+2025-11-19 23:11:06,783 - loader - INFO - [3/3] Processing article_id=DUMMY-3, title='Brief bursts of wisdom...'
+2025-11-19 23:11:06,786 - loader - INFO - [3/3] Created 8 chunks for article_id=DUMMY-3
+2025-11-19 23:11:06,791 - loader - INFO - [3/3] Starting embedding for 8 chunks
+2025-11-19 23:11:06,989 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:07,266 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:07,472 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:07,681 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:08,335 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:08,585 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:09,076 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:09,283 - httpx - INFO - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/newsjuice-123456/locations/us-central1/publishers/google/models/text-embedding-004:predict "HTTP/1.1 200 OK"
+2025-11-19 23:11:09,287 - loader - INFO - [3/3] Embedding completed for article_id=DUMMY-3
+2025-11-19 23:11:10,367 - loader - INFO - [3/3] Inserted 8 chunks into chunks_vector_test
+2025-11-19 23:11:10,518 - loader - INFO - [3/3] Updated vflag=1 for article_id=DUMMY-3
+2025-11-19 23:11:10,519 - loader - INFO - [3/3] ✓ Article DUMMY-3 completed in 3.74s
+2025-11-19 23:11:10,520 - loader - INFO - === COMPLETED: Processed 3 articles, Total found: 3 ===
