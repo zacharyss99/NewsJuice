@@ -5,7 +5,7 @@ from time import sleep
 from tqdm import tqdm
 from datetime import datetime, timezone
 from dateutil import parser as dateparser
-from db_manager import PostgresDBManager
+from .db_manager import PostgresDBManager
 
 class GazetteArticleScraper:
     def __init__(self, test_mode=False):
