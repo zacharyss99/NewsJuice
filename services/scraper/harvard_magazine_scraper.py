@@ -4,7 +4,7 @@ from playwright.sync_api import sync_playwright
 from dateutil import parser as dateparser
 from datetime import timezone, datetime
 from urllib.parse import urlparse
-from db_manager import PostgresDBManager
+from .db_manager import PostgresDBManager
 
 """
 Need to use Playwright instead of requests because some of the content such as "date" is rendered in the browser
