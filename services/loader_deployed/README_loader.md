@@ -264,11 +264,13 @@ gcloud iam service-accounts create cloud-run-invoker \
 
 Grant permissions:
 
+
 gcloud run services add-iam-policy-binding article-loader \
   --member="serviceAccount:cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com" \
   --role="roles/run.invoker" \
-  --region us-central1 \
-  --project newsjuice-123456
+  --region=us-central1 \
+  --project=newsjuice-123456
+
 
 Enable API [cloudscheduler.googleapis.com] on project [newsjuice-123456]
 

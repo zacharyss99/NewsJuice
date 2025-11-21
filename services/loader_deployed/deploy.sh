@@ -11,7 +11,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --source . \
   --region ${REGION} \
   --platform managed \
-  --no-allow-unauthenticated \
+  
   --env-vars-file env.yaml \
   --add-cloudsql-instances ${SQL_INSTANCE} \
   --timeout 60m \
@@ -20,6 +20,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --project ${PROJECT_ID}
  # --project newsjuice-123456 \
  # --account harvardnewsjuice@gmail.com
+ # --no-allow-unauthenticated \
 
 echo ""
 echo "Deployment complete!"
