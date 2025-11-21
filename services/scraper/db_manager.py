@@ -1,13 +1,11 @@
-## THis will be the db manager
+# This will be the db manager
 import os
-from collections.abc import Mapping, Sequence
-from typing import Any
-
 import psycopg
 from psycopg import sql
 
 
 class PostgresDBManager:
+
     def __init__(self, url_column):
         self._dsn = os.environ.get("DATABASE_URL")
         if not self._dsn:
@@ -17,8 +15,9 @@ class PostgresDBManager:
 
     def filter_new_urls(self, urls):
         """
-            This function is to be used in the scrapers as soon as the scraper identifies the article URLs.
-            It is designed to filter out any article URL that has already been scraped and added to the DB
+        This function is to be used in the scrapers as soon as the scraper identifies the
+        article URLs. It is designed to filter out any article URL that has already been scraped
+        and added to the DB
         """
         ordered_unique_urls = list(dict.fromkeys(urls))
         if not ordered_unique_urls:
@@ -36,9 +35,9 @@ class PostgresDBManager:
         return [url for url in ordered_unique_urls if url not in existing]
 
     def insert_records(self, records):
-
         """
-            This function is to be used after the scraper is done scraping, to add the nes articles to the database
+        This function is to be used after the scraper is done scraping, to add the nes articles to
+        the database
         """
         if not records:
             return 0
@@ -100,9 +99,9 @@ class PostgresDBManager:
         return [dict(zip(columns, row)) for row in rows]
 
     def update_article_summary(self, article_id, summary):
-        query = sql.SQL(
-            "UPDATE {table} SET summary = %s WHERE article_id = %s"
-        ).format(table=sql.Identifier(self._table_name))
+        query = sql.SQL("UPDATE {table} SET summary = %s WHERE article_id = %s").format(
+            table=sql.Identifier(self._table_name)
+        )
 
         with psycopg.connect(self._dsn) as conn:
             with conn.cursor() as cur:
