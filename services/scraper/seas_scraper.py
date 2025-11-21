@@ -4,7 +4,7 @@ from playwright.sync_api import sync_playwright
 from dateutil import parser as dateparser
 from datetime import timezone, datetime
 from urllib.parse import urljoin
-from db_manager import PostgresDBManager
+from .db_manager import PostgresDBManager
 from time import sleep
 
 class SeasArticleScraper:

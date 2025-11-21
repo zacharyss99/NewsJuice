@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from dateutil import parser as dateparser
 from datetime import timezone, datetime
-from db_manager import PostgresDBManager
+from .db_manager import PostgresDBManager
 from time import sleep
 
 class HlsArticleScraper:
