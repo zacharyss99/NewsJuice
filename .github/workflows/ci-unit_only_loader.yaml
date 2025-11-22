@@ -1,5 +1,4 @@
-# .github/workflows/ci.yml
-name: CI - Loader Faster
+name: CI - Loader Faster Unit Tests
 
 on:
   push:
@@ -8,7 +7,7 @@ on:
   pull_request:
     paths:
       - 'services/loader_faster/**'
-  workflow_dispatch: 
+  workflow_dispatch:  # Enables manual triggering from GitHub UI
 
 jobs:
   test:
@@ -16,7 +15,7 @@ jobs:
     
     defaults:
       run:
-        working-directory: services/loader_faster  # Run all commands here
+        working-directory: services/loader_faster  # Run all commands in this directory
     
     steps:
       - uses: actions/checkout@v3
@@ -32,4 +31,10 @@ jobs:
       
       - name: Run tests
         run: |
-          pytest tests/unit/ -v --cov=api || echo "No unit tests yet"
+          # Run unit tests only for now
+          uv run pytest tests/unit/ -v --cov=api || echo "No unit tests yet"
+      
+      - name: System tests info
+        run: |
+          echo "✓ System tests available locally:"
+          echo "  docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit"
