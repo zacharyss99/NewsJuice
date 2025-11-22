@@ -30,6 +30,8 @@ jobs:
           uv sync
       
       - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/services/loader_faster/src/api-service
         run: |
           # Run unit tests only for now
           uv run pytest tests/unit/ -v --cov=api || echo "No unit tests yet"
