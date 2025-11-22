@@ -7,6 +7,7 @@ ENV VIRTUAL_ENV=/home/app/.venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 ENV PORT=8080
 
+
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends build-essential ffmpeg && \
@@ -32,14 +33,16 @@ COPY uv.lock ./
 #RUN uv sync
 RUN uv lock && uv sync --no-dev
 
-# Copy application code
-COPY src/api-service/api/ ./api/
-COPY tests/ ./tests/
-COPY pytest.ini ./
-COPY docker-entrypoint.sh ./
+COPY . ./
 
-RUN chmod +x docker-entrypoint.sh
 
 EXPOSE 8080
 
-ENTRYPOINT ["/bin/bash", "docker-entrypoint.sh"]
+
+#ENTRYPOINT ["/bin/bash"]
+#CMD ["-c", "source /home/app/.venv/bin/activate && exec bash"]
+# Default command (Compose will override with wait_for_db + your script)
+#CMD ["python", "main.py", "--out", "/data/news.jsonl"]
+
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# TEST
