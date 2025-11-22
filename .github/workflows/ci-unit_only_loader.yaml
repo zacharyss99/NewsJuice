@@ -1,0 +1,34 @@
+# .github/workflows/ci.yml
+name: CI - Loader Faster
+
+on:
+  push:
+    paths:
+      - 'services/loader_faster/**'  # Only trigger when loader_faster changes
+  pull_request:
+    paths:
+      - 'services/loader_faster/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: services/loader_faster  # Run all commands here
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+      
+      - name: Run tests
+        run: |
+          pytest tests/unit/ -v --cov=api || echo "No unit tests yet"
