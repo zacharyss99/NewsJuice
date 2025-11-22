@@ -20,33 +20,21 @@ dependencies = [
   "langchain-experimental>=0.3.4",
   "langchain-openai>=0.3.35",
   "langchain-huggingface>=0.3.1",
-  "numpy>=2.1.0",
+  "numpy>=2.3.3",
   "langchain-text-splitters>=0.0.1",
-  "fastapi>=0.111.0",
-  "uvicorn[standard]>=0.27.0",
+  "fastapi>=0.104.1",
+  "uvicorn[standard]>=0.24.0",
   "dvc>=3.63.0",
   "dvc-gs>=3.0.2",
+  "black>=24.1.1",
+  "fastapi>=0.111.0",
+  "flake8>=7.0.0",
+  "httpx>=0.26.0",
+  "pre-commit>=3.6.0",
+  "pytest-asyncio>=0.23.3",
+  "pytest-cov>=4.1.0",
+  "pytest>=7.4.4",
   "python-multipart>=0.0.7",
   "requests>=2.31.0",
-]
-
-[project.optional-dependencies]
-dev = [
-  "black>=24.1.1",
-  "flake8>=7.0.0",
-  "pre-commit>=3.6.0",
-  "pytest>=7.4.4",
-  "pytest-asyncio>=0.23.3",
-  "pytest-cov>=4.1.0",
-]
-
-[tool.uv]
-# What uv should install when you do `uv sync --dev`
-dev-dependencies = [
-  "black>=24.1.1",
-  "flake8>=7.0.0",
-  "pre-commit>=3.6.0",
-  "pytest>=7.4.4",
-  "pytest-asyncio>=0.23.3",
-  "pytest-cov>=4.1.0",
+  "uvicorn>=0.27.0",
 ]
