@@ -1,10 +1,18 @@
-"""Simple unit tests without fixtures"""
+"""Simple unit tests"""
 import pytest
 from api.loader import (
     CharacterChunking,
     RecursiveChunking,
     get_chunking_strategy,
 )
+
+
+import os
+import pytest
+
+@pytest.fixture(autouse=True)
+def mock_db_url(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://fake")
 
 
 # ============= Test CharacterChunking =============
