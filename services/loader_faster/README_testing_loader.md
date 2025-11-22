@@ -10,7 +10,7 @@ docker run --rm \
   black api/
 ```
 
-yyy
+
 Rebuild after modifications by black
 ```bash
 docker build -t loader-app-api:local -f Dockerfile .
