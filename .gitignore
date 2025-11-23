@@ -3,9 +3,9 @@ services/scraper/artifacts/
 artifacts/
 services/finetunning/qwen_qlora_podcast/
 secrets/
-.env
+**/.env
 __pycache__/
 *.pyc
 logs/*.log
-.env.local
+**/.env.local
 **/OLD/
