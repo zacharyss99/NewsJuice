@@ -1,0 +1,113 @@
+name: CI - Loader Lint, Unit & Integration Tests
+
+on:
+  push:
+    paths:
+      - 'services/loader_testing/**'
+  pull_request:
+    paths:
+      - 'services/loader_testing/**'
+  workflow_dispatch:
+
+jobs:
+  # --------------------------
+  # LINT JOB
+  # --------------------------
+  lint:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: services/loader_testing
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --extra dev   # installs black, flake8, etc.
+
+      - name: Run Black formatting check
+        run: |
+          uv run black --check src/api-service/api
+
+      - name: Run Flake8 linting
+        run: |
+          uv run flake8 src/api-service/api
+
+  # --------------------------
+  # UNIT TEST JOB
+  # --------------------------
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: lint        # run after lint; remove this line to run fully in parallel
+
+    defaults:
+      run:
+        working-directory: services/loader_testing
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --extra dev   # installs pytest, pytest-cov, etc.
+
+      - name: Run unit tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
+        run: |
+          uv run python -m pytest tests/unit/ -v --cov=api --cov-fail-under=50
+
+  # --------------------------
+  # INTEGRATION TEST JOB
+  # --------------------------
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: lint        # can also depend on unit-tests if you prefer
+
+    defaults:
+      run:
+        working-directory: services/loader_testing
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --extra dev   # installs pytest + deps
+
+      - name: Run integration tests (no coverage)
+        env:
+          PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
+          DATABASE_URL: postgresql://dummy
+          GOOGLE_CLOUD_PROJECT: test-project
+        run: |
+          uv run python -m pytest tests/integration/ -v
+
+  # --------------------------
+  # INFO JOB (optional)
+  # --------------------------
+  system-tests-info:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: System tests info
+        run: |
+          echo "✓ System tests available locally:"
+          echo "  docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit"
