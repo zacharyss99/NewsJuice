@@ -39,14 +39,3 @@ dev = [
   "pytest-asyncio>=0.23.3",
   "pytest-cov>=4.1.0",
 ]
-
-[tool.uv]
-# What uv should install when you do `uv sync --dev`
-dev-dependencies = [
-  "black>=24.1.1",
-  "flake8>=7.0.0",
-  "pre-commit>=3.6.0",
-  "pytest>=7.4.4",
-  "pytest-asyncio>=0.23.3",
-  "pytest-cov>=4.1.0",
-]

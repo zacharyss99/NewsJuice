@@ -24,20 +24,17 @@ RUN mkdir -p /app/secrets
 
 # Copy the source code
 #COPY --chown=app:app . ./
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 
-#NEW
-COPY uv.lock ./
+# Install all dependencies including dev tools
+RUN uv sync --all-extras
 
-#RUN uv sync
-RUN uv lock && uv sync --no-dev
 
 # Copy application code
 COPY src/api-service/api/ ./api/
 COPY tests/ ./tests/
 COPY pytest.ini ./
 COPY docker-entrypoint.sh ./
-
 RUN chmod +x docker-entrypoint.sh
 
 EXPOSE 8080
