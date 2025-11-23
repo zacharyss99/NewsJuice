@@ -82,7 +82,7 @@ services:
 
   # TTS service: code is volume-mounted into chatter service
   # tts:  # Not run as standalone container - code mounted into chatter
-    
+
   # Cloud SQL Auth Proxy so the processor can reach your DB
   dbproxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2
