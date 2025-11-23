@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 
 
-# ============== Create log file with timestamp ==============
+# ================ Create log file with timestamp ==============
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -56,8 +56,6 @@ if __name__ == "__main__":
     import uvicorn
 
     logger.info("Starting article-loader service ...")
-    uvicorn.run(
-        app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info")
 
 # TEST END
