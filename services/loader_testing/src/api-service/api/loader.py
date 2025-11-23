@@ -68,7 +68,28 @@ class ProcessingResult:
     total_found: int = 0
 
 
-# ============= EMBEDDINGS CLASS =============
+# ============= EMBEDDINGS CLASSES =============
+class MockEmbeddings:
+    """Mock embeddings for testing without GCP credentials"""
+
+    def __init__(self, dim: int = 768):
+        self.dim = dim
+        logger.info(f"🎭 MockEmbeddings initialized - Dim: {dim} (MOCKED FOR TESTING)")
+
+    def _embed_one(self, text: str) -> List[float]:
+        """Return fake embedding"""
+        return [0.1] * self.dim
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Return fake embeddings for multiple texts"""
+        logger.info(f"🎭 Returning mocked embeddings for {len(texts)} texts")
+        return [[0.1] * self.dim for _ in texts]
+
+    def embed_query(self, text: str) -> List[float]:
+        """Return fake embedding for query"""
+        return [0.1] * self.dim
+
+
 class VertexEmbeddings:
     """Wrapper for Vertex AI embeddings"""
 
@@ -84,7 +105,7 @@ class VertexEmbeddings:
         self.dim = EMBEDDING_DIM
 
         logger.info(
-            f"VertexEmbeddings initialized - Project: {project}, "
+            f"🌐 VertexEmbeddings initialized - Project: {project}, "
             f"Location: {location}, Model: {self.model}, Dim: {self.dim}"
         )
 
@@ -216,7 +237,7 @@ class CharacterChunking(ChunkingStrategy):
         self.splitter = CharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            separator="\n\n",  # ← CHANGED
+            separator="\n\n",
             strip_whitespace=False,
         )
 
@@ -239,8 +260,8 @@ class RecursiveChunking(ChunkingStrategy):
 class SemanticChunking(ChunkingStrategy):
     """Semantic-based text splitting"""
 
-    def __init__(self, embeddings: VertexEmbeddings):
-        logger.info("Initializing semantic splitter with VertexEmbeddings")
+    def __init__(self, embeddings):
+        logger.info("Initializing semantic splitter with embeddings")
         self.splitter = SemanticChunker(
             embeddings=embeddings,
             breakpoint_threshold_type="percentile",
@@ -255,7 +276,7 @@ class SemanticChunking(ChunkingStrategy):
 
 
 # ============= CHUNKING FACTORY =============
-def get_chunking_strategy(method: str, embeddings: Optional[VertexEmbeddings] = None) -> ChunkingStrategy:
+def get_chunking_strategy(method: str, embeddings: Optional[Any] = None) -> ChunkingStrategy:
     """Factory function to get the appropriate chunking strategy"""
     strategies = {
         "char-split": CharacterChunking,
@@ -276,7 +297,7 @@ def get_chunking_strategy(method: str, embeddings: Optional[VertexEmbeddings] = 
 class ArticleProcessor:
     """Processes individual articles"""
 
-    def __init__(self, chunking_strategy: ChunkingStrategy, embedder: VertexEmbeddings):
+    def __init__(self, chunking_strategy: ChunkingStrategy, embedder):
         self.chunking_strategy = chunking_strategy
         self.embedder = embedder
 
@@ -341,8 +362,17 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
     logger.info(f"=== Starting chunk_embed_load - Method: {method} ===")
     logger.info(f"Using tables - Articles: {ARTICLES_TABLE_NAME}, Vectors: {VECTOR_TABLE_NAME}")
 
+    # Check if we should use mocked embeddings (for CI/testing)
+    use_mocked_ai = os.environ.get("USE_MOCKED_AI", "false").lower() == "true"
+
+    if use_mocked_ai:
+        logger.info("🎭 Using MOCKED embeddings (no GCP credentials required)")
+        embedder = MockEmbeddings(dim=EMBEDDING_DIM)
+    else:
+        logger.info("🌐 Using REAL Vertex AI embeddings")
+        embedder = VertexEmbeddings()
+
     # Initialize components
-    embedder = VertexEmbeddings()
     chunking_strategy = get_chunking_strategy(method, embedder if method == "semantic-split" else None)
     processor = ArticleProcessor(chunking_strategy, embedder)
 

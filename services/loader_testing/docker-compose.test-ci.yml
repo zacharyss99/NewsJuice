@@ -1,4 +1,3 @@
-# docker-compose.test-ci.yml
 services:
   test-db:
     image: pgvector/pgvector:pg16
@@ -27,7 +26,7 @@ services:
       ARTICLES_TABLE_NAME: articles_test
       VECTOR_TABLE_NAME: chunks_vector_test
       PORT: 8080
-      # No credentials needed - we'll mock in tests
+      USE_MOCKED_AI: "true"
     ports:
       - "8080:8080"
     command: python -m api.main
@@ -43,5 +42,5 @@ services:
       ARTICLES_TABLE_NAME: articles_test
       VECTOR_TABLE_NAME: chunks_vector_test
       API_BASE_URL: http://api-server:8080
-    # Run the CI version of system tests (with mocked AI)
-    command: sh -c "sleep 10 && pytest tests/system/test_loader_system_ci.py -v -s --no-cov"
+      USE_MOCKED_AI: "true"
+    command: sh -c "sleep 10 && pytest tests/system/test_loader_system.py -v -s --no-cov"
