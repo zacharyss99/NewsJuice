@@ -27,7 +27,7 @@ RUN mkdir -p /app/secrets
 COPY pyproject.toml uv.lock ./
 
 # Install all dependencies including dev tools
-RUN uv sync --all-extras
+RUN uv sync --extra dev
 
 
 # Copy application code
