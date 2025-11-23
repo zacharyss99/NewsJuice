@@ -6,9 +6,9 @@
 
 ## 👥 Team
 
-- **Khaled Aly**  
-- **Zac Sardi-Santos**  
-- **Joshua Rosenblum**  
+- **Khaled Aly**
+- **Zac Sardi-Santos**
+- **Joshua Rosenblum**
 - **Christian Michel**
 
 **Team name:** `NewsJuice`
@@ -17,14 +17,14 @@
 
 ## 📚 Project Overview
 
-**NewsJuice** is an application that generates a **customized podcasts** summarizing the latest news based on the user’s interests.  
+**NewsJuice** is an application that generates a **customized podcasts** summarizing the latest news based on the user’s interests.
 It is primarily designed for the **Harvard community**, pulling content from Harvard-related news sources.
 
 Users can:
-- Set preferences and topics of interest  
-- Provide a short news brief  
-- Receive an **audio podcast** generated automatically  
-- *(Future)* Interactively **ask follow-up questions** during playback  
+- Set preferences and topics of interest
+- Provide a short news brief
+- Receive an **audio podcast** generated automatically
+- *(Future)* Interactively **ask follow-up questions** during playback
 
 ---
 
@@ -34,35 +34,20 @@ Users can:
 
 ### Core Features
 
-1. **Scraping:** Collect Harvard-related news from 10+ sources (RSS/Atom feeds, websites, etc.)  
-2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP Cloud SQL). Articles are stored in the `articles` table. 
-3. **Processing:**  
-   - Semantic chunking (using Vertex AI). The chunks are stored in our `chunks_vector` table.
+1. **Scraping:** Collect Harvard-related news (RSS/Atom feeds, websites, etc.)
+2. **Ingestion:** Load scraped data into a **PostgreSQL database** (hosted on GCP). Specifically, we load the scraped articles into our articles table.
+3. **Processing:**
+   - Semantic chunking (using Vertex AI). The chunks are stored in our chunks_vector table.
    - Text embedding (using `sentence-transformers/all-mpnet-base-v2`). The text embeddings are used for embedding the chunks, AND also for embedding the user query for retrieval.
-4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database table, titled `chunks_vector`. 
-5. **User Authentication:** Firebase Authentication for secure user login and registration
-6. **Real-Time Voice Interaction:** WebSocket-based audio streaming for voice input and real-time podcast generation
-7. **Retrieval**  
+4. **Vector Storage:** Store embeddings in a **pgvector**-enabled PostgreSQL database table, titled chunks_vector.
+5. **Input Query & User_ID** Collect the unique user identification and the specific user query for podcast generation.
+6. **Retrieval**
    - Retrieve the most relevant news chunks from our database based on embedded user query
-8. **LLM Podcast Generation**
-    - Generate a text summary of the relevant news chunks with an LLM API call (Google Gemini). 
-    - Convert the text summary to audio via streaming TTS (OpenAI Live API)
-9. **User Preferences & History**
-    - User preferences stored in Cloud SQL
-    - Audio history tracking for personalized experiences
-    - Conversation history saved to `llm_conversations` table
-
-### Milestone 3 Enhancements
-
-- ✅ **Deployed Web Application**: Fully functional web app at `www.newsjuiceapp.com`
-- ✅ **React Frontend**: Modern React-based UI with voice recording, animated visualizations, and responsive design
-- ✅ **Firebase Authentication**: Secure user authentication and authorization
-- ✅ **WebSocket Streaming**: Real-time audio streaming for voice input and podcast playback
-- ✅ **User Preferences**: Personalized settings and topic preferences
-- ✅ **Audio History**: Track user interactions and podcast history
-- ✅ **Cloud Run Deployment**: Backend API deployed on Google Cloud Run
-- ✅ **Expanded Scrapers**: 10+ Harvard news sources (Gazette, Crimson, HBS, HLS, HMS, GSAS, SEAS, Harvard Magazine, etc.)
-- ✅ **Fine-Tuning Pipeline**: Teacher/student approach for model optimization (in progress)
+7. **LLM Podcast Generation**
+    - Generate a text summary of the relevant news chunks with an LLM API call (Google Gemini).
+    - Convert the text summary to audio (mp3) via TTS API call (Google Cloud Text-To-Speech API)
+8. **Chat Log History**
+    - Model text output and user identification pair saved to PostgreSQL database table, titled llm-conversations
 
 ---
 
@@ -74,16 +59,16 @@ The pipeline consists of **three standalone containers** plus **volume-mounted P
 
 ### App Screen Design
 
-To see the app screen, please see the file "NewsJuice screen flow.pdf" 
+To see the app screen, please see the file "NewsJuice screen flow.pdf"
 
 ### 🧱 Standalone Containers
 
-1. **🕸️ Scraper**  
-   - Fetches news articles from multiple Harvard-related sources on the web 
+1. **🕸️ Scraper**
+   - Fetches news articles from multiple Harvard-related sources on the web
    - Stores them in the `articles` table of the PostgreSQL database `newsdb`
    - **Runs standalone**: `make -f MakefileChatter scrape`
 
-2. **📥 Loader**  
+2. **📥 Loader**
    - Loads unprocessed articles (`vflag = 0`) from the `articles` table of `newsdb`
    - Performs **chunking** and **embedding** using Vertex AI and sentence-transformers
    - Stores the chunks in the `chunks_vector` table of `newsdb`
@@ -157,7 +142,7 @@ make run -f MakefileBatch  # Scrape and load Harvard news articles
 1. **Scrape Articles**: `make run -f MakefileBatch scrape`
    - Fetches articles from 10+ Harvard news sources
    - Stores in `articles` table with duplicate detection
-   
+
 2. **Process & Embed**: `make run -f MakefileBatch load`
    - Chunks articles using semantic chunking (Vertex AI)
    - Embeds chunks using `sentence-transformers/all-mpnet-base-v2`
@@ -244,12 +229,12 @@ Or via Google Cloud SDK:
 brew install google-cloud-sdk
 ```
 
-2. **Service Account Key**  
+2. **Service Account Key**
    Place your GCP service account key file here:
 ```
 ../secrets/gcp.json
 ```
-Service account:  
+Service account:
 `newsjuice-proxy@newsjuice-123456.iam.gserviceaccount.com`
 
 The SQL proxy runs automatically via `docker-compose`, opening a local port (`5432`) that connects securely to the Cloud SQL instance.
@@ -327,13 +312,13 @@ The services provide detailed logging for:
 
 ## 🗄️ Database Details
 
-- **Account:** `harvardnewsjuice@gmail.com`  
-- **Project:** `NewsJuice`  
-- **Project ID:** `newsjuice-123456`  
-- **Instance:** `newsdb-instance`  
-- **Region:** `us-central1`  
-- **Database:** `newsdb` (PostgreSQL 15)  
-- **Tables:** `articles`, `chunks_vector`  
+- **Account:** `harvardnewsjuice@gmail.com`
+- **Project:** `NewsJuice`
+- **Project ID:** `newsjuice-123456`
+- **Instance:** `newsdb-instance`
+- **Region:** `us-central1`
+- **Database:** `newsdb` (PostgreSQL 15)
+- **Tables:** `articles`, `chunks_vector`
 
 > ⚠️ **Note:** The above identifiers are for documentation and environment setup.
 
@@ -350,7 +335,7 @@ author TEXT,
 title TEXT,
 summary TEXT,
 content TEXT,
-source_link TEXT, 
+source_link TEXT,
 source_type TEXT,
 fetched_at TIMESTAMPTZ,
 published_at TIMESTAMPTZ,
@@ -367,7 +352,7 @@ author TEXT,
 title TEXT,
 summary TEXT,
 content TEXT,
-source_link TEXT, 
+source_link TEXT,
 source_type TEXT,
 fetched_at TIMESTAMPTZ,
 published_at TIMESTAMPTZ,
@@ -406,6 +391,5 @@ For this project we have used ChatGPT, Gemini and tools like Figma, app.eraser.i
 
 ## 📜 License
 
-This project is part of the **NewsJuice** prototype.  
+This project is part of the **NewsJuice** prototype.
 All rights reserved.
-
