@@ -77,7 +77,7 @@ jobs:
       
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: unit-test-coverage
           path: services/loader_testing/htmlcov/
@@ -228,4 +228,3 @@ jobs:
           echo ""
           echo "✅ ALL TESTS PASSED!"
           echo ""
-          
