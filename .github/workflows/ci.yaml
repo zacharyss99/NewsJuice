@@ -27,23 +27,45 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uv
-          # Install runtime + dev dependencies (pytest, black, flake8, etc.)
-          uv sync --extra dev
+          uv sync --extra dev   # installs black, flake8, pytest, pytest-cov, etc.
+
+      # --------------------------
+      # Linting
+      # --------------------------
+
+      - name: Run Black formatting check
+        run: |
+          uv run black --check src/api-service/api
+
+      - name: Run Flake8 linting
+        run: |
+          uv run flake8 src/api-service/api
+
+      # --------------------------
+      # Unit tests (with coverage)
+      # --------------------------
 
       - name: Run unit test with coverage
         env:
           PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
         run: |
-          uv run python -m pytest tests/unit/ -v --cov=api
+          uv run python -m pytest tests/unit/ -v --cov=api --cov-fail-under=50
 
-# 🔹 NEW: run integration tests
-      - name: Run integration tests with coverage
+      # --------------------------
+      # Integration tests (no coverage)
+      # --------------------------
+
+      - name: Run integration tests (no coverage)
         env:
           PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
           DATABASE_URL: postgresql://dummy
           GOOGLE_CLOUD_PROJECT: test-project
         run: |
-          uv run python -m pytest tests/integration/ -v --cov=api --cov-fail-under=40
+          uv run python -m pytest tests/integration/ -v
+
+      # --------------------------
+      # Notes about system tests
+      # --------------------------
 
       - name: System tests info
         run: |
