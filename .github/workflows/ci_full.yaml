@@ -1,4 +1,4 @@
-# .github/workflows/ci.yml
+# .github/workflows/ci_full.yaml
 name: CI - Loader Complete Test Suite
 
 on:
@@ -175,7 +175,6 @@ jobs:
           USE_MOCKED_AI: "true"
           GOOGLE_CLOUD_PROJECT: test-project-ci
         run: |
-          # Use CI-specific docker-compose file with mocked AI
           docker-compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
       
       - name: Show container logs on failure
@@ -229,46 +228,4 @@ jobs:
           echo ""
           echo "✅ ALL TESTS PASSED!"
           echo ""
-      
-      - name: Add comment to PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const botComment = comments.find(comment => {
-              return comment.user.type === 'Bot' && comment.body.includes('TEST SUITE RESULTS')
-            });
-            
-            const output = `## 🧪 TEST SUITE RESULTS
-            
-            | Test Type | Status |
-            |-----------|--------|
-            | 📋 Lint | ${{ needs.lint.result }} |
-            | 🧪 Unit Tests | ${{ needs.unit-tests.result }} |
-            | 🔗 Integration | ${{ needs.integration-tests.result }} |
-            | 🚀 System Tests | ${{ needs.system-tests.result }} |
-            
-            **Overall:** ${{ (needs.lint.result == 'success' && needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success' && needs.system-tests.result == 'success') && '✅ All tests passed!' || '❌ Some tests failed' }}
-            `;
-            
-            if (botComment) {
-              github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: output
-              });
-            } else {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: output
-              });
-            }
+          
