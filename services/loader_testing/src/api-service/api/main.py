@@ -42,7 +42,7 @@ def process(background_tasks: BackgroundTasks):
 @app.post("/process-sync")
 def process_sync():
     """Synchronous processing - waits for completion"""
-    logger.info("=== Starting synchronous article processing ===")
+    logger.info("=== Starting synchronous article processing===")
     try:
         result = chunk_embed_load(method="recursive-split")
         logger.info(f"Processing completed successfully: {result}")
@@ -59,3 +59,4 @@ if __name__ == "__main__":
     uvicorn.run(
         app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info"
     )
+#END (test line)
