@@ -20,4 +20,4 @@ down:
 	docker compose down
 
 clean: down
-	@echo "💥Scraper container deleted aftr successful run"
+	@echo "💥Scraper container deleted after successful run"
