@@ -1,7 +1,7 @@
 """
 ====================
 loader service
-====================
+===================
 Modular version with separated concerns
 """
 
