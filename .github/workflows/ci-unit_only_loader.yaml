@@ -27,13 +27,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uv
-          uv sync --dev  # installs runtime deps + pytest + tools from [tool.uv].dev-dependencies
+          # Install runtime + dev dependencies (pytest, black, flake8, etc.)
+          uv sync --extra dev
 
-      - name: Run tests
+      - name: Run unit test with coverage
         env:
           PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
         run: |
-          uv run pytest tests/unit/ -v --cov=api
+          uv run python -m pytest tests/unit/ -v --cov=api
 
       - name: System tests info
         run: |
