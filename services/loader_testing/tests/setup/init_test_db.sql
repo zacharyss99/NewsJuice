@@ -39,11 +39,11 @@ CREATE TABLE IF NOT EXISTS chunks_vector_test (
 );
 
 -- Create index on embedding for similarity search
-CREATE INDEX IF NOT EXISTS chunks_vector_test_embedding_idx 
-    ON chunks_vector_test 
+CREATE INDEX IF NOT EXISTS chunks_vector_test_embedding_idx
+    ON chunks_vector_test
     USING ivfflat (embedding vector_cosine_ops)
     WITH (lists = 100);
 
 -- Create index on vflag for faster queries
-CREATE INDEX IF NOT EXISTS articles_test_vflag_idx 
+CREATE INDEX IF NOT EXISTS articles_test_vflag_idx
     ON articles_test(vflag);

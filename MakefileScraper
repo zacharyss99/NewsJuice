@@ -5,10 +5,10 @@
 .PHONY: run build scrape up-proxy down clean
 
 run: build up-proxy scrape ## Build images, start proxy, scrape articles
-	@echo "✅ Scraper has finished." 
-	
+	@echo "✅ Scraper has finished."
+
 build:
-	docker compose build scraper       
+	docker compose build scraper
 
 up-proxy:
 	docker compose up -d dbproxy

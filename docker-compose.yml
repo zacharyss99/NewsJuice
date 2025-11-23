@@ -32,7 +32,7 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
       DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
       DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
-      GOOGLE_CLOUD_PROJECT: "newsjuice-123456" 
+      GOOGLE_CLOUD_PROJECT: "newsjuice-123456"
       GOOGLE_CLOUD_REGION:  "us-central1"
     working_dir: /app
     #change this to your actual processor entrypoint
@@ -80,7 +80,7 @@ services:
 
   # TTS service: code is volume-mounted into chatter service
   # tts:  # Not run as standalone container - code mounted into chatter
-    
+
   # Cloud SQL Auth Proxy so the processor can reach your DB
   dbproxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2

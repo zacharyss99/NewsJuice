@@ -20,4 +20,3 @@ while time.time() < deadline:
 
 print("Timed out waiting for DB", file=sys.stderr)
 sys.exit(1)
-

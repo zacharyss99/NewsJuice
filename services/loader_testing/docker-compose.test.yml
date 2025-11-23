@@ -22,7 +22,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://test_user:test_pass@test-db:5432/test_db
-      GOOGLE_CLOUD_PROJECT: newsjuice-123456  
+      GOOGLE_CLOUD_PROJECT: newsjuice-123456
       ARTICLES_TABLE_NAME: articles_test
       VECTOR_TABLE_NAME: chunks_vector_test
       PORT: 8080

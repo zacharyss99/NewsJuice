@@ -70,11 +70,11 @@ class TestProcessEndpoint:
         """Test that /process returns immediately without waiting"""
         # Make the mock function slow
         mock_chunk_embed.side_effect = lambda x: time.sleep(2)
-        
+
         start_time = time.time()
         response = client.post("/process")
         elapsed = time.time() - start_time
-        
+
         assert response.status_code == 200
         # Should return quickly, not wait for background task
         assert elapsed < 1.0
@@ -107,12 +107,12 @@ class TestProcessSyncEndpoint:
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["status"] == "success"
         assert data["processed"] == 5
         assert data["total_found"] == 5
         assert "Processed 5 articles" in data["message"]
-        
+
         # Verify chunk_embed_load was called with correct method
         mock_chunk_embed.assert_called_once_with(method="recursive-split")
 
@@ -129,7 +129,7 @@ class TestProcessSyncEndpoint:
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["status"] == "success"
         assert data["processed"] == 0
         assert "No new articles" in data["message"]
@@ -142,7 +142,7 @@ class TestProcessSyncEndpoint:
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["status"] == "error"
         assert "Database connection failed" in data["message"]
 
@@ -154,7 +154,7 @@ class TestProcessSyncEndpoint:
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["status"] == "error"
         assert "GOOGLE_CLOUD_PROJECT" in data["message"]
 
@@ -164,13 +164,13 @@ class TestProcessSyncEndpoint:
         def slow_process(method):
             time.sleep(0.5)
             return {"status": "success", "processed": 1}
-        
+
         mock_chunk_embed.side_effect = slow_process
 
         start_time = time.time()
         response = client.post("/process-sync")
         elapsed = time.time() - start_time
-        
+
         assert response.status_code == 200
         # Should have waited for the task
         assert elapsed >= 0.5
@@ -217,11 +217,11 @@ class TestAPIResponseFormats:
             "processed": 10,
             "total_found": 15,
         }
-        
+
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
-        
+
         assert isinstance(data, dict)
         assert isinstance(data["status"], str)
         assert isinstance(data["processed"], int)
@@ -235,10 +235,10 @@ class TestEdgeCases:
     def test_multiple_simultaneous_sync_requests(self, mock_chunk_embed):
         """Test handling of multiple simultaneous sync requests"""
         mock_chunk_embed.return_value = {"status": "success", "processed": 1}
-        
+
         # Send multiple requests
         responses = [client.post("/process-sync") for _ in range(3)]
-        
+
         # All should succeed
         for response in responses:
             assert response.status_code == 200
@@ -247,7 +247,7 @@ class TestEdgeCases:
     def test_empty_response_from_chunk_embed_load(self, mock_chunk_embed):
         """Test handling when chunk_embed_load returns empty/None"""
         mock_chunk_embed.return_value = None
-        
+
         response = client.post("/process-sync")
         # Should handle gracefully
         assert response.status_code in [200, 500]
@@ -261,7 +261,7 @@ class TestEdgeCases:
             "processed": 1000,
             "total_found": 1000,
         }
-        
+
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
@@ -302,7 +302,7 @@ class TestLogging:
     def test_process_sync_logs_completion(self, mock_chunk_embed, mock_logger):
         """Test that sync processing logs completion"""
         mock_chunk_embed.return_value = {"status": "success", "processed": 3}
-        
+
         response = client.post("/process-sync")
         assert response.status_code == 200
         # Should log start and completion
@@ -313,7 +313,7 @@ class TestLogging:
     def test_process_sync_logs_errors(self, mock_chunk_embed, mock_logger):
         """Test that sync processing logs errors"""
         mock_chunk_embed.side_effect = Exception("Test error")
-        
+
         response = client.post("/process-sync")
         assert response.status_code == 200
         # Should log the error

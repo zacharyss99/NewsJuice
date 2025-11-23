@@ -16,7 +16,7 @@ RUN apt-get update && \
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install uv
 
-# Set working directory 
+# Set working directory
 WORKDIR /app
 
 # Create secrets directory for mounting

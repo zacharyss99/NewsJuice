@@ -1,8 +1,8 @@
 # Loader module
 
-- Loads articles from `articles` table in the DB (only entries with vflag = 0, this flag indicates which article is already chunked and vectorized) 
-   - Performs **chunking & embedding**  
-   - Adds new article chunks to the **vector DB** (table `chunks_vector`)  
+- Loads articles from `articles` table in the DB (only entries with vflag = 0, this flag indicates which article is already chunked and vectorized)
+   - Performs **chunking & embedding**
+   - Adds new article chunks to the **vector DB** (table `chunks_vector`)
 - uses Vertex AI ("text-embedding-004") for final chunk embeddings
 
 Uses Vertex AI for embeddings of the chunks
@@ -19,17 +19,17 @@ Uses Vertex AI for embeddings of the chunks
 
 
 Database Information
-- **Account:** `harvardnewsjuice@gmail.com`  
-- **Project:** `NewsJuice`  
+- **Account:** `harvardnewsjuice@gmail.com`
+- **Project:** `NewsJuice`
 - **Project ID:** `newsjuice-123456`
-- **Instance:** `newsdb-instance`  
+- **Instance:** `newsdb-instance`
 - **Region:** `us-central1`
-- **Database:** `newsdb` (PostgreSQL 15)  
-- **Table:** 
-PRODUCTION: IN: `articles`, OUT:`chunks_vector`  
-TEST: IN: `articles_test`, OUT:`chunks_vector_test` (set via env variables ARTICLE_TABLE and CHUNKS_VECTOR_TABLE)  
+- **Database:** `newsdb` (PostgreSQL 15)
+- **Table:**
+PRODUCTION: IN: `articles`, OUT:`chunks_vector`
+TEST: IN: `articles_test`, OUT:`chunks_vector_test` (set via env variables ARTICLE_TABLE and CHUNKS_VECTOR_TABLE)
 
-- Service account used for all GC services in this module (PosgresSQL, VertexAI) = 
+- Service account used for all GC services in this module (PosgresSQL, VertexAI) =
 
 ---
 
@@ -39,22 +39,22 @@ TEST: IN: `articles_test`, OUT:`chunks_vector_test` (set via env variables ARTIC
 Service URL of deployed loader:
 https://article-loader-919568151211.us-central1.run.app
 Latest revision: article-loader-00001-9cx
-	
 
-## Instructions for local deployment  
 
-1. Test that secrets exist:  
+## Instructions for local deployment
+
+1. Test that secrets exist:
 ```bash
 ls -la ../../../secrets/sa-key.json
 ls -la ../../../secrets/gemini-service-account.json
 ```
 
-2. Make sure .env.local has OpenAI key  
+2. Make sure .env.local has OpenAI key
 ```bash
 cat .env.local
 ```
 
-3. Make sure Docker is running  
+3. Make sure Docker is running
 ```bash
 docker ps
 ```
@@ -71,7 +71,7 @@ Health:
 curl http://localhost:8080/
 ```
 
-Run the loader once 
+Run the loader once
 ```bash
 curl -X POST http://localhost:8080/process
 ```
@@ -95,7 +95,7 @@ docker compose -f docker-compose.local.yml up
 LOGGING:
 
 Local:
-For each loader run a timestamped logfile is created and stored in the 
+For each loader run a timestamped logfile is created and stored in the
 logs folder (./logs is mounted to /app/logs/ in the container)
 
 For Cloud Run:
@@ -126,7 +126,7 @@ gcloud config set account harvardnewsjuice@gmail.com
 
 ## Switch between test and production tables
 
-Go to production  
+Go to production
 
 Make sure right project
 ```bash
@@ -173,18 +173,18 @@ You never directly expose port 8080 to the internet. Cloud Run manages that.
 
 ## APPENDIX
 
-##E mbedding used:  
+##E mbedding used:
 
-Library: google-genai is Google’s official Python SDK for interacting with the Gemini family of generative AI models (like gemini-1.5-pro, gemini-2.0-flash, etc.).  
-It lets your code talk directly to Google’s GenAI API, which can be accessed in two ways:  
-- **Directly** via Google AI Studio (using an API key)  
-- **Via Vertex** AI (in Google Cloud) — using a GCP project and service account  
-Here: We are accessing Google’s Gemini models through Vertex AI’s managed GenAI service rather than through the lightweight public API key route.  
+Library: google-genai is Google’s official Python SDK for interacting with the Gemini family of generative AI models (like gemini-1.5-pro, gemini-2.0-flash, etc.).
+It lets your code talk directly to Google’s GenAI API, which can be accessed in two ways:
+- **Directly** via Google AI Studio (using an API key)
+- **Via Vertex** AI (in Google Cloud) — using a GCP project and service account
+Here: We are accessing Google’s Gemini models through Vertex AI’s managed GenAI service rather than through the lightweight public API key route.
 
 The google-genai library:
 - Handles all the API calls to Gemini models
 - Authenticates automatically (with a Google Cloud project or API key)
-- Provides simple methods for: 
+- Provides simple methods for:
 text generation (generate_content)
 chat (start_chat, send_message)
 embeddings (embed_content)
@@ -208,9 +208,9 @@ psql "postgresql://postgres:Newsjuice25+@localhost:5432/newsdb"
 
 -- Insert a test article
 INSERT INTO articles_test (
-    author, title, summary, content, 
-    source_link, source_type, 
-    fetched_at, published_at, 
+    author, title, summary, content,
+    source_link, source_type,
+    fetched_at, published_at,
     vflag, article_id
 )
 VALUES (
@@ -326,7 +326,7 @@ gcloud builds list --limit 20
   --schedule="0 0 * * *"
 
 
-  force a run  
+  force a run
   gcloud scheduler jobs run article-loader-job \
   --location us-central1
 
@@ -345,7 +345,7 @@ See the print to standard i/o:
 
 
   =====
- 
+
 # Deploy with secret
 gcloud run deploy article-loader \
   --source . \

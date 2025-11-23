@@ -11,7 +11,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --source . \
   --region ${REGION} \
   --platform managed \
-  
+
   --env-vars-file env.yaml \
   --add-cloudsql-instances ${SQL_INSTANCE} \
   --timeout 60m \

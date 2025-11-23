@@ -29,7 +29,7 @@ EOF
 
 
 ## Install dvc and add to pyproject.toml
-uv add dvc dvc-gs  
+uv add dvc dvc-gs
 uv sync
 
 
@@ -103,8 +103,8 @@ chmod +x scripts/data_versioning/version_data.py
 export PGHOST=127.0.0.1
 export PGPORT=5432
 export PGUSER=postgres
-export DB_PASS='Newsjuice25+'     
-export PGPASSWORD='Newsjuice25+'  
+export DB_PASS='Newsjuice25+'
+export PGPASSWORD='Newsjuice25+'
 python scripts/data_versioning/version_data.py
 
 
@@ -138,11 +138,11 @@ psql -h ... -f data/exports/db_export_20251112_231041.sql
 
 ## Further checks
 
-Check status (up to date?):  
-dvc status  
+Check status (up to date?):
+dvc status
 
-See what's being tracked:  
-dvc list . --dvc-only  
+See what's being tracked:
+dvc list . --dvc-only
 
 
 ## Create new version:
