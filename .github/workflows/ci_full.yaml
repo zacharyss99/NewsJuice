@@ -3,7 +3,6 @@ name: CI - Loader Complete Test Suite
 
 on:
   push:
-    branches: [ main, develop ]
     paths:
       - 'services/loader_testing/**'
   pull_request:
