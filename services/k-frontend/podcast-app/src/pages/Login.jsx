@@ -1,18 +1,40 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase/config';
 
 function Login() {
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
-  const handleLogin = (e) => {
-    e.preventDefault()
-    // Mock login - navigate to podcast page
-    navigate('/podcast')
-  }
+  //below is the main login function with firebase user auth
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    try {
+      // Firebase Auth login
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Get JWT token
+      const token = await user.getIdToken();
+      
+      // Store token and user ID
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user_id', user.uid);
+      // localStorage.setItem('auth_token', token);
+      // console.log("Token for testing:", token);  // ← This will print in console
+      
+      navigate('/podcast');
+    } catch (error) {
+      setError(error.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-primary-darker relative overflow-hidden flex items-center justify-center px-6">
@@ -25,6 +47,12 @@ function Login() {
           <h1 className="text-4xl font-bold mb-4">Login</h1>
           <p className="text-gray-400">Please enter your credentials to continue.</p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-full text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>

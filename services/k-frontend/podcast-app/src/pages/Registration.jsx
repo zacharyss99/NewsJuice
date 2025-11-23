@@ -1,30 +1,92 @@
 import { useState } from 'react'
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase/config';
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 
+"How this works"
+"1. User fills out registration form (on Registration.jsx) "
+"2. Firebase Authenticates their form data, user email and pwd with the createUserWithEmailandPassword() helper"
+
 function Registration() {
-  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
     repeatPassword: ''
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showRepeatPassword, setShowRepeatPassword] = useState(false)
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRepeatPassword, setShowRepeatPassword] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
-    })
-  }
+    });
+  };
 
-  const handleRegister = (e) => {
-    e.preventDefault()
-    // Mock registration - navigate to podcast page
-    navigate('/podcast')
-  }
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate passwords match
+    if (formData.password !== formData.repeatPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    // Validate password length
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      // Firebase Auth signup
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+      
+      // Get token
+      const token = await user.getIdToken();
+      
+      // Store token and user ID
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user_id', user.uid);
+
+      // Create user in CloudSQL
+      try {
+        const backendUrl = window.location.hostname.includes('newsjuiceapp.com')
+          ? 'https://chatter-919568151211.us-central1.run.app'
+          : 'http://localhost:8080';
+        
+        const response = await fetch(`${backendUrl}/api/user/create`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+          console.error('[registration] Failed to create user in backend:', errorData);
+          // Still navigate - user is created in Firebase, just not in CloudSQL yet
+        } else {
+          const data = await response.json();
+          console.log('[registration] User created in CloudSQL:', data);
+        }
+      } catch (error) {
+        console.error('[registration] Error calling backend:', error);
+        // Still navigate - user is created in Firebase, just not in CloudSQL yet
+      }
+      
+      navigate('/podcast');
+    } catch (error) {
+      setError(error.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-primary-darker relative overflow-hidden flex items-center justify-center px-6 py-12">
@@ -37,6 +99,12 @@ function Registration() {
           <h1 className="text-4xl font-bold mb-4">Registration</h1>
           <p className="text-gray-400">Please fill in the details to create your account.</p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-full text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleRegister} className="space-y-6">
           <div>

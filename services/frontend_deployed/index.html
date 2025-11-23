@@ -204,6 +204,11 @@
     <form id="form" class="group" novalidate>
       <label for="text">Paste or write the script</label>
       <textarea id="text" placeholder="Type your text here..."></textarea>
+      <div id="audioSection" style="margin-top: 1rem; text-align: center;">
+        <button id="recordBtn" type="button" class="secondary">🎤 Start Recording</button>
+        <button id="stopBtn" type="button" class="secondary" style="display: none; margin-left: 0.5rem;">⏹️ Stop & Send</button>
+        <div id="audioStatus" style="margin-top: 0.5rem; font-size: 0.9rem; min-height: 1.5rem;"></div>
+      </div>
       <div class="actions">
         <button id="btn" type="submit">Create & Play</button>
         <button id="clear" type="button" class="secondary">Clear</button>
@@ -231,7 +236,372 @@
     const BACKEND_URL = window.location.hostname.includes('newsjuiceapp.com')
       ? "https://chatter-919568151211.us-central1.run.app/api/chatter"
       : "http://localhost:8080/api/chatter";
+    
+    const WS_URL = window.location.hostname.includes('newsjuiceapp.com')
+    ? "wss://chatter-919568151211.us-central1.run.app/ws/chat"
+    : "ws://localhost:8080/ws/chat";
+    //ws:// for local, wss:// for https sites. This is website protocol for real-time bidirectional communication
+    //set up audio recording variables 
 
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioContext = null;
+    let mediaStream = null;
+    let ws = null;  // WebSocket connection
+    let isRecording = false;
+    //This function conencts on a page load or when recording starts
+    function connectWebSocket(){
+      return new Promise((resolve, reject) => {
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+        console.log("[ws] Connected");
+        resolve();
+        };
+        ws.onerror = (error) => {
+          console.error("[ws] Error:", error);
+          reject(error);
+        };
+        
+        ws.onclose = () => {
+          console.log("[ws] Disconnected");
+          ws = null;
+        };
+          ws.onmessage = async (event) => {
+            if (event.data instanceof Blob) {
+        // Received audio bytes
+              handleAudioChunk(event.data);
+            } else {
+              // Received JSON status message
+              const data = JSON.parse(event.data);
+              handleStatusMessage(data);
+            }
+        };
+      });
+    }
+        function handleStatusMessage(data) {
+      const status = data.status;
+      const audioStatus = document.getElementById("audioStatus");
+      
+      switch(status) {
+        case "chunk_received":
+          // Backend received audio chunk
+          break;
+          
+        case "transcribing":
+          audioStatus.textContent = "🎤 Transcribing your voice...";
+          break;
+          
+        case "transcribed":
+          audioStatus.textContent = `✅ Transcribed: "${data.text}"`;
+          break;
+          
+        case "retrieving":
+          audioStatus.textContent = "🔍 Finding relevant news articles...";
+          break;
+          
+        case "generating":
+          audioStatus.textContent = "✨ Generating podcast response...";
+          break;
+          
+        case "podcast_generated":
+          audioStatus.textContent = "📝 Podcast text ready!";
+          break;
+          
+        case "converting_to_audio":
+          audioStatus.textContent = "🔊 Converting to audio...";
+          break;
+          
+        case "streaming_audio":
+          audioStatus.textContent = "📡 Receiving audio stream...";
+          resetMedia(); // Clear previous audio
+          break;
+          
+        case "complete":
+          audioStatus.textContent = "✅ Complete! Playing podcast...";
+          finalizeAudio(); // Create blob and play when streaming is complete
+          break;
+          
+        case "error":
+          audioStatus.textContent = `❌ Error: ${data.error}`;
+          setBusy(false, "");
+          // Reset recording state if error occurs
+          if (isRecording) {
+            stopRecording();
+          }
+          break;
+          
+        default:
+          console.log("[ws] Status:", data);
+      }
+    }
+
+//function to handle audio chunks from backend! 
+    let audioBuffer = [];
+    let audioBlob = null;
+    let isStreamingAudio = false;
+
+    function handleAudioChunk(chunk) {
+      if (!isStreamingAudio) {
+        console.log("[audio] Starting to accumulate audio chunks");
+        isStreamingAudio = true;
+      }
+      
+      // Accumulate audio chunks (don't create blob yet - wait for complete signal)
+      audioBuffer.push(chunk);
+      console.log(`[audio] Accumulated ${audioBuffer.length} chunks (${chunk.size} bytes this chunk)`);
+    }
+    
+    function finalizeAudio() {
+      if (audioBuffer.length === 0) {
+        console.warn("[audio] No audio chunks to finalize");
+        return;
+      }
+      
+      console.log(`[audio] Finalizing audio: ${audioBuffer.length} chunks`);
+      
+      // Backend now sends WAV format, so use audio/wav
+      const mimeTypes = ['audio/wav', 'audio/wave', 'audio/x-wav'];
+      
+      for (const mimeType of mimeTypes) {
+        try {
+          audioBlob = new Blob(audioBuffer, { type: mimeType });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
+          // Update audio player
+          player.src = audioUrl;
+          playerWrap.style.display = "block";
+          
+          console.log(`[audio] Created audio blob with type: ${mimeType}`);
+          
+          // Auto-play when ready
+          player.oncanplay = () => {
+            console.log("[audio] Audio can play, attempting autoplay");
+            player.play().catch((err) => {
+              console.warn("[audio] Autoplay blocked:", err);
+            });
+          };
+          
+          player.onerror = (e) => {
+            console.error(`[audio] Error playing audio with ${mimeType}:`, e);
+            // Try next format if this one fails
+            if (mimeTypes.indexOf(mimeType) < mimeTypes.length - 1) {
+              console.log(`[audio] Trying next format...`);
+            }
+          };
+          
+          // If we got here without error, break
+          break;
+        } catch (e) {
+          console.warn(`[audio] Failed to create blob with ${mimeType}:`, e);
+        }
+      }
+      
+      // Reset for next recording
+      audioBuffer = [];
+      isStreamingAudio = false;
+    }
+
+    //now we need to convert this audio to PCM 16kHz because that is input to LiveAPI
+      async function convertToPCM16kHz(audioBuffer) {
+    // Create offline audio context with 16kHz sample rate
+    const offlineContext = new OfflineAudioContext(
+      1,  // mono
+      audioBuffer.length,
+      16000  // target sample rate
+    );
+    
+    // Create buffer source
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineContext.destination);
+    
+    // Render to PCM
+    const renderedBuffer = await offlineContext.startRendering();
+    
+    // Convert to Int16 PCM
+    const pcmData = new Int16Array(renderedBuffer.length);
+    const channelData = renderedBuffer.getChannelData(0);
+    
+    for (let i = 0; i < channelData.length; i++) {
+      // Convert float32 (-1 to 1) to int16 (-32768 to 32767)
+      const sample = Math.max(-1, Math.min(1, channelData[i]));
+      pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    }
+    
+    return pcmData.buffer; // Return ArrayBuffer
+  }
+
+  //function to start recording
+  // requests mic with 16kHz
+  //uses scriptprocessornode to capture chunks in real time
+  // connects WebSocket
+  //updates UI
+      async function startRecording() {
+      try {
+        // Reset audio buffer for new recording
+        audioBuffer = [];
+        
+        // Check if getUserMedia is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("getUserMedia is not supported in this browser");
+        }
+        
+        // Request microphone access with flexible constraints
+        // Browsers often ignore exact sampleRate/channelCount, so we make them "ideal"
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            // These are "ideal" - browser may use different values
+            sampleRate: { ideal: 16000 },
+            channelCount: { ideal: 1 }
+          }
+        }).catch(err => {
+          console.error("getUserMedia error:", err.name, err.message);
+          throw err;
+        });
+        
+        console.log("[audio] Microphone access granted");
+        console.log("[audio] Audio tracks:", mediaStream.getAudioTracks());
+        
+        // Create audio context (browser will use its default sample rate)
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Get actual sample rate (might not be 16kHz)
+        const actualSampleRate = audioContext.sampleRate;
+        console.log("[audio] AudioContext sample rate:", actualSampleRate);
+        
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        
+        // Create script processor to capture audio
+        // Note: ScriptProcessorNode is deprecated but still widely supported
+        const bufferSize = 4096;
+        const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+        
+        processor.onaudioprocess = (e) => {
+          if (!isRecording) return;
+          
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          // If sample rate is not 16kHz, we need to resample
+          // For now, send as-is and let backend handle it, or resample here
+          const pcmData = new Int16Array(inputData.length);
+          
+          // Convert float32 to int16
+          for (let i = 0; i < inputData.length; i++) {
+            const sample = Math.max(-1, Math.min(1, inputData[i]));
+            pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+          
+          // Send audio chunk to backend via WebSocket
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(pcmData.buffer); // Send as ArrayBuffer
+          }
+        };
+        
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        
+        console.log("[audio] ScriptProcessorNode created and connected");
+        
+        // Update UI first (so user can see stop button even if WebSocket fails)
+        isRecording = true;
+        
+        const recordBtn = document.getElementById("recordBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const audioStatus = document.getElementById("audioStatus");
+        
+        recordBtn.style.display = "none";
+        stopBtn.style.display = "inline-block";
+        stopBtn.style.visibility = "visible";
+        audioStatus.textContent = "🎤 Recording... Speak now!";
+        
+        console.log("[ui] Recording started - stop button should be visible");
+        
+        // Connect WebSocket if not already connected (non-blocking)
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          connectWebSocket().catch(err => {
+            console.error("[ws] Failed to connect WebSocket:", err);
+            audioStatus.textContent = "⚠️ Recording... (WebSocket connecting...)";
+          });
+        }
+        
+      } catch (error) {
+        console.error("[audio] Error starting recording:", error);
+        console.error("[audio] Error name:", error.name);
+        console.error("[audio] Error message:", error.message);
+        
+        // Provide more specific error messages
+        let errorMsg = "Failed to access microphone.";
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          errorMsg = "Microphone permission denied. Please allow microphone access and try again.";
+        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+          errorMsg = "No microphone found. Please connect a microphone and try again.";
+        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          errorMsg = "Microphone is already in use by another application.";
+        } else if (error.message.includes("getUserMedia")) {
+          errorMsg = "Browser does not support microphone access. Please use a modern browser.";
+        }
+        
+        alert(errorMsg);
+        
+        // Reset UI on error
+        document.getElementById("recordBtn").style.display = "inline-block";
+        document.getElementById("stopBtn").style.display = "none";
+        document.getElementById("audioStatus").textContent = "";
+      }
+    }
+
+        function stopRecording() {
+      console.log("[ui] stopRecording called, isRecording:", isRecording);
+      
+      if (!isRecording && !mediaStream) {
+        console.log("[ui] Not recording, nothing to stop");
+        return;
+      }
+      
+      isRecording = false;
+      
+      // Stop media stream tracks
+      if (mediaStream) {
+        console.log("[ui] Stopping media stream tracks");
+        mediaStream.getTracks().forEach(track => {
+          track.stop();
+          console.log("[ui] Stopped track:", track.kind);
+        });
+        mediaStream = null;
+      }
+      
+      // Close audio context
+      if (audioContext) {
+        console.log("[ui] Closing audio context");
+        audioContext.close().catch(err => {
+          console.error("[audio] Error closing audio context:", err);
+        });
+        audioContext = null;
+      }
+      
+      // Send "complete" signal to backend
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log("[ui] Sending complete signal to backend");
+        ws.send(JSON.stringify({ type: "complete" }));
+      } else {
+        console.warn("[ui] WebSocket not connected, cannot send complete signal");
+      }
+      
+      // Update UI
+      const recordBtn = document.getElementById("recordBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const audioStatus = document.getElementById("audioStatus");
+      
+      recordBtn.style.display = "inline-block";
+      stopBtn.style.display = "none";
+      stopBtn.style.visibility = "hidden";
+      audioStatus.textContent = "⏳ Processing...";
+      
+      console.log("[ui] UI updated - recording stopped");
+    }
 
     const form = document.getElementById("form");
     const textArea = document.getElementById("text");
@@ -309,6 +679,24 @@
         form.requestSubmit();
       }
     });
+
+    // Get buttons
+const recordBtn = document.getElementById("recordBtn");
+const stopBtn = document.getElementById("stopBtn");
+
+// Add event listeners
+recordBtn.addEventListener("click", startRecording);
+stopBtn.addEventListener("click", stopRecording);
+
+// Cleanup on page unload
+window.addEventListener("beforeunload", () => {
+  if (ws) ws.close();
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+  }
+});
+
+
   </script>
 </body>
 </html>

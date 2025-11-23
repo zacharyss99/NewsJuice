@@ -5,6 +5,5 @@ services/finetunning/qwen_qlora_podcast/
 secrets/
 .env
 __pycache__/
-*.pyc
-logs/*.log
-.env.local
+*.pyc.DS_Store
+**/.DS_Store

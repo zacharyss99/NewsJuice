@@ -5,7 +5,7 @@ services:
     container_name: scraper
     volumes:
       - ./services/scraper:/app
-      - ./artifacts:/data
+      - ./artifacts:/data #do we even need this anymore? 
       - ../secrets/gcp.json:/run/secrets/gcp.json:ro
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
@@ -20,18 +20,20 @@ services:
     restart: "no"
 
   # Step 2 — loader: reads the /data/news.jsonl file, chunks, embeds and loads to vector DB
+  #perhaps we change the description of this? not reading json file anymore 
   loader:
     build: ./services/loader
     depends_on:
       - dbproxy
     volumes:
       - ./services/loader:/app
-      - ./artifacts:/data
+      - ./artifacts:/data #again dont think we need 
       - ../secrets/gcp.json:/run/secrets/gcp.json:ro
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
       DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
-      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb" #not sure we need this
+      #either because we gave the database url above 
       GOOGLE_CLOUD_PROJECT: "newsjuice-123456" 
       GOOGLE_CLOUD_REGION:  "us-central1"
     working_dir: /app
