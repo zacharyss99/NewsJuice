@@ -6,7 +6,7 @@ uv venv
 source .venv/bin/activate
 
 # INstall dvc and add to pyproject.toml
-uv add dvc dvc-gs  
+uv add dvc dvc-gs
 uv sync
 
 
@@ -80,8 +80,8 @@ chmod +x scripts/data_versioning/version_data.py
 export PGHOST=127.0.0.1
 export PGPORT=5432
 export PGUSER=postgres
-export DB_PASS='Newsjuice25+'     
-export PGPASSWORD='Newsjuice25+'  
+export DB_PASS='Newsjuice25+'
+export PGPASSWORD='Newsjuice25+'
 python scripts/data_versioning/version_data.py
 
 

@@ -18,48 +18,48 @@ docker compose build scraper loader
  => [scraper internal] load build context                                                                                                                                     0.1s
  => => transferring context: 28.94kB                                                                                                                                          0.1s
  => [loader internal] load build context                                                                                                                                      0.1s
- => => transferring context: 9.29kB                                                                                                                                           0.0s 
+ => => transferring context: 9.29kB                                                                                                                                           0.0s
  => CACHED [loader 2/7] RUN apt-get update &&     apt-get upgrade -y &&     apt-get install -y --no-install-recommends build-essential ffmpeg &&     apt-get clean &&     rm  0.0s
  => CACHED [loader 3/7] RUN pip install --no-cache-dir --upgrade pip &&     pip install uv                                                                                    0.0s
- => CACHED [loader 4/7] WORKDIR /app                                                                                                                                          0.0s 
- => CACHED [scraper 5/7] COPY pyproject.toml ./                                                                                                                               0.0s 
- => CACHED [scraper 6/7] RUN uv sync && playwright install --with-deps chromium                                                                                               0.0s 
- => [scraper 7/7] COPY . ./                                                                                                                                                   0.1s 
- => CACHED [loader 5/7] COPY pyproject.toml ./                                                                                                                                0.0s 
- => [loader 6/7] RUN uv sync                                                                                                                                                246.7s 
- => [scraper] exporting to image                                                                                                                                              0.5s 
- => => exporting layers                                                                                                                                                       0.2s 
- => => exporting manifest sha256:614d3bbb7243ad19ecb35dcc228274cedeb30f546d5f336149d5fc9e0f14d300                                                                             0.0s 
- => => exporting config sha256:5f695652388759619443229ce52fafd3d3ca8449fa387517ce0435e33bf11312                                                                               0.0s 
- => => exporting attestation manifest sha256:b4d50e15d376d5f63ca929e67f2e1b82bf0814895b6c4a6aa43240b987b24d6d                                                                 0.0s 
- => => exporting manifest list sha256:b841149fead3e330368a370b623946b239c5f432eafa60e31cb6f3117e3f7301                                                                        0.0s 
- => => naming to docker.io/library/v2-scraper:latest                                                                                                                          0.0s 
- => => unpacking to docker.io/library/v2-scraper:latest                                                                                                                       0.1s 
- => [scraper] resolving provenance for metadata file                                                                                                                          0.0s 
- => [loader 7/7] COPY . ./                                                                                                                                                    0.5s 
- => [loader] exporting to image                                                                                                                                             626.0s 
- => => exporting layers                                                                                                                                                     507.6s 
- => => exporting manifest sha256:e8b4ac4b92a1725ed86b1871352eab1b24e5171469491581c321e6e7281c801c                                                                             0.0s 
- => => exporting config sha256:0261abea7b33c043ece7dfdf574f134320bcb4b47b07d8f298e22c248e15726a                                                                               0.0s 
- => => exporting attestation manifest sha256:b18188589d87049e1e1a0c1bc4588c2c374510576cd95d544407ac647cdefae3                                                                 0.0s 
- => => exporting manifest list sha256:d87fd461532af6f70427598cdf6adc44dfea37c1c3564dcc5756dfd851e792aa                                                                        0.0s 
- => => naming to docker.io/library/v2-loader:latest                                                                                 => [loader] exporting to image                                                                                                                                             626.0s latest                                                                             
- => => exporting layers                                                                                                                                                     507.6s ile                                                                                
- => => exporting manifest sha256:e8b4ac4b92a1725ed86b1871352eab1b24e5171469491581c321e6e7281c801c                                                                             0.0s 
- => => exporting config sha256:0261abea7b33c043ece7dfdf574f134320bcb4b47b07d8f298e22c248e15726a                                                                               0.0s 
- => => exporting attestation manifest sha256:b18188589d87049e1e1a0c1bc4588c2c374510576cd95d544407ac647cdefae3                                                                 0.0s 
- => => exporting manifest list sha256:d87fd461532af6f70427598cdf6adc44dfea37c1c3564dcc5756dfd851e792aa                                                                        0.0s 
+ => CACHED [loader 4/7] WORKDIR /app                                                                                                                                          0.0s
+ => CACHED [scraper 5/7] COPY pyproject.toml ./                                                                                                                               0.0s
+ => CACHED [scraper 6/7] RUN uv sync && playwright install --with-deps chromium                                                                                               0.0s
+ => [scraper 7/7] COPY . ./                                                                                                                                                   0.1s
+ => CACHED [loader 5/7] COPY pyproject.toml ./                                                                                                                                0.0s
+ => [loader 6/7] RUN uv sync                                                                                                                                                246.7s
+ => [scraper] exporting to image                                                                                                                                              0.5s
+ => => exporting layers                                                                                                                                                       0.2s
+ => => exporting manifest sha256:614d3bbb7243ad19ecb35dcc228274cedeb30f546d5f336149d5fc9e0f14d300                                                                             0.0s
+ => => exporting config sha256:5f695652388759619443229ce52fafd3d3ca8449fa387517ce0435e33bf11312                                                                               0.0s
+ => => exporting attestation manifest sha256:b4d50e15d376d5f63ca929e67f2e1b82bf0814895b6c4a6aa43240b987b24d6d                                                                 0.0s
+ => => exporting manifest list sha256:b841149fead3e330368a370b623946b239c5f432eafa60e31cb6f3117e3f7301                                                                        0.0s
+ => => naming to docker.io/library/v2-scraper:latest                                                                                                                          0.0s
+ => => unpacking to docker.io/library/v2-scraper:latest                                                                                                                       0.1s
+ => [scraper] resolving provenance for metadata file                                                                                                                          0.0s
+ => [loader 7/7] COPY . ./                                                                                                                                                    0.5s
+ => [loader] exporting to image                                                                                                                                             626.0s
+ => => exporting layers                                                                                                                                                     507.6s
+ => => exporting manifest sha256:e8b4ac4b92a1725ed86b1871352eab1b24e5171469491581c321e6e7281c801c                                                                             0.0s
+ => => exporting config sha256:0261abea7b33c043ece7dfdf574f134320bcb4b47b07d8f298e22c248e15726a                                                                               0.0s
+ => => exporting attestation manifest sha256:b18188589d87049e1e1a0c1bc4588c2c374510576cd95d544407ac647cdefae3                                                                 0.0s
+ => => exporting manifest list sha256:d87fd461532af6f70427598cdf6adc44dfea37c1c3564dcc5756dfd851e792aa                                                                        0.0s
+ => => naming to docker.io/library/v2-loader:latest                                                                                 => [loader] exporting to image                                                                                                                                             626.0s latest
+ => => exporting layers                                                                                                                                                     507.6s ile
+ => => exporting manifest sha256:e8b4ac4b92a1725ed86b1871352eab1b24e5171469491581c321e6e7281c801c                                                                             0.0s
+ => => exporting config sha256:0261abea7b33c043ece7dfdf574f134320bcb4b47b07d8f298e22c248e15726a                                                                               0.0s
+ => => exporting attestation manifest sha256:b18188589d87049e1e1a0c1bc4588c2c374510576cd95d544407ac647cdefae3                                                                 0.0s
+ => => exporting manifest list sha256:d87fd461532af6f70427598cdf6adc44dfea37c1c3564dcc5756dfd851e792aa                                                                        0.0s
  => => naming to docker.io/library/v2-loader:latest                                                                                                                           0.0s
  => => unpacking to docker.io/library/v2-loader:latest                                                                                                                      118.3s
  => [loader] resolving provenance for metadata file                                                                                                                           0.0s
 [+] Building 2/2
- ✔ v2-loader   Built                                                                                                               
+ ✔ v2-loader   Built
                                            0.0s
- ✔ v2-scraper  Built                                                                                                               
+ ✔ v2-scraper  Built
                                            0.0s
 docker compose up -d dbproxy
 [+] Running 1/1
- ✔ Container v2-dbproxy-1  Running                                                                                                 
+ ✔ Container v2-dbproxy-1  Running
                                            0.0s
 mkdir -p artifacts
 A subdirectory or file artifacts already exists.
@@ -68,57 +68,57 @@ make: *** [.\MakefileBatch:13: scrape] Error 1
 PS C:\Users\Khaled\Documents\MSDS\CSCI115\Project\V2> make run -f .\MakefileBatch
 docker compose build scraper loader
 [+] Building 978.6s (23/23) FINISHED
- => [internal] load local bake definitions                                                                                    0.0s 
+ => [internal] load local bake definitions                                                                                    0.0s
  => => reading from stdin 1.10kB                                                                                              0.0s
  => [loader internal] load build definition from Dockerfile                                                                   0.1s
- => => transferring dockerfile: 893B                                                                                          0.0s 
- => [scraper internal] load build definition from Dockerfile                                                                  0.1s 
- => => transferring dockerfile: 912B                                                                                          0.0s 
+ => => transferring dockerfile: 893B                                                                                          0.0s
+ => [scraper internal] load build definition from Dockerfile                                                                  0.1s
+ => => transferring dockerfile: 912B                                                                                          0.0s
  => [scraper internal] load metadata for docker.io/library/python:3.12-slim-bookworm                                          0.9s
  => [auth] library/python:pull token for registry-1.docker.io                                                                 0.0s
  => [loader internal] load .dockerignore                                                                                      0.1s
- => => transferring context: 2B                                                                                               0.0s 
- => [scraper internal] load .dockerignore                                                                                     0.1s 
- => => transferring context: 2B                                                                                               0.0s 
+ => => transferring context: 2B                                                                                               0.0s
+ => [scraper internal] load .dockerignore                                                                                     0.1s
+ => => transferring context: 2B                                                                                               0.0s
  => [scraper 1/7] FROM docker.io/library/python:3.12-slim-bookworm@sha256:4a8e0824201e50fc44ee8d208a2b3e44f33e00448907e52406  0.1s
- => => resolve docker.io/library/python:3.12-slim-bookworm@sha256:4a8e0824201e50fc44ee8d208a2b3e44f33e00448907e524066fca5a96  0.0s 
- => [loader internal] load build context                                                                                      0.0s 
- => => transferring context: 260B                                                                                             0.0s 
- => [scraper internal] load build context                                                                                     0.0s 
+ => => resolve docker.io/library/python:3.12-slim-bookworm@sha256:4a8e0824201e50fc44ee8d208a2b3e44f33e00448907e524066fca5a96  0.0s
+ => [loader internal] load build context                                                                                      0.0s
+ => => transferring context: 260B                                                                                             0.0s
+ => [scraper internal] load build context                                                                                     0.0s
  => => transferring context: 525B                                                                                             0.0s
- => CACHED [loader 2/7] RUN apt-get update &&     apt-get upgrade -y &&     apt-get install -y --no-install-recommends build  0.0s 
- => CACHED [loader 3/7] RUN pip install --no-cache-dir --upgrade pip &&     pip install uv                                    0.0s 
- => CACHED [loader 4/7] WORKDIR /app                                                                                          0.0s 
- => CACHED [scraper 5/7] COPY pyproject.toml ./                                                                               0.0s 
- => CACHED [scraper 6/7] RUN uv sync && playwright install --with-deps chromium                                               0.0s 
- => CACHED [loader 5/7] COPY pyproject.toml ./                                                                                0.0s 
- => [loader 6/7] RUN uv sync                                                                                                235.5s 
- => [scraper 7/7] COPY . ./                                                                                                   0.1s 
- => [scraper] exporting to image                                                                                              0.5s 
- => => exporting layers                                                                                                       0.3s 
- => => exporting manifest sha256:df8e5ff99724a57098edc738e8f868fddb679967a72f8adfa906394c819298eb                             0.0s 
- => => exporting config sha256:e60449fb0da8297f9e095466ee338a62806f4d96c8b582d16d505dc0c94b91f6                               0.0s 
- => => exporting attestation manifest sha256:535ffcd92af81289991c33929fa7bef1c87cf48b91ac9ebf938f111eb5bc3291                 0.1s 
- => => exporting manifest list sha256:92156192a5d628a39eab24e7de2d9f8f7c920303f8c5b2cef579e544feea17ac                        0.0s 
- => => naming to docker.io/library/v2-scraper:latest                                                                          0.0s 
- => => unpacking to docker.io/library/v2-scraper:latest                                                                       0.0s 
- => [scraper] resolving provenance for metadata file                                                                          0.0s 
- => [loader 7/7] COPY . ./                                                                                                    0.7s 
- => [loader] exporting to image                                                                                             740.4s 
- => => exporting layers                                                                                                     549.8s 
- => => exporting manifest sha256:b123f641536e417210bca94639e51e26c7abd170d045936096cb792f85e0d4a1                             0.0s 
- => => exporting config sha256:38c1976d909f01a3c62f5585d9530e6cbece043a64a3ba5030897040a233054b                               0.0s 
- => => exporting attestation manifest sha256:9593e7dee162c0310dfe847c1e50584a000a7ab42975cd8b6d021b0eccaa4368                 0.0s 
- => => exporting manifest list sha256:de7d7deebb7e2efbca24d244503be4d134a3260ed2a8265e3a689bafacbe6d22                        0.0s 
- => => naming to docker.io/library/v2-loader:latest                                                                           0.0s 
- => => unpacking to docker.io/library/v2-loader:latest                                                                      190.4s 
- => [loader] resolving provenance for metadata file                                                                           0.0s 
+ => CACHED [loader 2/7] RUN apt-get update &&     apt-get upgrade -y &&     apt-get install -y --no-install-recommends build  0.0s
+ => CACHED [loader 3/7] RUN pip install --no-cache-dir --upgrade pip &&     pip install uv                                    0.0s
+ => CACHED [loader 4/7] WORKDIR /app                                                                                          0.0s
+ => CACHED [scraper 5/7] COPY pyproject.toml ./                                                                               0.0s
+ => CACHED [scraper 6/7] RUN uv sync && playwright install --with-deps chromium                                               0.0s
+ => CACHED [loader 5/7] COPY pyproject.toml ./                                                                                0.0s
+ => [loader 6/7] RUN uv sync                                                                                                235.5s
+ => [scraper 7/7] COPY . ./                                                                                                   0.1s
+ => [scraper] exporting to image                                                                                              0.5s
+ => => exporting layers                                                                                                       0.3s
+ => => exporting manifest sha256:df8e5ff99724a57098edc738e8f868fddb679967a72f8adfa906394c819298eb                             0.0s
+ => => exporting config sha256:e60449fb0da8297f9e095466ee338a62806f4d96c8b582d16d505dc0c94b91f6                               0.0s
+ => => exporting attestation manifest sha256:535ffcd92af81289991c33929fa7bef1c87cf48b91ac9ebf938f111eb5bc3291                 0.1s
+ => => exporting manifest list sha256:92156192a5d628a39eab24e7de2d9f8f7c920303f8c5b2cef579e544feea17ac                        0.0s
+ => => naming to docker.io/library/v2-scraper:latest                                                                          0.0s
+ => => unpacking to docker.io/library/v2-scraper:latest                                                                       0.0s
+ => [scraper] resolving provenance for metadata file                                                                          0.0s
+ => [loader 7/7] COPY . ./                                                                                                    0.7s
+ => [loader] exporting to image                                                                                             740.4s
+ => => exporting layers                                                                                                     549.8s
+ => => exporting manifest sha256:b123f641536e417210bca94639e51e26c7abd170d045936096cb792f85e0d4a1                             0.0s
+ => => exporting config sha256:38c1976d909f01a3c62f5585d9530e6cbece043a64a3ba5030897040a233054b                               0.0s
+ => => exporting attestation manifest sha256:9593e7dee162c0310dfe847c1e50584a000a7ab42975cd8b6d021b0eccaa4368                 0.0s
+ => => exporting manifest list sha256:de7d7deebb7e2efbca24d244503be4d134a3260ed2a8265e3a689bafacbe6d22                        0.0s
+ => => naming to docker.io/library/v2-loader:latest                                                                           0.0s
+ => => unpacking to docker.io/library/v2-loader:latest                                                                      190.4s
+ => [loader] resolving provenance for metadata file                                                                           0.0s
 [+] Building 2/2
- ✔ v2-loader   Built                                                                                                          0.0s 
- ✔ v2-scraper  Built                                                                                                          0.0s 
+ ✔ v2-loader   Built                                                                                                          0.0s
+ ✔ v2-scraper  Built                                                                                                          0.0s
 docker compose up -d dbproxy
 [+] Running 1/1
- ✔ Container v2-dbproxy-1  Running                                                                                            0.0s 
+ ✔ Container v2-dbproxy-1  Running                                                                                            0.0s
 docker compose run --rm scraper
 DB reachable.
 
@@ -177,7 +177,7 @@ Total articles scraped: 13
 Skipped (already in DB): 0
 docker compose run --rm loader
 [+] Creating 1/1
- ✔ Container v2-dbproxy-1  Running                                                                                            0.0s 
+ ✔ Container v2-dbproxy-1  Running                                                                                            0.0s
 DB reachable.
 modules.json: 100%|███████████████████████████████████████████████████████████████████████████████| 349/349 [00:00<00:00, 2.07MB/s]
 config_sentence_transformers.json: 100%|███████████████████████████████████████████████████████████| 116/116 [00:00<00:00, 697kB/s]

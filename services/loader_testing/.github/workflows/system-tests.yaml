@@ -11,7 +11,7 @@ on:
 jobs:
   system-tests:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -26,31 +26,31 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.12'
-    
+
     - name: Setup GCP credentials
       run: |
         echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
         echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
-    
+
     - name: Install dependencies
       run: |
         pip install uv
         uv sync
-    
+
     - name: Initialize test database
       env:
         PGPASSWORD: test_pass
       run: |
         psql -h localhost -U test_user -d test_db -f tests/setup/init_test_db.sql
-    
+
     - name: Run system tests
       env:
         DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
@@ -60,7 +60,7 @@ jobs:
         VECTOR_TABLE_NAME: chunks_vector_test
       run: |
         pytest tests/system/ -v -s --tb=short --no-cov
-    
+
     - name: Cleanup credentials
       if: always()
       run: rm -f /tmp/gcp-key.json

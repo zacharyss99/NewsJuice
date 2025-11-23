@@ -18,7 +18,7 @@ client = TestClient(app)
 
 
 class TestBasicFunctionality:
-    
+
     def test_health_check(self):
         """TEST 1: Health Check Endpoint"""
         response = client.get("/")
@@ -46,7 +46,7 @@ class TestBasicFunctionality:
             "processed": 3,
             "total_found": 3
         }
-        
+
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()
@@ -59,7 +59,7 @@ class TestBasicFunctionality:
     def test_sync_processing_error(self, mock_chunk_embed_load):
         """TEST 4: Error Handling"""
         mock_chunk_embed_load.side_effect = Exception("Database connection failed")
-        
+
         response = client.post("/process-sync")
         assert response.status_code == 200
         data = response.json()

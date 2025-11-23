@@ -5,7 +5,7 @@
 # chmod +x test-deployed-loader.sh
 # ./test-deployed-loader.sh
 
-# Check environmental variables: 
+# Check environmental variables:
 # ARTICLE_TABLE_NAME and VECTOR_TABLE_NAME
 gcloud run services describe article-loader \
   --region us-central1 \
@@ -36,4 +36,3 @@ echo "3. Generating logs.text file"
 gcloud logging read "resource.labels.service_name=article-loader" \
   --limit=1000 \
   --format="value(timestamp,textPayload)" > logs.txt
-

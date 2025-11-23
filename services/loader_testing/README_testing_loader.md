@@ -21,7 +21,7 @@ Check with black - should now be clean
 docker run --rm loader-app-api:local black --check api/
 ```
 
-## Flake8 
+## Flake8
 
 Check code quality with flake
 ```bash
@@ -30,7 +30,7 @@ flake8 src/api-service/api/
 
 let black reformat
 ```bash
-black src/api-service/api/  
+black src/api-service/api/
 ```
 
 # PYTEST
@@ -46,7 +46,7 @@ uv run pytest tests/unit/test_utils.py -v --cov=api --cov-report=html
 
 Get the report:
 ```bash
-open htmlcov/index.html     
+open htmlcov/index.html
 ```
 
 =====Appendix
@@ -94,7 +94,7 @@ docker run --rm \
 Need to use a real DB now.
 
 Use a docker-compose (docker-compose.test.yml) as we need to spin up DB for testing
-and also initialize tables. 
+and also initialize tables.
 Initialization uses tests/setup/init_test_db.sql to create tables in temporary local DB
 Will use real VertexAI calls for embeddings
 
