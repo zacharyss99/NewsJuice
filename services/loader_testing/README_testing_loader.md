@@ -161,7 +161,9 @@ USE_MOCKED_AI=true docker-compose -f docker-compose.test-ci.yml up --build --abo
 # Don't set USE_MOCKED_AI, defaults to real
 docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
 
-
+# Test locally with mock AI
+cd services/loader_testing
+docker-compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
 
 (needs credentials)
 
