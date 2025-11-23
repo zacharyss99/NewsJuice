@@ -6,13 +6,13 @@ import sys
 from datetime import datetime
 
 
-# ============ Create log file with timestamp ===============
+# ============ Create log file with timestamp =============
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 log_file = os.path.join(log_dir, f"loader_{timestamp}.log")
 
-# Configure logging to both file and console
+# Configure logging to both file and console - test
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
