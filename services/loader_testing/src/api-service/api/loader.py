@@ -1,7 +1,7 @@
 """
-===============
+=================
 loader service
-===============
+=================
 Modular version with separated concerns
 """
 
@@ -212,16 +212,13 @@ class ChunkingStrategy:
 class CharacterChunking(ChunkingStrategy):
     """Character-based text splitting"""
 
-    def __init__(
-        self, chunk_size: int = CHUNK_SIZE_CHAR, chunk_overlap: int = CHUNK_OVERLAP_CHAR
-    ):
+    def __init__(self, chunk_size: int = CHUNK_SIZE_CHAR, chunk_overlap: int = CHUNK_OVERLAP_CHAR):
         self.splitter = CharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             separator="\n\n",  # ← CHANGED
             strip_whitespace=False,
         )
-
 
     def chunk_text(self, text: str) -> List[str]:
         docs = self.splitter.create_documents([text or ""])
@@ -232,11 +229,7 @@ class RecursiveChunking(ChunkingStrategy):
     """Recursive text splitting"""
 
     def __init__(self, chunk_size: int = CHUNK_SIZE_RECURSIVE, chunk_overlap: int = 0):
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
-        )
-
+        self.splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     def chunk_text(self, text: str) -> List[str]:
         docs = self.splitter.create_documents([text or ""])
@@ -262,9 +255,7 @@ class SemanticChunking(ChunkingStrategy):
 
 
 # ============= CHUNKING FACTORY =============
-def get_chunking_strategy(
-    method: str, embeddings: Optional[VertexEmbeddings] = None
-) -> ChunkingStrategy:
+def get_chunking_strategy(method: str, embeddings: Optional[VertexEmbeddings] = None) -> ChunkingStrategy:
     """Factory function to get the appropriate chunking strategy"""
     strategies = {
         "char-split": CharacterChunking,
@@ -289,9 +280,7 @@ class ArticleProcessor:
         self.chunking_strategy = chunking_strategy
         self.embedder = embedder
 
-    def process_article(
-        self, article: Article, article_num: int, total: int
-    ) -> pd.DataFrame:
+    def process_article(self, article: Article, article_num: int, total: int) -> pd.DataFrame:
         """Process a single article into chunks with embeddings"""
         import time
 
@@ -305,8 +294,7 @@ class ArticleProcessor:
         # Chunk the article
         text_chunks = self.chunking_strategy.chunk_text(article.content)
         logger.info(
-            f"[{article_num}/{total}] Created {len(text_chunks)} chunks "
-            f"for article_id={article.article_id}"
+            f"[{article_num}/{total}] Created {len(text_chunks)} chunks " f"for article_id={article.article_id}"
         )
 
         # Create DataFrame
@@ -319,16 +307,11 @@ class ArticleProcessor:
 
         # Log timing
         article_time = time.time() - article_start
-        logger.info(
-            f"[{article_num}/{total}] ✓ Article {article.article_id} "
-            f"completed in {article_time:.2f}s"
-        )
+        logger.info(f"[{article_num}/{total}] ✓ Article {article.article_id} " f"completed in {article_time:.2f}s")
 
         return df
 
-    def _create_chunks_dataframe(
-        self, article: Article, chunks: List[str]
-    ) -> pd.DataFrame:
+    def _create_chunks_dataframe(self, article: Article, chunks: List[str]) -> pd.DataFrame:
         """Create DataFrame from article and chunks"""
         df = pd.DataFrame(chunks, columns=["chunk"])
         df["author"] = article.author
@@ -356,15 +339,11 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
         Dictionary with processing results
     """
     logger.info(f"=== Starting chunk_embed_load - Method: {method} ===")
-    logger.info(
-        f"Using tables - Articles: {ARTICLES_TABLE_NAME}, Vectors: {VECTOR_TABLE_NAME}"
-    )
+    logger.info(f"Using tables - Articles: {ARTICLES_TABLE_NAME}, Vectors: {VECTOR_TABLE_NAME}")
 
     # Initialize components
     embedder = VertexEmbeddings()
-    chunking_strategy = get_chunking_strategy(
-        method, embedder if method == "semantic-split" else None
-    )
+    chunking_strategy = get_chunking_strategy(method, embedder if method == "semantic-split" else None)
     processor = ArticleProcessor(chunking_strategy, embedder)
 
     # Process articles
@@ -374,9 +353,7 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
 
         if not articles:
             logger.info("No new articles to process")
-            return ProcessingResult(
-                status="success", message="No new articles to process", processed=0
-            ).__dict__
+            return ProcessingResult(status="success", message="No new articles to process", processed=0).__dict__
 
         # Process each article
         processed_count = 0
