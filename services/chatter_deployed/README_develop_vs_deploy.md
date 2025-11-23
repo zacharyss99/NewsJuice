@@ -135,7 +135,7 @@ Should return: {"ok":true}
 
 ## Files structure for chatter service backend and for frontend
 
-
+```bash
 chatter-app/
 │
 ├── 📱 Backend (FastAPI)
@@ -168,7 +168,7 @@ chatter-app/
 │
 └── 🔒 Security
     └── .gitignore                   # Prevents committing secrets
-
+```
 
 
 ## Appendix
