@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 
 
-# ============== Create log file with timestamp =================
+# ================== Create log file with timestamp =================
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
