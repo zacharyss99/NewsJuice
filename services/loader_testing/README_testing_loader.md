@@ -151,17 +151,11 @@ With system test (needs credentials)
 
 Use **.github/workflows/ci.yaml** file
 
-then execute:
-```bash
-git add .github/workflows/ci.yml
-git commit -m "Add simple CI for unit tests"
-git push
-```
+Whenever there is a change in the files specified in ci.yaml (currently only loader.py and main.py in loader_testing) and a push being executed, then GitHub Actions workflow with unit and integration tests are triggered.
+Go to GitHub->Actions to the the workflow in action, with logs and outcome (should be gree tick)
 
 
-
-
-
+APPENDIX/NOTES
 
 Recommended Structure
 ```
@@ -228,21 +222,4 @@ Run with pytest (standard way)
 
 ```bash
 uv run pytest tests/integration/test_api_simple.py -v
-```
-
-
-
-
-
-
-
-
-Run as a Python script (educational mode with output)
-```bash
-uv run python tests/integration/test_api_simple.py
-```
-
-Run just one test
-```bash
-uv run pytest tests/integration/test_api_simple.py::TestBasicFunctionality::test_health_check -v
 ```
