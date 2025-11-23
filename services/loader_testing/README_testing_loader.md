@@ -1,47 +1,73 @@
-# Loader testing notes
+# Loader testing workflow
 
-## Black (with container)
+Go into folder: services/loader_testing
 
-Run with mount so black changes code in origin
+### Black + Flake 8 (with container)
+
+Build development image
+```bash
+docker build -f Dockerfile.dev -t loader-app-api:dev .
+```
+
+Run Black inside container, but write changes by Black to local files
 ```bash
 docker run --rm \
   -v $(pwd)/src/api-service/api:/app/api \
-  loader-app-api:local \
+  loader-app-api:dev \
   black api/
 ```
+This does
+* The container mounts your local API folder at /app/api
+* Black runs inside the container using uv’s dependencies
+* Black formats the files in the mounted volume
+* The changes appear instantly on local machine
 
+Similarly, run the image for Flake8:
+```bash
+docker run --rm \
+  -v $(pwd)/src/api-service/api:/app/api \
+  loader-app-api:dev \
+  flake8 api/
+  ```
 
 Rebuild after modifications by black
 ```bash
-docker build -t loader-app-api:local -f Dockerfile .
+docker build -f Dockerfile.dev -t loader-app-api:dev .
 ```
 
 Check with black - should now be clean
 ```bash
-docker run --rm loader-app-api:local black --check api/
+docker run --rm loader-app-api:dev black --check api/
 ```
 
-## Flake8
+### Black and Flake8 (direct, without container)
+
+Let black reformat
+```bash
+black src/api-service/api/
+```
 
 Check code quality with flake
 ```bash
 flake8 src/api-service/api/
 ```
 
-let black reformat
-```bash
-black src/api-service/api/
-```
 
-# PYTEST
+## Testing with pytest
 
 ## Unit tests
 
-Execute the unit test
+Move into the folder **services/loader_testing**
+
+Execute the unit tests in **tests/unit/\***
+```bash
+uv sync --extra dev
+```
+
 ```bash
 DATABASE_URL="postgresql://test:test@localhost:5432/testdb" \
 GOOGLE_CLOUD_PROJECT="test-project" \
-uv run pytest tests/unit/test_utils.py -v --cov=api --cov-report=html
+uv run python -m pytest tests/unit/ -v --cov=api --cov-report=html
 ```
 
 Get the report:
@@ -49,41 +75,28 @@ Get the report:
 open htmlcov/index.html
 ```
 
-=====Appendix
-Run this specific test file
-```bash
-uv run pytest tests/unit/test_chunking_simple.py -v
-```
-Run with details
-```bash
-uv run pytest tests/unit/test_chunking_simple.py -v -s
-```
-Run just one test
-```bash
-uv run pytest tests/unit/test_chunking_simple.py::test_character_chunking_creates_chunks -v
-```
-===========
 
 ## Integration tests
 
 Integration test (no container)
+
 ```bash
 DATABASE_URL="postgresql://dummy" GOOGLE_CLOUD_PROJECT="test-project" \
-  uv run pytest tests/integration/ -v --cov-fail-under=50
+  uv run python -m pytest tests/integration/ -v --cov-fail-under=50
 ```
 
 Integration test (container)
 
 Build the image first
 ```bash
-docker build -t loader-app-api:local .
+docker build -t loader-app-api:dev .
 ```
 Run integration tests only
 ```bash
 docker run --rm \
   -e DATABASE_URL="postgresql://dummy" \
   -e GOOGLE_CLOUD_PROJECT="test-project" \
-  loader-app-api:local \
+  loader-app-api:dev \
   pytest tests/integration/ -v
 ```
 
@@ -93,10 +106,14 @@ docker run --rm \
 
 Need to use a real DB now.
 
-Use a docker-compose (docker-compose.test.yml) as we need to spin up DB for testing
+- Use a docker-compose (docker-compose.test.yml) as we need to spin up DB for testing
 and also initialize tables.
-Initialization uses tests/setup/init_test_db.sql to create tables in temporary local DB
-Will use real VertexAI calls for embeddings
+- Initialization uses tests/setup/init_test_db.sql to create tables in temporary local DB
+- Uses real VertexAI calls for embeddings.
+
+
+# UP TO HERE ALL PROPERLY WORKING
+
 
 Authenticate (if not already done)
 ```bash
@@ -128,6 +145,8 @@ issues encountered, stuff learned:
 
 
 # GitHub Actions
+
+
 With system test (needs credentials)
 
 Use **.github/workflows/ci.yaml** file
