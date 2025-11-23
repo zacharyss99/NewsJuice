@@ -175,7 +175,7 @@ jobs:
           USE_MOCKED_AI: "true"
           GOOGLE_CLOUD_PROJECT: test-project-ci
         run: |
-          docker-compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
+          docker compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
       
       - name: Show container logs on failure
         if: failure()
@@ -183,12 +183,12 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "Container Logs (on failure):"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          docker-compose -f docker-compose.test-ci.yml logs
+          docker compose -f docker-compose.test-ci.yml logs
       
       - name: Cleanup Docker resources
         if: always()
         run: |
-          docker-compose -f docker-compose.test-ci.yml down -v
+          docker compose -f docker-compose.test-ci.yml down -v
 
   # ============================================================
   # TEST SUMMARY - Aggregate Results
