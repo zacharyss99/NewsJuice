@@ -146,8 +146,24 @@ issues encountered, stuff learned:
 
 # GitHub Actions
 
+SYSTEMS TEST
 
-With system test (needs credentials)
+Locally use real VertexAI calls (environmental variable)
+CI: use mocked VertexAI calls
+
+Have two docker-compose files: 
+- docker-compose.test
+- docker-compose.test-ci (for mocked system test)
+
+# Set USE_MOCKED_AI=true
+USE_MOCKED_AI=true docker-compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
+
+# Don't set USE_MOCKED_AI, defaults to real
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+
+
+
+(needs credentials)
 
 Use **.github/workflows/ci.yaml** file
 
@@ -223,3 +239,68 @@ Run with pytest (standard way)
 ```bash
 uv run pytest tests/integration/test_api_simple.py -v
 ```
+
+
+```
+
+## Required Files Structure
+```
+services/loader_testing/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                          # ← This file above
+├── src/
+│   └── api-service/
+│       └── api/
+│           ├── __init__.py
+│           ├── loader.py
+│           └── main.py
+├── tests/
+│   ├── unit/
+│   │   └── test_sample.py
+│   ├── integration/
+│   │   └── test_api_simple.py
+│   ├── system/
+│   │   └── test_loader_system.py          # ← Modified with USE_MOCKED_AI support
+│   └── setup/
+│       └── init_test_db.sql
+├── docker-compose.test.yml                 # ← Original (real AI, local use)
+├── docker-compose.test-ci.yml              # ← New (mocked AI, CI use)
+├── Dockerfile
+├── pyproject.toml
+├── uv.lock
+├── pytest.ini
+└── .flake8
+```
+
+## Execution Flow Visualization
+```
+┌─────────────────────────────────────────────────────────┐
+│                    PUSH / PULL REQUEST                  │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+                  ┌──────────────┐
+                  │   🔍 LINT    │ (Black + Flake8)
+                  └──────┬───────┘
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+            ▼                         ▼
+     ┌──────────────┐          ┌──────────────┐
+     │ 🧪 UNIT TESTS│          │ 🔗 INTEGRATION│
+     │  (Coverage)  │          │   (DB Mock)  │
+     └──────┬───────┘          └──────┬───────┘
+            │                         │
+            └────────────┬────────────┘
+                         │
+                         ▼
+                  ┌──────────────┐
+                  │ 🚀 SYSTEM    │ (Full Stack + Mocked AI)
+                  │    TESTS     │ (Docker Compose)
+                  └──────┬───────┘
+                         │
+                         ▼
+                  ┌──────────────┐
+                  │ 📊 SUMMARY   │ (Results + PR Comment)
+                  └──────────────┘
