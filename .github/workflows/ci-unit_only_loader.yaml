@@ -36,6 +36,15 @@ jobs:
         run: |
           uv run python -m pytest tests/unit/ -v --cov=api
 
+# 🔹 NEW: run integration tests
+      - name: Run integration tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
+          DATABASE_URL: postgresql://dummy
+          GOOGLE_CLOUD_PROJECT: test-project
+        run: |
+          uv run python -m pytest tests/integration/ -v --cov=api --cov-append --cov-fail-under=50
+
       - name: System tests info
         run: |
           echo "✓ System tests available locally:"
