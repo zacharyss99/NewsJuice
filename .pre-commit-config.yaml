@@ -32,7 +32,7 @@ repos:
       - id: black
         name: Format Python code with Black
         args: ['--line-length', '120']
-        files: ^src/.*\.py$
+        files: ^(src/|services/loader_testing/src/).*\.(py)$
 
   # Flake8 linter - L17, Slide 8
   - repo: https://github.com/PyCQA/flake8
@@ -41,4 +41,4 @@ repos:
       - id: flake8
         name: Check Python code with Flake8
         args: ['--max-line-length=120', '--extend-ignore=E203,W503']
-        files: ^src/.*\.py$
+        files: ^(src/|services/loader_testing/src/).*\.(py)$
