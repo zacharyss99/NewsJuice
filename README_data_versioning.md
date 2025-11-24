@@ -156,9 +156,9 @@ gsutil ls -lh gs://newsjuice-data-versions/dvc-storage/files/md5/
 
 ### Visualizing detailed version history
 
-**Details**
+**Detail (written to data_version_history.txt file)**
 ```bash
-git log --stat --date=format:"%Y-%m-%d %H:%M" -- data.dvc
+git log --stat --date=format:"%Y-%m-%d %H:%M" -- data.dvc | tee data_version_history.txt
 ```
 **Summary**
 ```bash

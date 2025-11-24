@@ -23,7 +23,7 @@ RUN mkdir -p /app/secrets
 COPY pyproject.toml uv.lock .flake8 ./
 
 # Install main + dev dependencies (Black, Flake8, pytest, pre-commit)
-RUN uv sync --all-extras
+RUN uv sync --extra dev
 
 # Copy app & test code
 COPY src/api-service/api/ ./api/
