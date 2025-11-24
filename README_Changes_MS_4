@@ -1,0 +1,36 @@
+# 📆 NewsJuice (AC215 - Milestone 4)
+
+
+## 👥 Team
+
+- **Khaled Aly**
+- **Zac Sardi-Santos**
+- **Joshua Rosenblum**
+- **Christian Michel**
+
+**Team name:** `NewsJuice`
+
+---
+
+## 📚 Overview of changes versus Milestone 3
+
+**Scraper service**
+-XXXX
+
+**Loader service**
+- Changed embedding to VertexAI
+- Deployment with Cloud Run and Scheduler (currently live deployed, running every 24h)
+- Full test suite added (unit, integration and system) + CI workflow with GitHub Actions implemented
+
+**chatter service**
+- Changed embedding to VertexAI
+- XXXX
+
+**frontend** 
+- completely newly implemented with Firebase
+- XXXX
+
+**other**
+- Dataversioning implemented for SQL DB
+- Finetuning (but use discarded)
+- XXXX
