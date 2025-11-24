@@ -1,5 +1,26 @@
 # Loader testing workflow
 
+The base version of the loader service is in "loader_deployed".
+In this "loader_testing" folder, a test suit has been added.
+In the final version both folders will be integrated into a version that can be used in development/testing and production.
+
+Tests covered:
+- Black + Flake8 (with container)
+- Black and Flake8 (direct, without container)
+- Pytest (unit, integration and system)
+- GitHub Actions CI workflow
+
+
+Files testet (in **src/api-service/api/**)
+- main.py
+- loader.py
+
+Test files in **/tests/**
+
+
+## Instructions:
+
+
 Go into folder: services/loader_testing
 
 ### Black + Flake 8 (with container)
@@ -29,12 +50,10 @@ docker run --rm \
   loader-app-api:dev \
   flake8 api/
   ```
-
 Rebuild after modifications by black
 ```bash
 docker build -f Dockerfile.dev -t loader-app-api:dev .
 ```
-
 Check with black - should now be clean
 ```bash
 docker run --rm loader-app-api:dev black --check api/
@@ -46,16 +65,14 @@ Let black reformat
 ```bash
 black src/api-service/api/
 ```
-
 Check code quality with flake
 ```bash
 flake8 src/api-service/api/
 ```
 
+### Testing with pytest
 
-## Testing with pytest
-
-## Unit tests
+#### Unit tests
 
 Move into the folder **services/loader_testing**
 
@@ -76,7 +93,7 @@ open htmlcov/index.html
 ```
 
 
-## Integration tests
+### Integration tests
 
 Integration test (no container)
 
@@ -100,9 +117,7 @@ docker run --rm \
   pytest tests/integration/ -v
 ```
 
-
-
-## System tests
+### System tests
 
 Need to use a real DB now.
 
@@ -111,15 +126,10 @@ and also initialize tables.
 - Initialization uses tests/setup/init_test_db.sql to create tables in temporary local DB
 - Uses real VertexAI calls for embeddings.
 
-
-# UP TO HERE ALL PROPERLY WORKING
-
-
 Authenticate (if not already done)
 ```bash
 gcloud auth application-default login
 ```
-
 Verify credentials exist
 ```bash
 ls -la ~/.config/gcloud/application_default_credentials.json
@@ -130,64 +140,45 @@ docker-compose -f docker-compose.test.yml down -v  # ← The -v removes volumes
 docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
 ```
 
+```
 ✅ Tests with real Google Cloud Vertex AI embeddings
 ✅ Validates the complete end-to-end pipeline
 ✅ Shows you the actual embedding values
 ✅ Runs in isolated Docker environment
-
-(
-issues encountered, stuff learned:
-* local test PostgresSQL DB
-* google cloud login and creation of credential file in ~/......... for VertexAI
-* after FastAPI server starts, how to continue flow
-* no coverage for system tests?
-)
+```
 
 
-# GitHub Actions
+## GitHub Actions CI workflow
 
-SYSTEMS TEST
+### Systems test
+- Locally: use real VertexAI calls (environmental variable)  
+- CI: use mocked VertexAI calls  
 
-Locally use real VertexAI calls (environmental variable)
-CI: use mocked VertexAI calls
+Have two docker-compose files:   
+- **docker-compose.test**  
+- **docker-compose.test-ci** (for mocked system test)  
 
-Have two docker-compose files: 
-- docker-compose.test
-- docker-compose.test-ci (for mocked system test)
-
-# Set USE_MOCKED_AI=true
+Set **USE_MOCKED_AI=true**
+```bash
 USE_MOCKED_AI=true docker-compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
-
-# Don't set USE_MOCKED_AI, defaults to real
+```
+Don't set USE_MOCKED_AI, defaults to real
+```bash
 docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
-
-# Test locally with mock AI
+```
+Test locally with mock AI
+```bash
 cd services/loader_testing
 docker-compose -f docker-compose.test-ci.yml up --build --abort-on-container-exit
+```
 
-(needs credentials)
-
-Use **.github/workflows/ci.yaml** file
+Use **.github/workflows/ci_full.yaml** file (IN PROJECT ROOT)  
 
 Whenever there is a change in the files specified in ci.yaml (currently only loader.py and main.py in loader_testing) and a push being executed, then GitHub Actions workflow with unit and integration tests are triggered.
 Go to GitHub->Actions to the the workflow in action, with logs and outcome (should be gree tick)
 
 
-APPENDIX/NOTES
-
-Recommended Structure
-```
-.github/
-└── workflows/
-    ├── ci.yml              # Fast tests on every push
-    ├── integration.yml     # Integration tests with DB
-    └── system-tests.yml    # Manual/scheduled system tests (costs money)
-
-tests/
-├── unit/               # Fast, no external dependencies
-├── integration/        # Database, mocked AI
-└── system/            # Full stack, real AI (run locally or manually)
-```
+## APPENDIX/NOTES
 
 Set up SA and credentials
 
@@ -208,49 +199,45 @@ Create and download key
 gcloud iam service-accounts keys create github-actions-key.json \
   --iam-account=github-actions-ci@newsjuice-123456.iam.gserviceaccount.com
 ```
-
 Paste the key to the Clipboard
 ```bash
 cat github-actions-key.json | pbcopy
 ```
 
-Add Secret to GitHub
+Add Secret to GitHub  
 
-Go to your GitHub repo → Settings → Secrets and variables → Actions
-Click "New repository secret"
-Name: GCP_SA_KEY
-Value: Paste the entire contents of github-actions-key.json
-
-
-# *****
+Go to your GitHub repo → Settings → Secrets and variables → Actions  
+Click "New repository secret"  
+Name: GCP_SA_KEY  
+Value: Paste the entire contents of github-actions-key.json  
 
 
 Start the API server
+```bash
 docker run -d --name api-server -p 8080:8080 -e DEV=1 loader-app-api:local
-
+```
 Run system tests against the live server
+```bash
 docker run --rm --network host loader-app-api:local pytest tests/system/ -v
-
+```
 Clean up when done
+```bash
 docker stop api-server && docker rm api-server
+```
 
-
-DIRECTLY:
-Run with pytest (standard way)
-
+Test directly:
+Run with pytest (standard way)  
 ```bash
 uv run pytest tests/integration/test_api_simple.py -v
 ```
 
-
-```
 
 ## Required Files Structure
 ```
 services/loader_testing/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                          # ← This file above
+│       └── ci_full.yml                          # ← This file above
 ├── src/
 │   └── api-service/
 │       └── api/
@@ -259,7 +246,10 @@ services/loader_testing/
 │           └── main.py
 ├── tests/
 │   ├── unit/
-│   │   └── test_sample.py
+│   │   └── test_utils.py
+|   |   |__ test_main_api.py
+|   |   |__ test_database_manager-py
+|   |   |__ test_article_processing_and_orchestrator.py 
 │   ├── integration/
 │   │   └── test_api_simple.py
 │   ├── system/
