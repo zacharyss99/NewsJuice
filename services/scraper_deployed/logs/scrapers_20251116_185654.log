@@ -1,3 +1,0 @@
-2025-11-16 18:56:54,355 - main - INFO - Logging to file: logs/scrapers_20251116_185654.log
-2025-11-16 18:57:22,148 - main - INFO - === Starting background article scraping process ===
-2025-11-16 18:57:22,149 - main - INFO - Background task for scrapers queued successfully

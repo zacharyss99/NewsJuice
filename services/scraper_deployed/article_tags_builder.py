@@ -3,11 +3,14 @@
 import json
 import os
 
-from db_manager import PostgresDBManager
 from tqdm import tqdm
 from vertexai.generative_models import GenerativeModel
 
-GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get("GEMINI_SERVICE_ACCOUNT_PATH", "../../../secrets/gemini-service-account.json")
+from db_manager import PostgresDBManager
+
+GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get(
+    "GEMINI_SERVICE_ACCOUNT_PATH", "../../../secrets/gemini-service-account.json"
+)
 GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
 GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 
@@ -15,12 +18,13 @@ GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 try:
     if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
         # Set the credentials file path
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GEMINI_SERVICE_ACCOUNT_PATH
-        
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GEMINI_SERVICE_ACCOUNT_PATH
+
         # Initialize the model (using full model path for Vertex AI)
         # Try gemini-2.5-flash first as it's more readily available
         model = GenerativeModel(
-            model_name=f'projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_REGION}/publishers/google/models/gemini-2.5-flash'
+            model_name=f"""projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_REGION}
+            /publishers/google/models/gemini-2.5-flash"""
         )
         print("[gemini] Configured with Vertex AI service account authentication")
         print(f"[gemini] Using model: gemini-2.5-flash in {GOOGLE_CLOUD_REGION}")
@@ -43,13 +47,21 @@ def call_gemini_api(article):
             return None, "No article content provided"
 
         prompt = f"""
-            You are an expert news-tagging system. Your task is to analyze the provided news article and generate a structured JSON object containing a broad category, a specific sub-topic, and a list of key entities.
+            You are an expert news-tagging system. Your task is to analyze the provided news article
+            and generate a structured JSON object containing a broad category,
+            a specific sub-topic, and a list of key entities.
 
             ### INSTRUCTIONS ###
-            1.  **Broad Category:** Identify ONE main, high-level category for the article (e.g., "Technology," "Politics," "Business," "Sports," "Science").
-            2.  **Specific Sub-Topic:** Provide ONE mid-level, descriptive topic that narrows down the category (e.g., "Generative AI," "US-China Relations," "Semiconductor Market," "Climate Tech").
-            3.  **Key Tags:** Generate a list of 3-5 specific keywords, people, organizations, or locations central to the article (e.g., "OpenAI," "GPT-4o," "Sam Altman," "Senate Hearing").
-            4.  **Format:** Return your response *only* as a single, valid JSON object following the specified structure. Do not include any other text or explanations.
+            1.  **Broad Category:** Identify ONE main, high-level category for the article
+            (e.g., "Technology," "Politics," "Business," "Sports," "Science").
+            2.  **Specific Sub-Topic:** Provide ONE mid-level, descriptive topic that narrows down
+            the category (e.g., "Generative AI," "US-China Relations," "Semiconductor Market,"
+            "Climate Tech").
+            3.  **Key Tags:** Generate a list of 3-5 specific keywords, people, organizations,
+            or locations central to the article (e.g., "OpenAI," "GPT-4o," "Sam Altman,"
+            "Senate Hearing").
+            4.  **Format:** Return your response *only* as a single, valid JSON object following the
+             specified structure. Do not include any other text or explanations.
 
             ### JSON OUTPUT STRUCTURE ###
             {{
@@ -64,7 +76,7 @@ def call_gemini_api(article):
             ### YOUR RESPONSE (JSON only) ###
 
             """
-        
+
         response = model.generate_content(prompt)
         payload_text = response.text.strip() if response and response.text else ""
         tags_json, parse_error = _extract_json_payload(payload_text)
@@ -138,6 +150,3 @@ def process_articles(limit=1000):
 
 if __name__ == "__main__":
     process_articles()
-
-
-
