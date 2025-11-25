@@ -1,19 +1,18 @@
-# Chatter Service - Complete Setup Guide
+# Chatter Service - Setup & Usage Guide
 
-This guide provides step-by-step instructions to run the **Backend**, **Frontend**, and **Firebase** services for the NewsJuice application.
+This guide provides instructions to run the **NewsJuice Backend (chatter_deployed)** and **Frontend** locally for development and testing.
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Firebase Setup](#firebase-setup)
+2. [Environment Configuration](#environment-configuration)
 3. [Backend Setup](#backend-setup)
 4. [Frontend Setup](#frontend-setup)
-5. [Running the Complete Application](#running-the-complete-application)
+5. [Running the Application](#running-the-application)
 6. [Testing](#testing)
-7. [Deployment](#deployment)
-8. [Troubleshooting](#troubleshooting)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -24,78 +23,107 @@ Before starting, ensure you have the following installed:
 - **Docker** and **Docker Compose**
 - **Node.js** (v16 or higher) and **npm**
 - **Google Cloud SDK** (`gcloud`)
-- **Firebase CLI** (optional, for Firebase management)
 - Access to the following Google Cloud resources:
   - Cloud SQL instance: `newsjuice-123456:us-central1:newsdb-instance`
-  - Cloud Storage bucket: `ac215-audio-bucket`
-  - Service account keys (see below)
+  - Vertex AI API enabled
+  - Speech-to-Text API enabled
 
 ### Required Service Account Keys
 
-You need the following service account JSON files in the parent `secrets/` directory:
+You need the following service account JSON files in the parent `secrets/` directory (three levels up from this folder):
 
 ```
-../secrets/
-├── sa-key.json                    # GCP service account for Cloud SQL & GCS
+../../../secrets/
+├── sa-key.json                    # GCP service account for Cloud SQL & Vertex AI
 └── gemini-service-account.json    # Service account for Gemini API
 ```
 
-To download these keys:
-```bash
-mkdir -p ../secrets
-gcloud iam service-accounts keys create ../secrets/sa-key.json \
-  --iam-account=YOUR-SA@newsjuice-123456.iam.gserviceaccount.com
-gcloud iam service-accounts keys create ../secrets/gemini-service-account.json \
-  --iam-account=GEMINI-SA@newsjuice-123456.iam.gserviceaccount.com
-```
+**To obtain these keys:**
+
+1. **Create or use existing GCP project** (`newsjuice-123456` or your own)
+2. **Enable required APIs**:
+   ```bash
+   gcloud services enable sqladmin.googleapis.com
+   gcloud services enable aiplatform.googleapis.com
+   gcloud services enable speech.googleapis.com
+   ```
+
+3. **Create service accounts and download keys**:
+   ```bash
+   mkdir -p ../../../secrets
+
+   # Create service account for Cloud SQL and general GCP access
+   gcloud iam service-accounts create newsjuice-sa \
+     --display-name="NewsJuice Service Account"
+
+   # Grant necessary roles
+   gcloud projects add-iam-policy-binding newsjuice-123456 \
+     --member="serviceAccount:newsjuice-sa@newsjuice-123456.iam.gserviceaccount.com" \
+     --role="roles/cloudsql.client"
+
+   gcloud projects add-iam-policy-binding newsjuice-123456 \
+     --member="serviceAccount:newsjuice-sa@newsjuice-123456.iam.gserviceaccount.com" \
+     --role="roles/aiplatform.user"
+
+   # Download key
+   gcloud iam service-accounts keys create ../../../secrets/sa-key.json \
+     --iam-account=newsjuice-sa@newsjuice-123456.iam.gserviceaccount.com
+
+   # Use same key for Gemini (or create separate one)
+   cp ../../../secrets/sa-key.json ../../../secrets/gemini-service-account.json
+   ```
 
 ---
 
-## 🔥 Firebase Setup
+## ⚙️ Environment Configuration
 
-### 1. Firebase Project Configuration
+### Create `.env.local` File
 
-The Firebase project is already configured with:
-- **Project ID**: `newsjuice-123456`
-- **Auth Domain**: `newsjuice-123456.firebaseapp.com`
+In the `services/chatter_deployed/` directory, create a `.env.local` file with the following configuration:
 
-### 2. Firebase Authentication Setup
-
-1. **Enable Authentication in Firebase Console**:
-   - Go to [Firebase Console](https://console.firebase.google.com/)
-   - Select project `newsjuice-123456`
-   - Navigate to **Authentication** → **Sign-in method**
-   - Enable **Email/Password** authentication
-
-2. **Get Firebase Admin SDK Service Account** (for backend):
-   ```bash
-   # Download Firebase Admin SDK service account key
-   # Go to Firebase Console → Project Settings → Service Accounts
-   # Click "Generate new private key" and save as:
-   ../secrets/firebase-service-account.json
-   ```
-
-3. **Frontend Firebase Config**:
-   The frontend Firebase configuration is already set in:
-   `services/k-frontend/podcast-app/src/firebase/config.js`
-
-   ```javascript
-   const firebaseConfig = {
-     apiKey: "AIzaSyBgsCjTT1B_qZUioacHrLHcs5v0tXcmr2c",
-     authDomain: "newsjuice-123456.firebaseapp.com",
-     projectId: "newsjuice-123456",
-     // ... other config
-   };
-   ```
-
-### 3. Backend Firebase Admin Setup
-
-For local development, set the Firebase service account path in `.env.local`:
 ```bash
-FIREBASE_SERVICE_ACCOUNT_PATH=../secrets/firebase-service-account.json
+# Database (Local Development - uses Cloud SQL Proxy)
+DATABASE_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
+DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
+
+# Google Cloud
+GOOGLE_CLOUD_PROJECT=newsjuice-123456
+GOOGLE_CLOUD_REGION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
+GEMINI_SERVICE_ACCOUNT_PATH=/secrets/gemini-service-account.json
+
+# Google AI API (for Gemini Live API TTS)
+# Instructions:
+# 1. Visit https://aistudio.google.com/app/apikey
+# 2. Create a new API key
+# 3. Replace the value below with your key
+GOOGLE_API_KEY=your_google_api_key_here
+
+# GCS Bucket (for audio storage)
+AUDIO_BUCKET=ac215-audio-bucket
+GCS_PREFIX=podcasts/
+CACHE_CONTROL=public, max-age=3600
+
+# CORS (for local frontend)
+CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080
+
+# Server
+PORT=8080
+
+# Firebase (Optional - for user authentication)
+# If you want to test Firebase authentication:
+# 1. Create Firebase project at https://console.firebase.google.com/
+# 2. Go to Project Settings → Service Accounts
+# 3. Generate new private key and save as ../../../secrets/firebase-service-account.json
+# 4. Uncomment the line below
+# FIREBASE_SERVICE_ACCOUNT_PATH=../../../secrets/firebase-service-account.json
 ```
 
-For production (Cloud Run), Firebase Admin uses Workload Identity automatically.
+### Notes on API Keys
+
+- **GOOGLE_API_KEY**: Required for text-to-speech (TTS) functionality. Get from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **Firebase**: Optional for MS4 grading - the app can run without authentication for basic testing
+- **Database password**: `Newsjuice25+` (URL-encoded as `Newsjuice25%2B`) 
 
 ---
 
@@ -107,50 +135,13 @@ For production (Cloud Run), Firebase Admin uses Workload Identity automatically.
 cd services/chatter_deployed
 ```
 
-### 2. Create Environment File
+### 2. Verify Environment File Exists
 
-Create a `.env.local` file (this file is gitignored):
-
-```bash
-# Database (Local Development - uses Cloud SQL Proxy)
-DATABASE_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
-DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
-
-# OpenAI API (for Live API TTS)
-OPENAI_API_KEY=sk-proj-XXXXXXXXXXXXXXXXXXXXXXXX
-
-# Google Cloud
-GOOGLE_CLOUD_PROJECT=newsjuice-123456
-GOOGLE_CLOUD_REGION=us-central1
-GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
-GEMINI_SERVICE_ACCOUNT_PATH=/secrets/gemini-service-account.json
-
-# Google AI API (for Gemini Live API)
-GOOGLE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXX
-
-# Hugging Face (for sentence-transformers model)
-HUGGING_FACE_HUB_TOKEN=hf_XXXXXXXXXXXXXXXXXXXXXXXX
-
-# GCS Bucket
-AUDIO_BUCKET=ac215-audio-bucket
-GCS_PREFIX=podcasts/
-CACHE_CONTROL=public, max-age=3600
-
-# CORS (for local frontend)
-CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8080
-
-# Server
-PORT=8080
-
-# Firebase (Local Development)
-FIREBASE_SERVICE_ACCOUNT_PATH=../secrets/firebase-service-account.json
-```
+Ensure `.env.local` is created with the configuration above.
 
 ### 3. Start Backend Services
 
 The backend runs in Docker Compose with Cloud SQL Proxy:
-
-[CM:] Move to the chatter_deployed subfolder
 
 ```bash
 # Build and start all services (Cloud SQL Proxy + API)
@@ -162,7 +153,15 @@ This will:
 - Start the FastAPI backend on port 8080
 - Mount service account keys and secrets
 
+**Wait for the following output**:
+```
+api-1  | INFO:     Application startup complete.
+api-1  | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+```
+
 ### 4. Verify Backend is Running
+
+In a new terminal:
 
 ```bash
 # Check health endpoint
@@ -170,15 +169,16 @@ curl http://localhost:8080/healthz
 # Should return: {"ok":true}
 ```
 
-### 5. Backend Endpoints
+### Backend Architecture
 
-- **Health Check**: `GET http://localhost:8080/healthz`
-- **WebSocket Chat**: `ws://localhost:8080/ws/chat?token=<firebase-token>`
-- **User Creation**: `POST http://localhost:8080/api/user/create` (requires auth)
-- **User Preferences**: 
-  - `GET http://localhost:8080/api/user/preferences` (requires auth)
-  - `POST http://localhost:8080/api/user/preferences` (requires auth)
-- **Audio History**: `GET http://localhost:8080/api/user/history` (requires auth)
+The backend consists of:
+- **FastAPI** web framework with WebSocket support
+- **Speech-to-Text Client**: Converts audio to text using Google Cloud Speech-to-Text API
+- **Query Enhancement**: Uses Gemini to expand user queries into sub-queries
+- **RAG Retrieval**: Searches vector database (pgvector) for relevant news chunks
+- **Podcast Generation**: Uses Gemini 2.5 Flash to generate podcast scripts
+- **TTS (Text-to-Speech)**: Uses Gemini Live API to convert text to audio
+- **User Database**: Stores user preferences and audio history in Cloud SQL
 
 ---
 
@@ -196,33 +196,32 @@ cd services/k-frontend/podcast-app
 npm install
 ```
 
-### 3. Configure Backend URL
-
-The frontend automatically detects the backend URL based on the hostname:
-
-- **Production**: Uses `https://chatter-919568151211.us-central1.run.app`
-- **Local Development**: Uses `http://localhost:8080`
-
-This is configured in the frontend code (check `src/pages/Podcast.jsx` or similar files).
-
-### 4. Start Frontend Development Server
+### 3. Start Frontend Development Server
 
 ```bash
 npm run dev
 ```
 
-The frontend will start on **http://localhost:5173** (Vite default port).
+The frontend will start on **http://localhost:3000** (configured in `vite.config.js`).
 
-### 5. Access the Application
+**Expected output**:
+```
+  VITE v5.4.21  ready in 142 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: use --host to expose
+```
+
+### 4. Access the Application
 
 Open your browser and navigate to:
 ```
-http://localhost:5173
+http://localhost:3000
 ```
 
-### 6. Frontend Features
+### Frontend Features
 
-- **Login/Registration**: Firebase Authentication
+- **Login/Registration**: Firebase Authentication (optional for MS4 testing)
 - **Podcast Page**: Voice recording and real-time podcast generation
 - **Settings**: User preferences management
 - **About Us**: Team information
@@ -230,128 +229,97 @@ http://localhost:5173
 
 ---
 
-## 🎯 Running the Complete Application
+## 🎯 Running the Application
 
 ### Step-by-Step Startup
 
-1. **Start Backend** (Terminal 1):
-   ```bash
-   cd services/chatter_deployed
-   docker-compose -f docker-compose.local.yml --env-file .env.local up --build
-   ```
-   Wait for: `Application startup complete` and `Uvicorn running on http://0.0.0.0:8080`
+**Terminal 1 - Start Backend**:
+```bash
+cd services/chatter_deployed
+docker-compose -f docker-compose.local.yml --env-file .env.local up --build
+```
+Wait for: `Uvicorn running on http://0.0.0.0:8080`
 
-2. **Start Frontend** (Terminal 2):
-   ```bash
-   cd services/k-frontend/podcast-app
-   npm run dev
-   ```
-   Wait for: `Local: http://localhost:5173/`
+**Terminal 2 - Start Frontend**:
+```bash
+cd services/k-frontend/podcast-app
+npm run dev
+```
+Wait for: `Local: http://localhost:3000/`
 
-3. **Open Browser**:
-   - Navigate to `http://localhost:5173`
-   - Register a new account or login
-   - Start recording voice queries!
+**Browser**:
+- Navigate to `http://localhost:3000`
+- Click "Get Started" or navigate directly to the Podcast page
 
-### Application Flow
+### Application Flow (Without Authentication)
 
-1. **User Registration/Login**:
-   - Frontend authenticates with Firebase
-   - Backend creates user in Cloud SQL (on first registration)
-   - Firebase token is used for all authenticated requests
-
-2. **Voice Interaction**:
+1. **Voice Interaction**:
    - User presses and holds the record button
-   - Audio is streamed via WebSocket to backend
-   - Backend transcribes audio using Speech-to-Text
-   - Backend retrieves relevant news chunks
-   - Backend generates podcast using Gemini
-   - Backend streams audio response back via WebSocket
+   - Audio is streamed via WebSocket to backend (`ws://localhost:8080/ws/chat`)
+   - Backend transcribes audio using Google Cloud Speech-to-Text
+   - Backend enhances query using Gemini (breaks into sub-queries)
+   - Backend retrieves relevant news chunks from vector database
+   - Backend generates podcast script using Gemini 2.5 Flash
+   - Backend streams audio response back via WebSocket using Gemini Live API
    - Frontend plays the audio response
 
-3. **User Preferences**:
-   - User can set preferences in Settings page
-   - Preferences are saved to Cloud SQL
-   - Preferences are used to personalize future podcasts
+2. **Status Updates**:
+   - Frontend displays real-time status messages during processing:
+     - "Transcribing audio..."
+     - "Enhancing query..."
+     - "Retrieving articles..."
+     - "Generating podcast..."
+     - "Streaming audio..."
 
 ---
 
 ## 🧪 Testing
 
-### Backend Testing
+### Backend Health Check
 
 ```bash
-# Health check
 curl http://localhost:8080/healthz
+```
+**Expected response**: `{"ok":true}`
 
-# Test WebSocket (requires Firebase token)
-# Use a WebSocket client or the frontend
+### WebSocket Connection Test
 
-# Test authenticated endpoint (requires Firebase token in header)
-curl -X GET http://localhost:8080/api/user/preferences \
-  -H "Authorization: Bearer <firebase-token>"
+1. Open `http://localhost:3000` in browser
+2. Open browser DevTools (F12) → Console tab
+3. Navigate to Podcast page
+4. Press and hold the record button
+5. Speak a question (e.g., "What's happening with AI research at Harvard?")
+6. Release the button
+7. Verify in console:
+   - WebSocket connection established
+   - Status messages received
+   - Audio playback starts
+
+### Backend Logs
+
+Monitor backend logs in the terminal where Docker Compose is running:
+
+```bash
+# Look for these log messages:
+[websocket] Authenticated user: <user_id>
+[websocket] Received audio chunk: <size> bytes
+[websocket] Starting transcription...
+[websocket] Transcription complete, text: ...
+[websocket] Enhancing query...
+[websocket] Query enhanced into N sub-queries
+[websocket] Retrieving articles...
+[websocket] Generating podcast...
+[websocket] Streaming audio...
 ```
 
-### Frontend Testing
+### Testing Without Microphone
 
-1. Open `http://localhost:5173`
-2. Register a new account
-3. Navigate to Podcast page
-4. Test voice recording:
-   - Press and hold the record button
-   - Speak a question (e.g., "What's happening in AI research?")
-   - Release the button
-   - Wait for podcast response
+If microphone access is not available, you can test the backend directly:
 
-### End-to-End Testing
-
-1. Ensure backend is running on `http://localhost:8080`
-2. Ensure frontend is running on `http://localhost:5173`
-3. Register/login in the frontend
-4. Record a voice query
-5. Verify:
-   - Audio is transcribed correctly
-   - Relevant news chunks are retrieved
-   - Podcast is generated and streamed back
-   - Audio plays in the browser
-
----
-
-## ☁️ Deployment
-
-### Backend Deployment (Cloud Run)
-
-1. **Set up Cloud Build**:
-   ```bash
-   gcloud config set project newsjuice-123456
-   gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
-   ```
-
-2. **Deploy**:
-   ```bash
-   cd services/chatter_deployed
-   gcloud builds submit \
-     --config cloudbuild.yaml \
-     --substitutions _HUGGING_FACE_HUB_TOKEN=hf_XXXXXXXXXXXXXX
-   ```
-
-3. **Monitor Deployment**:
-   ```bash
-   # Check build status
-   gcloud builds list --limit=1
-   
-   # Check Cloud Run service
-   gcloud run services describe chatter --region us-central1
-   
-   # View logs
-   gcloud run services logs read chatter --region us-central1
-   ```
-
-### Frontend Deployment
-
-The frontend is deployed to Firebase Hosting at `www.newsjuiceapp.com`.
-
-See `services/k-frontend/podcast-app/firebase.json` for hosting configuration.
+```bash
+# Test transcription endpoint (requires audio file)
+# Note: WebSocket is the primary interface, direct HTTP testing requires custom scripts
+```
 
 ---
 
@@ -359,69 +327,156 @@ See `services/k-frontend/podcast-app/firebase.json` for hosting configuration.
 
 ### Backend Issues
 
-**Problem**: Database connection failed
-- **Solution**: Ensure Cloud SQL Proxy is running and `DATABASE_URL` is correct
-- Check: `docker-compose logs cloud-sql-proxy`
+**Problem**: `Database connection failed`
+- **Solution**:
+  - Ensure Cloud SQL Proxy container is running: `docker ps | grep cloud-sql-proxy`
+  - Check `DATABASE_URL` in `.env.local` is correct
+  - Verify service account has `cloudsql.client` role
+  - Check logs: `docker-compose -f docker-compose.local.yml logs cloud-sql-proxy`
 
-**Problem**: Firebase authentication not working
-- **Solution**: Verify `FIREBASE_SERVICE_ACCOUNT_PATH` is set correctly in `.env.local`
-- Check: Service account key file exists at the specified path
+**Problem**: `Gemini API errors` or `GOOGLE_API_KEY not set`
+- **Solution**:
+  - Verify `GOOGLE_API_KEY` is set in `.env.local`
+  - Get a valid key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+  - Restart backend after updating `.env.local`
 
-**Problem**: WebSocket connection fails
-- **Solution**: Check CORS settings in `CORS_ALLOW_ORIGINS`
-- Verify frontend URL is included in allowed origins
+**Problem**: `WebSocket connection fails`
+- **Solution**:
+  - Verify backend is running: `curl http://localhost:8080/healthz`
+  - Check CORS settings: Ensure `CORS_ALLOW_ORIGINS` includes `http://localhost:3000`
+  - Check browser console for specific error messages
+  - Disable browser extensions that might block WebSocket connections
 
-**Problem**: OpenAI API errors
-- **Solution**: Verify `OPENAI_API_KEY` is set in `.env.local`
-- Check API key is valid and has credits
+**Problem**: `Service account authentication failed`
+- **Solution**:
+  - Verify service account keys exist at `../../../secrets/sa-key.json` and `../../../secrets/gemini-service-account.json`
+  - Check file permissions: `ls -la ../../../secrets/`
+  - Verify service account has required roles:
+    ```bash
+    gcloud projects get-iam-policy newsjuice-123456 \
+      --flatten="bindings[].members" \
+      --filter="bindings.members:serviceAccount:*newsjuice*"
+    ```
+
+**Problem**: `No articles found` or `Empty retrieval results`
+- **Solution**:
+  - The scraper and loader services need to be run first to populate the database
+  - Navigate to project root and run:
+    ```bash
+    # Run scraper to fetch articles
+    cd services/scraper
+    docker-compose up --build
+
+    # Run loader to create embeddings
+    cd services/loader_deployed
+    docker-compose up --build
+    ```
+  - These are batch jobs that populate the `articles` and `chunks_vector` tables
 
 ### Frontend Issues
 
-**Problem**: Cannot connect to backend
-- **Solution**: Verify backend is running on `http://localhost:8080`
-- Check browser console for CORS errors
-- Verify `CORS_ALLOW_ORIGINS` includes frontend URL
+**Problem**: `Cannot connect to backend`
+- **Solution**:
+  - Verify backend is running: `curl http://localhost:8080/healthz`
+  - Check browser console for CORS errors
+  - Verify frontend URL in `CORS_ALLOW_ORIGINS` (`.env.local`)
+  - Clear browser cache and reload
 
-**Problem**: Firebase authentication errors
-- **Solution**: Verify Firebase config in `src/firebase/config.js`
-- Check Firebase project has Authentication enabled
-- Verify email/password sign-in method is enabled
+**Problem**: `Microphone not working`
+- **Solution**:
+  - Grant microphone permissions in browser (Chrome: Settings → Privacy → Microphone)
+  - Use HTTPS or localhost (required for Web Audio API)
+  - Check browser console for permission errors
+  - Try a different browser (Chrome recommended)
 
-**Problem**: Microphone not working
-- **Solution**: Grant microphone permissions in browser
-- Use HTTPS or localhost (required for Web Audio API)
-- Check browser console for errors
+**Problem**: `Audio playback not working`
+- **Solution**:
+  - Check browser console for audio errors
+  - Verify browser supports Web Audio API
+  - Ensure speakers/headphones are working
+  - Check system volume settings
+
+**Problem**: `npm install` fails
+- **Solution**:
+  - Verify Node.js version: `node --version` (should be v16+)
+  - Clear npm cache: `npm cache clean --force`
+  - Delete `node_modules` and `package-lock.json`, then retry:
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
 
 ### Database Issues
 
-**Problem**: No articles found
-- **Solution**: Run the scraper and loader services first:
-  ```bash
-  make run -f MakefileBatch scrape
-  make run -f MakefileBatch load
-  ```
+**Problem**: `Cloud SQL Proxy fails to start`
+- **Solution**:
+  - Check Cloud SQL instance is running in GCP Console
+  - Verify instance connection string: `newsjuice-123456:us-central1:newsdb-instance`
+  - Check service account key has Cloud SQL Client role
+  - View proxy logs: `docker-compose -f docker-compose.local.yml logs cloud-sql-proxy`
 
-**Problem**: User preferences not saving
-- **Solution**: Verify user is authenticated (check Firebase token)
-- Check Cloud SQL connection and user table exists
+**Problem**: `User preferences not saving`
+- **Solution**:
+  - Verify user is authenticated (check browser console for Firebase token)
+  - Check Cloud SQL connection is active
+  - Verify `users` and `user_preferences` tables exist in database
 
 ---
 
-## 📚 Additional Resources
+## 📚 Additional Information
 
-- **Backend API Documentation**: See `main.py` for endpoint details
-- **Frontend Components**: See `services/k-frontend/podcast-app/src/`
-- **Database Schema**: See main `README.md` for table structures
-- **Development vs Deployment**: See `README_develop_vs_deploy.md` for differences
+### API Endpoints
+
+- **Health Check**: `GET http://localhost:8080/healthz`
+- **WebSocket Chat**: `ws://localhost:8080/ws/chat?token=<firebase-token>`
+- **User Creation**: `POST http://localhost:8080/api/user/create` (requires auth)
+- **User Preferences**:
+  - `GET http://localhost:8080/api/user/preferences` (requires auth)
+  - `POST http://localhost:8080/api/user/preferences` (requires auth)
+- **Audio History**: `GET http://localhost:8080/api/user/history` (requires auth)
+
+### Database Schema
+
+The application uses PostgreSQL with pgvector extension:
+
+- **articles**: Raw scraped news articles
+- **chunks_vector**: Semantic chunks with 768-dimensional embeddings
+- **users**: User profiles (Firebase UID, email)
+- **user_preferences**: Key-value preferences per user
+- **audio_history**: Log of questions and generated podcasts
+
+### Cloud Deployment
+
+The backend is deployed to Google Cloud Run:
+- **Production URL**: `https://chatter-919568151211.us-central1.run.app`
+- **Deployment**: Via `cloudbuild.yaml` using Cloud Build
+- **Environment**: Production uses `env.yaml` instead of `.env.local`
+
+For deployment instructions, see `README_develop_vs_deploy.md`.
 
 ---
 
 ## 🔐 Security Notes
 
-- **Never commit** `.env.local` or service account keys to git
+- **Never commit** `.env.local` or service account keys to git (already in `.gitignore`)
 - Use Secret Manager for production secrets
-- Firebase tokens should be validated on every request
+- Firebase tokens should be validated on every authenticated request
 - CORS should be restricted to known origins in production
+
+---
+
+## 🎉 Success Checklist
+
+- [ ] Backend running on `http://localhost:8080`
+- [ ] Backend health check returns `{"ok":true}`
+- [ ] Frontend running on `http://localhost:3000`
+- [ ] Can access Podcast page in browser
+- [ ] Can record voice input (microphone permission granted)
+- [ ] Transcript appears in UI after recording
+- [ ] Podcast audio is generated and plays automatically
+- [ ] No errors in backend logs or browser console
+
+Once all items are checked, you're ready to use NewsJuice! 🚀
 
 ---
 
@@ -429,21 +484,28 @@ See `services/k-frontend/podcast-app/firebase.json` for hosting configuration.
 
 For issues or questions:
 1. Check the troubleshooting section above
-2. Review service logs: `docker-compose logs`
-3. Check Firebase Console for authentication issues
-4. Review Cloud Run logs for deployment issues
+2. Review service logs: `docker-compose -f docker-compose.local.yml logs`
+3. Check browser console for frontend errors (F12 → Console tab)
+4. Verify all prerequisites and environment configuration
 
 ---
 
-## 🎉 Success Checklist
+## 📝 Quick Start Summary
 
-- [ ] Backend running on `http://localhost:8080`
-- [ ] Frontend running on `http://localhost:5173`
-- [ ] Firebase authentication working
-- [ ] Can register/login in frontend
-- [ ] Can record voice queries
-- [ ] Podcast responses are generated and played
-- [ ] User preferences can be saved
-- [ ] Audio history is tracked
+```bash
+# 1. Setup (one-time)
+cd services/chatter_deployed
+# Create .env.local file with configuration above
+# Ensure service account keys exist in ../../../secrets/
 
-Once all items are checked, you're ready to use NewsJuice! 🚀
+# 2. Start Backend
+docker-compose -f docker-compose.local.yml --env-file .env.local up --build
+
+# 3. Start Frontend (new terminal)
+cd services/k-frontend/podcast-app
+npm install
+npm run dev
+
+# 4. Open Browser
+# Navigate to http://localhost:3000
+```
