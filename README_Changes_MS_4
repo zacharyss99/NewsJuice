@@ -14,23 +14,22 @@
 
 ## 📚 Overview of changes versus Milestone 3
 
-**Scraper service**
--XXXX
+**Scraper service**  
+- XXXX
 
 **Loader service**
 - Changed embedding to VertexAI
 - Deployment with Cloud Run and Scheduler (currently live deployed, running every 24h)
 - Full test suite added (unit, integration and system) + CI workflow with GitHub Actions implemented
 
-**chatter service**
+**Chatter service**
 - Changed embedding to VertexAI
-- XXXX
+- Voice to text and text to voice implemented in streaming mode
 
-**frontend** 
-- completely newly implemented with Firebase
-- XXXX
+**Frontend** 
+- Newly implemented with Firebase
+- User registration and authentication
 
-**other**
+**Other**
 - Dataversioning implemented for SQL DB
-- Finetuning (but use discarded)
-- XXXX
+- Finetuning of LLM (but decided to discard in app)
