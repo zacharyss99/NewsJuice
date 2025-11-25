@@ -30,13 +30,12 @@ Contains the version of the chatter service
 Contains the frontend
 
 - **finetuning/**
-Contains the finetuning exercise for the LLM used for ppodcast generation.
+Contains the 2 finetuning exercise for the LLM
+    1. Finetuning for podcast generation.
+    2. Finetuning for article Classification
 
 - **data_versioner/**
 Contains the files for the Data Versioning module (hybrid SQL snapshot + DVC)
-
-**Finetuning/**
-Contains the files for the LLM model finetuning
 
 **Archive/**
 Older files and versions (not relevant for submission)

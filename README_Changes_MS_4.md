@@ -15,8 +15,10 @@
 ## 📚 Overview of changes versus Milestone 3
 
 **Scraper service**  
+- Expanded to include all Harvard major news sources accross different schools
 - Converted into an API 
-- Deployed on Cloud Run
+- Deployed on Cloud Run and Scheduler (currently live deployed, running every 24h)
+- Unit test added, covering every source scraper 
 
 **Loader service**
 - Changed embedding to VertexAI

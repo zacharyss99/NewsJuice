@@ -26,13 +26,15 @@ It is primarily designed for the **Harvard community**, pulling content from Har
 
 1. The main changes versus Milestone 3 can be found in README_Changes_MS_4.md
 
-2. A detailed description of the app can be found in the docs/Application_Design_Document/APPLICATION_DESIGN.md
+3. you will find in the Docs folder:
 
-3. A detaiñed description of the CI/CD test suit can be found in docs/CI_Evidence/README_testing_loader.md
+    a. A detailed description of the app can be found in the docs/Application_Design_Document/APPLICATION_DESIGN.md
 
-4. A detailed description of the Data Versioning approach can be found in docs/Data_Versioning_documentation/README_data_versioning.md
+    b. A detaiñed description of the CI/CD test suit can be found in docs/CI_Evidence/README_testing_loader.md
 
-5. A detailed description of Finetuning can be found in Finetuning/README.md
+    c. A detailed description of the Data Versioning approach can be found in docs/Data_Versioning_documentation/README_data_versioning.md
+
+4. A detailed description of Finetuning can be found in Finetuning/README.md
 
 Each service contains a README with a more detailed description
 - README_loader_deployed

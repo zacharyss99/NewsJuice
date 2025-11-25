@@ -67,7 +67,7 @@ The goal was to automatically classify news articles into predefined categories 
 Located in `finetuning-for-classification/`:
 
 1. **Data Preprocessing** (`data_preprocessing.py`)
-   - Dataset: HuffPost News Category Dataset (209,527 articles)
+   - Dataset: HuffPost News Category Dataset (209,527 articles) (source:https://www.kaggle.com/datasets/rmisra/news-category-dataset)
    - Balanced to 1,000 samples per category (29 categories)
    - Train/test split: 80/20 (23,200 train / 5,800 test)
 
