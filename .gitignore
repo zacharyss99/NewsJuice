@@ -2,6 +2,9 @@
 services/scraper/artifacts/
 artifacts/
 services/finetunning/qwen_qlora_podcast/
+Finetuning/finetuning-for-podcast/Output/
+Finetuning/finetuning-for-podcast/wandb/
+Finetuning/finetuning-for-classification/wandb/
 secrets/
 **/.env
 __pycache__/
@@ -9,3 +12,4 @@ __pycache__/
 logs/*.log
 **/.env.local
 **/OLD/
+
