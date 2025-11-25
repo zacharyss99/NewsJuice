@@ -15,7 +15,8 @@
 ## 📚 Overview of changes versus Milestone 3
 
 **Scraper service**  
-- XXXX
+- Converted into an API 
+- Deployed on Cloud Run
 
 **Loader service**
 - Changed embedding to VertexAI
