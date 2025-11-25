@@ -35,9 +35,9 @@ The production system uses **Gemini 2.5 Flash** to generate podcast-style script
 
 ### Training Metrics
 
-![Podcast Qwen Training Loss](wandb%20Screenshots/Podcast_qwen06_train.png)
+![Podcast Qwen Training Loss](../../Finetuning/wandb%20Screenshots/Podcast_qwen06_train.png)
 
-![Podcast Qwen Evaluation](wandb%20Screenshots/Podcast_Qwen06_Eval.png)
+![Podcast Qwen Evaluation](../../Finetuning/wandb%20Screenshots/Podcast_Qwen06_Eval.png)
 
 ### Results & Conclusion
 
@@ -67,7 +67,7 @@ The goal was to automatically classify news articles into predefined categories 
 Located in `finetuning-for-classification/`:
 
 1. **Data Preprocessing** (`data_preprocessing.py`)
-   - Dataset: HuffPost News Category Dataset (209,527 articles)
+   - Dataset: HuffPost News Category Dataset (209,527 articles) (source:https://www.kaggle.com/datasets/rmisra/news-category-dataset)
    - Balanced to 1,000 samples per category (29 categories)
    - Train/test split: 80/20 (23,200 train / 5,800 test)
 
@@ -84,15 +84,15 @@ Located in `finetuning-for-classification/`:
 
 #### DistilBERT
 
-![Classification DistilBERT Training](wandb%20Screenshots/Classification_Distillbert_Train.png)
+![Classification DistilBERT Training](../../Finetuning/wandb%20Screenshots/Classification_Distillbert_Train.png)
 
-![Classification DistilBERT Evaluation](wandb%20Screenshots/Classification%20Distillbert%20Eval.png)
+![Classification DistilBERT Evaluation](../../Finetuning/wandb%20Screenshots/Classification%20Distillbert%20Eval.png)
 
 #### RoBERTa
 
-![Classification RoBERTa](wandb%20Screenshots/Classification%20_%20RoBerta.png)
+![Classification RoBERTa](../../Finetuning/wandb%20Screenshots/Classification%20_%20RoBerta.png)
 
-![Classification RoBERTa Evaluation](wandb%20Screenshots/Classification_Roberta_Eval.png)
+![Classification RoBERTa Evaluation](../../Finetuning/wandb%20Screenshots/Classification_Roberta_Eval.png)
 
 ### Results
 
