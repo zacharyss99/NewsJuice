@@ -2,6 +2,7 @@
 Integration Tests for Article Loader API
 """
 import os
+import sys
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -9,6 +10,9 @@ from unittest.mock import patch, MagicMock
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
 os.environ.setdefault("GOOGLE_CLOUD_PROJECT", "test-project")
 os.environ.setdefault("GOOGLE_CLOUD_REGION", "us-central1")
+
+# Add api-service directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src", "api-service"))
 
 # ============= NOW IMPORT THE APP =============
 from fastapi.testclient import TestClient
