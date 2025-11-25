@@ -3,9 +3,13 @@
 **/.github/**
 Contains the workflow file for the CI/CD GitHub Actions workflow (ci_full.yaml)
 
-**/docs/**  
+**/docs/** Contains folder with documentation for submission of MS_4  
+- Application_Design_Document
+- Data_Versioning_documentation
+- CI_Evidence
+- Finetuning documentation
 
-- The **/services/** folder contains folders each of which is a self-contained containerized micro-service:
+The **/services/** folder contains folders each of which is a self-contained containerized micro-service:
 
 - **/scraper_deployed/**
 scraper version - currently deployed on Cloud Run and running on Scheduler every 24 h
