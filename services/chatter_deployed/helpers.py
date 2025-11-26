@@ -1,12 +1,11 @@
-
-'''
+"""
 HELPER FUNCTIONS (called by main.py in chatter_deployed)
-THE HELPER FUNCTIONS USED CURRENTLY ARE 
+THE HELPER FUNCTIONS USED CURRENTLY ARE
 
 1. call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
 ===================================================================
 Call the retriever service to get relevant articles.
-Input: query  
+Input: query
 Returns: List of tuples: (id, chunk, score) for each matching article
 
 
@@ -16,11 +15,11 @@ Call Google Gemini LLM API with the question and context articles to generate a 
 Input: question text + tuple of relevant chunks (with id, chunk text and similarity score)
 Output: tuple of response text + error message
 
-THE HELPER FUNCTIONS NOT YET USED ARE 
-check_llm_conversations_table() 
+THE HELPER FUNCTIONS NOT YET USED ARE
+check_llm_conversations_table()
 ================================
 Check if the llm_conversations table exists.
-Inpùt: - 
+Inpùt: -
 Output: TRUE if table exists, FALSE otherwise
 
 
@@ -28,7 +27,7 @@ log_conversation
 ================
 NOT YET USED
 
-'''
+"""
 
 from typing import List, Tuple, Dict, Optional
 import psycopg
@@ -48,9 +47,10 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
     try:
         # Import the retriever function directly since we're in the same environment
         import sys
-        sys.path.append('/app/retriever')
+
+        sys.path.append("/app/retriever")
         from retriever import search_articles
-        
+
         print(f"[retriever] Searching for: '{query[:50]}...'")
         articles = search_articles(query, limit=2)
         print(f"[retriever] Found {len(articles)} relevant chunks")
@@ -59,19 +59,24 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
         print(f"[retriever-error] Error calling retriever service: {e}")
         return []
 
-def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None, model=None) -> tuple[Optional[str], Optional[str]]:
+
+def call_gemini_api(
+    question: str, context_articles: List[Tuple[int, str, float]] = None, model=None
+) -> tuple[Optional[str], Optional[str]]:
     """Call Google Gemini API with the question and context articles to generate a podcast-style response."""
     if not model:
-        return None, "Gemini API not configured" 
+        return None, "Gemini API not configured"
 
     try:
         # Build the prompt with context if articles are provided
         if context_articles:
-            context_text = "\n\n".join([
-                f"News Article {i+1} (Relevance Score: {score:.3f}):\n{chunk}"
-                for i, (_, chunk, score) in enumerate(context_articles)
-            ])
-            
+            context_text = "\n\n".join(
+                [
+                    f"News Article {i+1} (Relevance Score: {score:.3f}):\n{chunk}"
+                    for i, (_, chunk, score) in enumerate(context_articles)
+                ]
+            )
+
             prompt = f"""You are the host of NewsJuice, a conversational news podcast. Your name is NewsJuice, and you deliver news in a friendly, engaging style.
 
 LISTENER'S QUESTION: {question}
@@ -98,26 +103,28 @@ Generate your podcast response now:"""
             prompt = f"""You are a news podcast host. The user has asked: "{question}"
 
 However, no relevant news articles were found to provide context. Please provide a thoughtful response acknowledging this limitation and suggest how the user might find more information about their question."""
-        
+
         response = model.generate_content(prompt)
         return response.text, None
     except Exception as e:
         return None, str(e)
 
 
-def check_llm_conversations_table(): #[Z] check_llm_convos is not used by our current workflow. 
-    #its use case is to first check if there is previous context already present to pull from for our podcast generation.
-    
+def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our current workflow.
+    # its use case is to first check if there is previous context already present to pull from for our podcast generation.
+
     """Check if the llm_conversations table exists."""
     try:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_name = 'llm_conversations'
                     );
-                """)
+                """
+                )
                 exists = cur.fetchone()[0]
                 if exists:
                     print("[db] llm_conversations table found")
@@ -128,24 +135,30 @@ def check_llm_conversations_table(): #[Z] check_llm_convos is not used by our cu
         print(f"[db-error] Failed to check table: {e}")
         raise
 
+
 # [Z] log conversations scaffolding is here in case we plan to insert conversations into db for context
-def log_conversation(user_id: str, question: str, response: Optional[str], error_message: Optional[str]):
+def log_conversation(
+    user_id: str, question: str, response: Optional[str], error_message: Optional[str]
+):
     """Log the conversation to the database."""
     try:
         # Prepare conversation data as JSON
         conversation_data = {
             "question": question,
             "response": response,
-            "error": error_message
+            "error": error_message,
         }
-        
+
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO llm_conversations (user_id, model_name, conversation_data)
                     VALUES (%s, %s, %s);
-                """, (user_id, 'gemini-2.5-flash', json.dumps(conversation_data)))
-                
+                """,
+                    (user_id, "gemini-2.5-flash", json.dumps(conversation_data)),
+                )
+
                 print("[db] Conversation logged successfully")
     except Exception as e:
         print(f"[db-error] Failed to log conversation: {e}")
