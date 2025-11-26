@@ -18,6 +18,7 @@ import os
 import struct
 from typing import Optional
 from google import genai
+
 # from google.genai import types
 
 
@@ -121,21 +122,29 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
                 await asyncio.wait_for(collect_audio(), timeout=60.0)
 
             except asyncio.TimeoutError:
-                print(f"""[live-api-tts] Timeout waiting for audio (60s),
-                received {audio_chunk_count} chunks""")
+                print(
+                    f"""[live-api-tts] Timeout waiting for audio (60s),
+                received {audio_chunk_count} chunks"""
+                )
 
-            print(f"""[live-api-tts] Audio stream complete: {audio_chunk_count} chunks,
-             {total_audio_bytes} total bytes""")
+            print(
+                f"""[live-api-tts] Audio stream complete: {audio_chunk_count} chunks,
+             {total_audio_bytes} total bytes"""
+            )
 
             # convert PCM (analog) to WAV because that is the audio input the frontend takes
             if all_audio_chunks:
-                print(f"""[live-api-tts] Converting {len(all_audio_chunks)}
-                 PCM chunks to WAV format...""")
+                print(
+                    f"""[live-api-tts] Converting {len(all_audio_chunks)}
+                 PCM chunks to WAV format..."""
+                )
                 pcm_data = b"".join(all_audio_chunks)
                 wav_data = _pcm_to_wav(pcm_data, sample_rate=24000)  # LiveAPI uses 24kHz
 
-                print(f"""[live-api-tts] Converted to WAV: {len(pcm_data)}
-                bytes PCM -> {len(wav_data)} bytes WAV""")
+                print(
+                    f"""[live-api-tts] Converted to WAV: {len(pcm_data)}
+                bytes PCM -> {len(wav_data)} bytes WAV"""
+                )
 
                 # stream WAV chunks to frontend via websocket.send_bytes(chunk)
                 chunk_size = 8192
@@ -163,7 +172,6 @@ def _pcm_to_wav(
     channels: int = 1,
     sample_width: int = 2,
 ) -> bytes:
-
     """
     Convert raw PCM audio data to WAV format.
 
