@@ -137,9 +137,7 @@ def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our 
 
 
 # [Z] log conversations scaffolding is here in case we plan to insert conversations into db for context
-def log_conversation(
-    user_id: str, question: str, response: Optional[str], error_message: Optional[str]
-):
+def log_conversation(user_id: str, question: str, response: Optional[str], error_message: Optional[str]):
     """Log the conversation to the database."""
     try:
         # Prepare conversation data as JSON

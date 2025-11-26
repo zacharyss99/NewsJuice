@@ -69,9 +69,7 @@ def save_user_preferences(user_id: str, preferences: Dict[str, str]) -> bool:
         return False
 
 
-def save_audio_history(
-    user_id: str, question_text: str, podcast_text: str, audio_url: Optional[str] = None
-) -> bool:
+def save_audio_history(user_id: str, question_text: str, podcast_text: str, audio_url: Optional[str] = None) -> bool:
     """Save audio history entry."""
     try:
         with psycopg.connect(DB_URL, autocommit=True) as conn:

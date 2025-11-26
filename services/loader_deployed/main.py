@@ -15,11 +15,8 @@ log_file = os.path.join(log_dir, f"loader_{timestamp}.log")
 # Configure logging to both file and console
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(log_file), logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 logger.info(f"Logging to file: {log_file}")
@@ -27,10 +24,12 @@ logger.info(f"Logging to file: {log_file}")
 
 app = FastAPI()
 
+
 @app.get("/")
 def health():
     logger.info("Health check called")
     return {"status": "ok"}
+
 
 @app.post("/process")
 def process(background_tasks: BackgroundTasks):
@@ -38,6 +37,7 @@ def process(background_tasks: BackgroundTasks):
     background_tasks.add_task(chunk_embed_load, "semantic-split")
     logger.info("Background task queued successfully")
     return {"status": "started"}
+
 
 @app.post("/process-sync")
 def process_sync():
@@ -51,12 +51,11 @@ def process_sync():
         logger.error(f"Processing failed: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     logger.info("Starting article-loader service...")
     uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=int(os.environ.get("PORT", 8080)),
-        log_level="info"
+        app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info"
     )

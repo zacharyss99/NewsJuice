@@ -86,9 +86,7 @@ ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://www.newsjuiceapp.com").split("
 # --------------------------
 # Gemini Config
 # --------------------------
-GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get(
-    "GEMINI_SERVICE_ACCOUNT_PATH", "/secrets/gemini-service-account.json"
-)
+GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get("GEMINI_SERVICE_ACCOUNT_PATH", "/secrets/gemini-service-account.json")
 GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
 GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 
@@ -109,9 +107,7 @@ try:
     initialize_firebase_admin()
 except Exception as e:
     print(f"[firebase-admin-warning] Firebase Admin not initialized: {e}")
-    print(
-        "[firebase-admin-warning] Authentication will not work until Firebase Admin is configured"
-    )
+    print("[firebase-admin-warning] Authentication will not work until Firebase Admin is configured")
 
 
 # --------------------------
@@ -147,9 +143,7 @@ async def healthz_root() -> Dict[str, bool]:
 # [Z]
 async def _retrieve_and_generate_podcast(
     websocket: WebSocket,
-    enhanced_queries: Dict[
-        str, str
-    ],  # dictionary w/ string keys and stringvalues, which are each enhanced query
+    enhanced_queries: Dict[str, str],  # dictionary w/ string keys and stringvalues, which are each enhanced query
     original_query: str,
     user_id: Optional[str],
     model: GenerativeModel,
@@ -160,9 +154,7 @@ async def _retrieve_and_generate_podcast(
     all_chunks = []
 
     # Extract all enhanced_query_N keys and sort them
-    query_keys = sorted(
-        [k for k in enhanced_queries.keys() if k.startswith("enhanced_query_")]
-    )
+    query_keys = sorted([k for k in enhanced_queries.keys() if k.startswith("enhanced_query_")])
 
     # [Z] assuming here that for each sub query, we run the cosine similarity of the db and pull relevant chunks
     for query_key in query_keys:
@@ -173,9 +165,7 @@ async def _retrieve_and_generate_podcast(
             # Print each chunk with its similarity score
             print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
             for i, (chunk_id, chunk_text, score) in enumerate(chunks):
-                print(
-                    f"  Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:100]}..."
-                )
+                print(f"  Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:100]}...")
             all_chunks.extend(chunks)
 
     # Remove duplicates based on chunk ID (keep first occurrence)
@@ -192,9 +182,7 @@ async def _retrieve_and_generate_podcast(
     # Print summary of final unique chunks
     print(f"[retriever] After deduplication: {len(all_chunks)} unique chunks")
     for i, (chunk_id, chunk_text, score) in enumerate(all_chunks):
-        print(
-            f"  Final Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:150]}..."
-        )
+        print(f"  Final Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:150]}...")
 
     if not all_chunks:
         await websocket.send_json({"warning": "No relevant articles found"})
@@ -284,9 +272,7 @@ async def websocket_chatter(websocket: WebSocket):
     # - Save audio history with user_id
     # - Load user preferences with user_id
 
-    audio_buffer = (
-        bytearray()
-    )  # bytearray data structure is what will hold our audio chunks
+    audio_buffer = bytearray()  # bytearray data structure is what will hold our audio chunks
     # tts_client = OpenAI()  # Initialize once, reuse in loop
     is_processing = False  # what this is checking is that the backend is already transcribing/generating a response
 
@@ -306,9 +292,7 @@ async def websocket_chatter(websocket: WebSocket):
                 if "bytes" in message:
                     # if we're processing a previous request, ignore new audio chunks. avoid overstuffing the audio bujffer
                     if is_processing:
-                        print(
-                            f"[websocket] Ignoring audio chunk - still processing previous request"
-                        )
+                        print(f"[websocket] Ignoring audio chunk - still processing previous request")
                         continue
                     chunk_size = len(message["bytes"])
                     audio_buffer.extend(
@@ -317,9 +301,7 @@ async def websocket_chatter(websocket: WebSocket):
                     print(
                         f"[websocket] Received audio chunk: {chunk_size} bytes, total buffer: {len(audio_buffer)} bytes"
                     )
-                    await websocket.send_json(
-                        {"status": "chunk_received", "size": len(audio_buffer)}
-                    )
+                    await websocket.send_json({"status": "chunk_received", "size": len(audio_buffer)})
 
                 # Handle JSON control messages
                 elif "text" in message:
@@ -330,32 +312,24 @@ async def websocket_chatter(websocket: WebSocket):
                         if data.get("type") == "complete":
                             # Check if we're already processing
                             if is_processing:
-                                print(
-                                    "[websocket] Already processing a request, ignoring new complete signal"
-                                )
+                                print("[websocket] Already processing a request, ignoring new complete signal")
                                 continue
 
                             # Check if we have audio to process
                             if len(audio_buffer) == 0:
                                 print("[websocket] ERROR: No audio received in buffer!")
-                                await websocket.send_json(
-                                    {"error": "No audio received"}
-                                )
+                                await websocket.send_json({"error": "No audio received"})
                                 continue
 
                             is_processing = True
-                            print(
-                                f"[websocket] Received complete signal, audio buffer size: {len(audio_buffer)} bytes"
-                            )
+                            print(f"[websocket] Received complete signal, audio buffer size: {len(audio_buffer)} bytes")
 
                             # Step 1: Convert audio to text
                             await websocket.send_json(
                                 {"status": "transcribing"}
                             )  # send.json sends a JSON message from backend to frontend
                             # via frontend connection
-                            print(
-                                "[websocket] Starting transcription..."
-                            )  # backend status print
+                            print("[websocket] Starting transcription...")  # backend status print
 
                             try:
                                 # audio_to_text again is the speech_to_text_client.py file, that converts our frontend
@@ -365,68 +339,46 @@ async def websocket_chatter(websocket: WebSocket):
                                 )  # and we feed audio_buffer, our chunks of audio, into the function as input
                                 # I think this is what shows up in the backend terminal once the transcription is complete
                                 # so we can monitor progress
-                                print(
-                                    f"[websocket] Transcription complete, text: {text[:100] if text else 'None'}..."
-                                )
+                                print(f"[websocket] Transcription complete, text: {text[:100] if text else 'None'}...")
                             except Exception as e:
                                 print(f"[websocket] Transcription error: {e}")
-                                await websocket.send_json(
-                                    {"error": f"Transcription failed: {str(e)}"}
-                                )
+                                await websocket.send_json({"error": f"Transcription failed: {str(e)}"})
                                 audio_buffer.clear()
                                 is_processing = False
                                 continue
 
                             if not text:
-                                await websocket.send_json(
-                                    {
-                                        "error": "Failed to transcribe audio (empty response)"
-                                    }
-                                )
+                                await websocket.send_json({"error": "Failed to transcribe audio (empty response)"})
                                 audio_buffer.clear()
                                 is_processing = False
                                 continue
                             # websocket.send_json updates the frontend, status message via websocket
                             # frontend receives this and updates the UI
-                            await websocket.send_json(
-                                {"status": "transcribed", "text": text}
-                            )
+                            await websocket.send_json({"status": "transcribed", "text": text})
 
                             # NEW STEP: Query Enhancement - enhance query once and use it directly
                             await websocket.send_json({"status": "enhancing_query"})
                             print("[websocket] Enhancing query...")
 
                             # Enhance the query once
-                            enhancement_result, error = enhance_query_with_gemini(
-                                text, model
-                            )
-                            original_query = (
-                                text  # Keep original for podcast generation
-                            )
+                            enhancement_result, error = enhance_query_with_gemini(text, model)
+                            original_query = text  # Keep original for podcast generation
 
                             if error or not enhancement_result:
-                                print(
-                                    f"[websocket] Query enhancement error: {error}, using original query"
-                                )
+                                print(f"[websocket] Query enhancement error: {error}, using original query")
                                 # Use original query as single sub-query if enhancement fails
                                 enhanced_queries = {"enhanced_query_1": text}
                             else:
                                 # Extract all enhanced_query_N keys from the result
                                 enhanced_queries = {
-                                    k: v
-                                    for k, v in enhancement_result.items()
-                                    if k.startswith("enhanced_query_")
+                                    k: v for k, v in enhancement_result.items() if k.startswith("enhanced_query_")
                                 }
                                 if not enhanced_queries:
                                     # Fallback if format is unexpected
                                     enhanced_queries = {
-                                        "enhanced_query_1": enhancement_result.get(
-                                            "enhanced_query", text
-                                        )
+                                        "enhanced_query_1": enhancement_result.get("enhanced_query", text)
                                     }
-                                print(
-                                    f"[websocket] Query enhanced into {len(enhanced_queries)} sub-queries"
-                                )
+                                print(f"[websocket] Query enhanced into {len(enhanced_queries)} sub-queries")
 
                             # Use the helper function to retrieve and generate podcast
                             success = await _retrieve_and_generate_podcast(
@@ -445,9 +397,7 @@ async def websocket_chatter(websocket: WebSocket):
                             # Reset buffer for next request
                             audio_buffer.clear()
                             is_processing = False
-                            print(
-                                "[websocket] Request processing complete, ready for next recording"
-                            )
+                            print("[websocket] Request processing complete, ready for next recording")
 
                         elif data.get("type") == "audio":
                             # JSON with base64 audio data
@@ -459,9 +409,7 @@ async def websocket_chatter(websocket: WebSocket):
                             audio_buffer.clear()
                             is_processing = False
                             await websocket.send_json({"status": "reset"})
-                            print(
-                                "[websocket] Reset signal received, cleared buffer and processing flag"
-                            )
+                            print("[websocket] Reset signal received, cleared buffer and processing flag")
 
                     except json.JSONDecodeError:
                         await websocket.send_json({"error": "Invalid JSON"})
@@ -509,9 +457,7 @@ class FirebaseAuthMiddleware(BaseHTTPMiddleware):
         # Get token from header
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            raise HTTPException(
-                status_code=401, detail="Missing or invalid authorization header"
-            )
+            raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
 
         token = auth_header.split("Bearer ")[1]
 
@@ -561,9 +507,7 @@ async def get_preferences_endpoint(request: Request):
 
 
 @app.post("/api/user/preferences")
-async def save_preferences_endpoint(
-    request: Request, preferences: Dict[str, Any] = Body(...)
-):
+async def save_preferences_endpoint(request: Request, preferences: Dict[str, Any] = Body(...)):
     """Save user preferences."""
     try:
         user_id = request.state.user_id

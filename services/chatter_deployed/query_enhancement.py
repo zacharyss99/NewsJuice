@@ -52,9 +52,7 @@ def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
     """Parse Gemini's response to extract JSON, handling markdown code blocks if present."""
     try:
         # Try to find JSON in the response (might be wrapped in ```json or ```)
-        json_match = re.search(
-            r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL
-        )
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:
@@ -71,15 +69,11 @@ def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
         # Validate required fields: must have original_query and at least one enhanced_query_N
         if "original_query" in result:
             # Check if there's at least one enhanced_query_N key
-            has_enhanced_query = any(
-                k.startswith("enhanced_query_") for k in result.keys()
-            )
+            has_enhanced_query = any(k.startswith("enhanced_query_") for k in result.keys())
             if has_enhanced_query:
                 return result
 
-        print(
-            f"[query-enhancement-error] Missing required fields in response: {result}"
-        )
+        print(f"[query-enhancement-error] Missing required fields in response: {result}")
         return None
     except json.JSONDecodeError as e:
         print(f"[query-enhancement-error] Failed to parse JSON from response: {e}")

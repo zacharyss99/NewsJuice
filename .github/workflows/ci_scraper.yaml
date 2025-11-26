@@ -48,7 +48,7 @@ jobs:
   # UNIT TESTS - Fast, No External Dependencies
   # ============================================================
   unit-tests-scraper:
-    name: Scraper Unit Tests (Coverage >= 30%)
+    name: Scraper Unit Tests (Coverage >= 50%)
     runs-on: ubuntu-latest
     needs: lint-scraper
     defaults:
@@ -78,7 +78,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/testdb
         run: |
-          uv run pytest test/ -v --cov=. --cov-fail-under=30 --cov-report=term --cov-report=html
+          uv run pytest test/ -v --cov=. --cov-fail-under=50 --cov-report=term --cov-report=html
       
       - name: Upload coverage report
         if: always()
