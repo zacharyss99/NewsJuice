@@ -185,25 +185,13 @@ class CrimsonArticleScraper:
         print("Crimson Scraper Summary")
         print(f"\n\nTotal number of articles: {len(self.all_articles_details)}")
         blank_content = len(
-            [
-                d
-                for d in self.all_articles_details
-                if not d["article_content"] or d["article_content"].strip() == ""
-            ]
+            [d for d in self.all_articles_details if not d["article_content"] or d["article_content"].strip() == ""]
         )
         blank_author = len(
-            [
-                d
-                for d in self.all_articles_details
-                if not d["article_author"] or d["article_author"].strip() == ""
-            ]
+            [d for d in self.all_articles_details if not d["article_author"] or d["article_author"].strip() == ""]
         )
         blank_title = len(
-            [
-                d
-                for d in self.all_articles_details
-                if not d["article_title"] or d["article_title"].strip() == ""
-            ]
+            [d for d in self.all_articles_details if not d["article_title"] or d["article_title"].strip() == ""]
         )
         blank_publish_date = len(
             [

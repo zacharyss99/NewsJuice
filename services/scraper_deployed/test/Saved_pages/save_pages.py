@@ -23,8 +23,7 @@ URLS_TO_SAVE: list[Tuple[str, str]] = [
     ],
     ["https://gsas.harvard.edu/news/topic/commencement", "GSAS_sample_topic_page.html"],
     [
-        "https://news.harvard.edu/gazette/story/2025/05/searching-for-answers-to-lifes-"
-        "big-questions/",
+        "https://news.harvard.edu/gazette/story/2025/05/searching-for-answers-to-lifes-" "big-questions/",
         "GSAS_sample_article.html",
     ],
     [
@@ -32,13 +31,11 @@ URLS_TO_SAVE: list[Tuple[str, str]] = [
         "Harvard_Magazine_sample_topic_page.html",
     ],
     [
-        "https://www.harvardmagazine.com/university-news/marla-frederick-harvard-"
-        "divinity-school",
+        "https://www.harvardmagazine.com/university-news/marla-frederick-harvard-" "divinity-school",
         "Harvard_Magazine_sample_article.html",
     ],
     [
-        "https://www.hbs.edu/news/Pages/browse.aspx?format=Article&source=Harvard%20"
-        "Business%20School",
+        "https://www.hbs.edu/news/Pages/browse.aspx?format=Article&source=Harvard%20" "Business%20School",
         "HBS_sample_topic_page.html",
     ],
     [
@@ -67,8 +64,7 @@ URLS_TO_SAVE: list[Tuple[str, str]] = [
         "SEAS_sample_article.html",
     ],
     [
-        "https://news.harvard.edu/gazette/story/2025/11/solving-mystery-at-tip-of-"
-        "south-america/",
+        "https://news.harvard.edu/gazette/story/2025/11/solving-mystery-at-tip-of-" "south-america/",
         "Gazette_sample_article.html",
     ],
 ]

@@ -87,9 +87,7 @@ class TestHbsScraper:
         assert scraper.extract_article_publish_date(soup) is None
 
     def test_extract_author_with_by_prefix(self, scraper):
-        soup = BeautifulSoup(
-            '<table class="body-html-fix"><p>By John Doe</p></table>', "html.parser"
-        )
+        soup = BeautifulSoup('<table class="body-html-fix"><p>By John Doe</p></table>', "html.parser")
         assert scraper.extract_article_author(soup) == "John Doe"
 
     def test_extract_author_missing(self, scraper):
@@ -107,9 +105,7 @@ class TestHbsScraper:
         mock_page.content.return_value = article_soup.prettify()
         mock_browser = MagicMock()
         mock_browser.new_page.return_value = mock_page
-        mock_playwright.return_value.__enter__.return_value.chromium.launch.return_value = (
-            mock_browser
-        )
+        mock_playwright.return_value.__enter__.return_value.chromium.launch.return_value = mock_browser
 
         scraper.topic_urls = ["http://fake-topic.com"]
         scraper.db_manager.filter_new_urls.return_value = ["https://www.hbs.edu/news/test"]
