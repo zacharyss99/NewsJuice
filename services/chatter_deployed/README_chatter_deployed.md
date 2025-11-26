@@ -77,38 +77,17 @@ You need the following service account JSON files in the parent `secrets/` direc
 
 ## ⚙️ Environment Configuration
 
-### Create `.env.local` File
+### Create `.env.local` File (if not already present)
 
 In the `services/chatter_deployed/` directory, create a `.env.local` file with the following configuration:
 
 ```bash
-# Database (Local Development - uses Cloud SQL Proxy)
-DATABASE_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
-DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
-
-# Google Cloud
-GOOGLE_CLOUD_PROJECT=newsjuice-123456
-GOOGLE_CLOUD_REGION=us-central1
-GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
-GEMINI_SERVICE_ACCOUNT_PATH=/secrets/gemini-service-account.json
-
 # Google AI API (for Gemini Live API TTS)
 # Instructions:
 # 1. Visit https://aistudio.google.com/app/apikey
 # 2. Create a new API key
-# 3. Replace the value below with your key
+# 3. Replace the value below with your key (PASTE INSIDE .env.local FILE YOU HAVE CREATED!)
 GOOGLE_API_KEY=your_google_api_key_here
-
-# GCS Bucket (for audio storage)
-AUDIO_BUCKET=ac215-audio-bucket
-GCS_PREFIX=podcasts/
-CACHE_CONTROL=public, max-age=3600
-
-# CORS (for local frontend)
-CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080
-
-# Server
-PORT=8080
 
 # Firebase (Optional - for user authentication)
 # If you want to test Firebase authentication:
@@ -145,7 +124,7 @@ The backend runs in Docker Compose with Cloud SQL Proxy:
 
 ```bash
 # Build and start all services (Cloud SQL Proxy + API)
-docker-compose -f docker-compose.local.yml --env-file .env.local up --build
+docker-compose -f docker-compose.local.yml build
 ```
 
 This will:

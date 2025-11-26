@@ -30,7 +30,7 @@ It is primarily designed for the **Harvard community**, pulling content from Har
 
     a. A detailed description of the app can be found in the docs/Application_Design_Document/APPLICATION_DESIGN.md
 
-    b. A detaiñed description of the CI/CD test suit can be found in docs/CI_Evidence/README_testing_loader.md
+    b. A detailed description of the CI/CD test suit can be found in docs/CI_Evidence/README_testing_loader.md
 
     c. A detailed description of the Data Versioning approach can be found in docs/Data_Versioning_documentation/README_data_versioning.md
 

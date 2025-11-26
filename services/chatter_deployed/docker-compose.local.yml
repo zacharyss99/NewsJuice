@@ -36,7 +36,7 @@ services:
       - DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
       
       # OpenAI
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
       
       # Google Cloud
       - GOOGLE_CLOUD_PROJECT=newsjuice-123456
