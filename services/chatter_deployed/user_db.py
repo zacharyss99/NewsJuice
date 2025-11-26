@@ -16,7 +16,10 @@ def create_user(user_id: str, email: str) -> bool:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO users (user_id, email) VALUES (%s, %s) ON CONFLICT (user_id) DO NOTHING",
+                    (
+                        "INSERT INTO users (user_id, email) VALUES (%s, %s) "
+                        "ON CONFLICT (user_id) DO NOTHING"
+                    ),
                     (user_id, email),
                 )
                 print(f"[db] User created: {user_id}")
@@ -32,7 +35,10 @@ def get_user_preferences(user_id: str) -> Dict[str, str]:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT preference_key, preference_value FROM user_preferences WHERE user_id = %s",
+                    (
+                        "SELECT preference_key, preference_value FROM user_preferences "
+                        "WHERE user_id = %s"
+                    ),
                     (user_id,),
                 )
                 preferences = {}
@@ -56,10 +62,12 @@ def save_user_preferences(user_id: str, preferences: Dict[str, str]) -> bool:
                         value = json.dumps(value)
 
                     cur.execute(
-                        """INSERT INTO user_preferences (user_id, preference_key, preference_value, updated_at)
-                           VALUES (%s, %s, %s, NOW())
-                           ON CONFLICT (user_id, preference_key) 
-                           DO UPDATE SET preference_value = EXCLUDED.preference_value, updated_at = NOW()""",
+                        (
+                            "INSERT INTO user_preferences (user_id, preference_key, "
+                            "preference_value, updated_at) VALUES (%s, %s, %s, NOW()) "
+                            "ON CONFLICT (user_id, preference_key) DO UPDATE SET "
+                            "preference_value = EXCLUDED.preference_value, updated_at = NOW()"
+                        ),
                         (user_id, key, str(value)),
                     )
                 print(f"[db] Preferences saved for user: {user_id}")
@@ -69,7 +77,12 @@ def save_user_preferences(user_id: str, preferences: Dict[str, str]) -> bool:
         return False
 
 
-def save_audio_history(user_id: str, question_text: str, podcast_text: str, audio_url: Optional[str] = None) -> bool:
+def save_audio_history(
+    user_id: str,
+    question_text: str,
+    podcast_text: str,
+    audio_url: Optional[str] = None,
+) -> bool:
     """Save audio history entry."""
     try:
         with psycopg.connect(DB_URL, autocommit=True) as conn:

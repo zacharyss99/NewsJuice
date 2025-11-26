@@ -1,3 +1,7 @@
+import firebase_admin
+from firebase_admin import auth
+from typing import Dict
+
 """Firebase Admin SDK initialization and token verification."""
 
 """
@@ -7,11 +11,6 @@ initialize_firebase_admin()   ---- called by main.py
 verify_token(token: str) -> Dict --- called by main.py
 
 """
-
-import os
-import firebase_admin
-from firebase_admin import credentials, auth
-from typing import Dict
 
 
 def initialize_firebase_admin():

@@ -9,7 +9,7 @@ Enhances the query once and returns the improved version for immediate use.
 import os
 import json
 import re
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict
 from vertexai.generative_models import GenerativeModel
 
 
@@ -31,21 +31,26 @@ def load_system_prompt() -> str:
         with open(prompt_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # Extract the system prompt section (everything after "## 🧠 **System Prompt: News Query Enhancement LLM**")
+        # Extract the system prompt section (everything after "## 🧠 **System Prompt:
+        # News Query Enhancement LLM**")
         # We'll use the entire file content as the system prompt
         return content
     except Exception as e:
         print(f"[query-enhancement-error] Failed to load system prompt: {e}")
         # Return a minimal fallback prompt
-        return """You are a news query enhancement assistant. Your job is to take a human user's question about the news and make it clearer, more focused, and more useful for retrieving relevant information.
+        return """You are a news query enhancement assistant. Your job is to take a human user's
+         question about the news and make it clearer, more focused, and more useful for retrieving
+         relevant information.
 
 Every response must strictly follow this JSON schema:
 {
   "original_query": "<the user's original query>",
-  "enhanced_query": "<the LLM's improved and more specific version, possibly containing multiple explicit questions>"
+  "enhanced_query": "<the LLM's improved and more specific version, possibly containing multiple
+  explicit questions>"
 }
 
-The enhanced query will be used directly for retrieving relevant news articles. Produce the best possible enhanced query on the first attempt."""
+The enhanced query will be used directly for retrieving relevant news articles. Produce the best
+possible enhanced query on the first attempt."""
 
 
 def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
