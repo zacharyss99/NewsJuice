@@ -33,9 +33,7 @@ async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
         Transcribed text string, or None if transcription fails
     """
     try:
-        print(
-            f"[speech-to-text] Starting transcription, audio size: {len(audio_bytes)} bytes"
-        )
+        print(f"[speech-to-text] Starting transcription, audio size: {len(audio_bytes)} bytes")
 
         if GOOGLE_SPEECH_AVAILABLE:
             # transcribe_with_google_speech is defined below
@@ -94,9 +92,7 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
                 # speech to text transcription version : degree of confidence model has that that is the ground truth transcription
 
                 # Debug: Print full response
-                print(
-                    f"[speech-to-text] Response received: {len(response.results)} results"
-                )
+                print(f"[speech-to-text] Response received: {len(response.results)} results")
                 # [Z]
                 # Here we actually transcript the text in the event the response is recognized.
                 # processes phrase/sentence segments (response.results is multiple transcription segments)
@@ -111,13 +107,9 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
                             0
                         ].transcript  # Result alternatives are different interpretations of the same segment
                         confidence = (
-                            result.alternatives[0].confidence
-                            if hasattr(result.alternatives[0], "confidence")
-                            else None
+                            result.alternatives[0].confidence if hasattr(result.alternatives[0], "confidence") else None
                         )
-                        print(
-                            f"[speech-to-text] Result {i}: '{transcript_text}' (confidence: {confidence})"
-                        )
+                        print(f"[speech-to-text] Result {i}: '{transcript_text}' (confidence: {confidence})")
                         if transcript_text.strip():  # Only add non-empty transcripts
                             transcript_parts.append(
                                 transcript_text
@@ -126,14 +118,10 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
                 transcript = " ".join(transcript_parts)
 
                 if transcript.strip():
-                    print(
-                        f"[speech-to-text] Transcription successful at {sample_rate}Hz: {transcript[:100]}..."
-                    )
+                    print(f"[speech-to-text] Transcription successful at {sample_rate}Hz: {transcript[:100]}...")
                     return transcript.strip()
                 else:
-                    print(
-                        f"[speech-to-text] No transcript at {sample_rate}Hz, trying next..."
-                    )
+                    print(f"[speech-to-text] No transcript at {sample_rate}Hz, trying next...")
                     continue  # Try next sample rate
 
             except Exception as e:

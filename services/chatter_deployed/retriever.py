@@ -162,9 +162,7 @@ def search_articles(query: str, limit: int = 2) -> List[Tuple[int, str, float]]:
             cur.execute(select_sql, (q, q, limit))
 
             results = cur.fetchall()
-            print(
-                f"[retriever] Found {len(results)} results for query: '{query[:50]}...'"
-            )
+            print(f"[retriever] Found {len(results)} results for query: '{query[:50]}...'")
             return results
 
     except Exception as e:

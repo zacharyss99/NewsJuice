@@ -1,4 +1,4 @@
-'''
+"""
 ===============
 loader service
 ===============
@@ -13,7 +13,7 @@ resp = client.models.embed_content(model="text-embedding-004", contents=["text"]
 with wrapper you just do:
 emb = VertexEmbeddings()
 vectors = emb.embed_documents(["text1", "text2"])
-'''
+"""
 
 import os
 
@@ -42,35 +42,38 @@ from google.genai import types
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
+
 # source: https://api.python.langchain.com/en/latest/text_splitter/langchain_experimental.text_splitter.SemanticChunker.html
 
 import time
 
 # FE - Comment out if final embedding is Vertex AI
-#from sentence_transformers import SentenceTransformer
-#model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+# from sentence_transformers import SentenceTransformer
+# model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 
 # FE - Parameter for final embedding using Vertex AI
 EMBEDDING_MODEL = "text-embedding-004"
-#GENERATIVE_MODEL = "gemini-2.0-flash-001"
-EMBEDDING_DIM = 768 #256
+# GENERATIVE_MODEL = "gemini-2.0-flash-001"
+EMBEDDING_DIM = 768  # 256
 
-# Parameter for chunking 
+# Parameter for chunking
 CHUNK_SIZE_CHAR = 350
 CHUNK_OVERLAP_CHAR = 20
 CHUNK_SIZE_RECURSIVE = 350
 
 # ============== CHANGE 1: ADD LOGGING ==============
 import logging
+
 logger = logging.getLogger(__name__)
 # ===================================================
 
 import os
-DB_URL = os.environ["DATABASE_URL"]       
-#DB_URL= "postgresql://postgres:Newsjuice25%2B@host.docker.internal:5432/newsdb" # for use with container
-#DB_URL = "postgresql://postgres:Newsjuice25%2B@127.0.0.1:5432/newsdb"  # for use standalone; run proxy as well
-#USER_AGENT = "minimal-rag-ingest/0.1"
+
+DB_URL = os.environ["DATABASE_URL"]
+# DB_URL= "postgresql://postgres:Newsjuice25%2B@host.docker.internal:5432/newsdb" # for use with container
+# DB_URL = "postgresql://postgres:Newsjuice25%2B@127.0.0.1:5432/newsdb"  # for use standalone; run proxy as well
+# USER_AGENT = "minimal-rag-ingest/0.1"
 
 from pgvector.psycopg import register_vector
 
@@ -86,7 +89,9 @@ class VertexEmbeddings:
         self.model = EMBEDDING_MODEL
         self.dim = EMBEDDING_DIM
         # ============== CHANGE 2: LOG INITIALIZATION ==============
-        logger.info(f"VertexEmbeddings initialized - Project: {project}, Location: {location}, Model: {self.model}, Dim: {self.dim}")
+        logger.info(
+            f"VertexEmbeddings initialized - Project: {project}, Location: {location}, Model: {self.model}, Dim: {self.dim}"
+        )
         # ==========================================================
 
     def _embed_one(self, text: str) -> List[float]:
@@ -103,11 +108,14 @@ class VertexEmbeddings:
     def embed_query(self, text: str) -> List[float]:
         return self._embed_one(text)
 
+
 # Chunking function
-def chunk_embed_load(method='char-split'):
+def chunk_embed_load(method="char-split"):
     # ============== CHANGE 3: LOG FUNCTION START ==============
     logger.info(f"=== Starting chunk_embed_load - Method: {method} ===")
-    logger.info(f"Using tables - Articles: {ARTICLES_TABLE_NAME}, Vectors: {VECTOR_TABLE_NAME}")
+    logger.info(
+        f"Using tables - Articles: {ARTICLES_TABLE_NAME}, Vectors: {VECTOR_TABLE_NAME}"
+    )
     # ==========================================================
 
     conn = psycopg.connect(DB_URL, autocommit=True)
@@ -121,13 +129,15 @@ def chunk_embed_load(method='char-split'):
 
     # Fetch new articles from articles table (vflag = 0)
     cur.execute(
-        sql.SQL("""
+        sql.SQL(
+            """
             SELECT id, author, title, summary, content,
                 source_link, source_type, fetched_at, published_at,
                 vflag, article_id
             FROM {}
             WHERE vflag = 0;
-        """).format(sql.Identifier(ARTICLES_TABLE_NAME))
+        """
+        ).format(sql.Identifier(ARTICLES_TABLE_NAME))
     )
 
     rows = cur.fetchall()
@@ -143,7 +153,7 @@ def chunk_embed_load(method='char-split'):
         return {
             "status": "success",
             "message": "No new articles to process",
-            "processed": 0
+            "processed": 0,
         }
 
     # Prepare semantic splitter once (if requested)
@@ -154,15 +164,15 @@ def chunk_embed_load(method='char-split'):
         logger.info("Initializing semantic splitter with VertexEmbeddings")
         # ==================================================================
         emb = VertexEmbeddings()
-        #sem_splitter = SemanticChunker(embeddings=emb)
+        # sem_splitter = SemanticChunker(embeddings=emb)
         # NEW VERSION WITH ALL PARAMETERS SET EXPLICITLY
         sem_splitter = SemanticChunker(
             embeddings=emb,
             breakpoint_threshold_type="percentile",
             breakpoint_threshold_amount=90,
             min_chunk_size=None,
-            #max_chunk_size=None,
-            #embedding_batch_size=100
+            # max_chunk_size=None,
+            # embedding_batch_size=100
         )
         # ============== CHANGE 8: LOG SPLITTER READY ==============
         logger.info("Semantic splitter initialized successfully")
@@ -171,26 +181,38 @@ def chunk_embed_load(method='char-split'):
     # FE - Use this when using VERTEX AI for final embedding
     vertex_embedder = VertexEmbeddings()
 
-    '''
+    """
     Process now article by article
-    '''
+    """
 
     for i, row in enumerate(rows, start=1):
         # ============== tart timing for this article ==============
         article_start_time = time.time()
         # ================================================================
-        (id, author, title, summary, content,
-            source_link, source_type, fetched_at, published_at,
-            vflag, article_id) = row
+        (
+            id,
+            author,
+            title,
+            summary,
+            content,
+            source_link,
+            source_type,
+            fetched_at,
+            published_at,
+            vflag,
+            article_id,
+        ) = row
 
         # ============== CHANGE 9: LOG ARTICLE PROCESSING START ==============
-        logger.info(f"[{i}/{len(rows)}] Processing article_id={article_id}, title='{title[:50] if title else 'N/A'}...'")
+        logger.info(
+            f"[{i}/{len(rows)}] Processing article_id={article_id}, title='{title[:50] if title else 'N/A'}...'"
+        )
         # ====================================================================
 
-        '''
+        """
         Do chunking of the article
-        '''
-        
+        """
+
         if method == "char-split":
             text_splitter = CharacterTextSplitter(
                 chunk_size=CHUNK_SIZE_CHAR,
@@ -216,13 +238,15 @@ def chunk_embed_load(method='char-split'):
 
         text_chunks = [d.page_content for d in docs]
         # ============== CHANGE 10: LOG CHUNKS CREATED ==============
-        logger.info(f"[{i}/{len(rows)}] Created {len(text_chunks)} chunks for article_id={article_id}")
+        logger.info(
+            f"[{i}/{len(rows)}] Created {len(text_chunks)} chunks for article_id={article_id}"
+        )
         # ===========================================================
         print(f"[{i}/{len(rows)}] article_id={article_id} → {len(text_chunks)} chunks")
 
-        '''
+        """
         Build rows to insert into vector table
-        '''
+        """
 
         df = pd.DataFrame(text_chunks, columns=["chunk"])
         df["author"] = author
@@ -236,43 +260,47 @@ def chunk_embed_load(method='char-split'):
         df["chunk_index"] = range(len(df))
         df["article_id"] = article_id
 
-        '''
+        """
         Final embedding of the chunk (align with retrieval model)
-        '''
+        """
         # ============== CHANGE 11: LOG EMBEDDING START ==============
         logger.info(f"[{i}/{len(rows)}] Starting embedding for {len(df)} chunks")
         # ============================================================
 
         # FE - VERSION WITH HUGGING sentence-encoder
-        #df["embedding"] = [model.encode(t).tolist() for t in df["chunk"]] 
+        # df["embedding"] = [model.encode(t).tolist() for t in df["chunk"]]
         # VERSION WITH VERTEX AI
         df["embedding"] = vertex_embedder.embed_documents(df["chunk"].tolist())
-        
-        # ============== CHANGE 12: LOG EMBEDDING COMPLETE ==============
-        logger.info(f"[{i}/{len(rows)}] Embedding completed for article_id={article_id}")
-        # ===============================================================
-        
-        '''
-        Print article currently processed for inspection
-        '''
-        print(f"\n \n Inserting now chunks for article_ID = {article_id}")
-        #print("Article text =\n")
-        #print(content)
 
-        '''
+        # ============== CHANGE 12: LOG EMBEDDING COMPLETE ==============
+        logger.info(
+            f"[{i}/{len(rows)}] Embedding completed for article_id={article_id}"
+        )
+        # ===============================================================
+
+        """
+        Print article currently processed for inspection
+        """
+        print(f"\n \n Inserting now chunks for article_ID = {article_id}")
+        # print("Article text =\n")
+        # print(content)
+
+        """
         Insert chunks
-        '''
+        """
         inserted = 0
         for _, r in df.iterrows():
             # --- INSERT chunk row into vector table ---
-            insert_sql = sql.SQL("""
+            insert_sql = sql.SQL(
+                """
                 INSERT INTO {} (
                     author, title, summary, content,
                     source_link, source_type, fetched_at, published_at,
                     chunk, chunk_index, embedding, article_id
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """).format(sql.Identifier(VECTOR_TABLE_NAME))
+            """
+            ).format(sql.Identifier(VECTOR_TABLE_NAME))
 
             cur.execute(
                 insert_sql,
@@ -287,27 +315,31 @@ def chunk_embed_load(method='char-split'):
                     r["published_at"],
                     r["chunk"],
                     int(r["chunk_index"]),
-                    r["embedding"],     
+                    r["embedding"],
                     r["article_id"],
-                )
+                ),
             )
 
             # print chunk for inspection
             print(f"\nChunk Number {int(r['chunk_index'])}: ")
-            #print(r["chunk"])
-            #print("\n")
+            # print(r["chunk"])
+            # print("\n")
             inserted += 1
 
         # ============== CHANGE 13: LOG CHUNKS INSERTED ==============
-        logger.info(f"[{i}/{len(rows)}] Inserted {inserted} chunks into {VECTOR_TABLE_NAME}")
+        logger.info(
+            f"[{i}/{len(rows)}] Inserted {inserted} chunks into {VECTOR_TABLE_NAME}"
+        )
         # ============================================================
 
-        # UPDATE article as 
-        update_sql = sql.SQL("""
+        # UPDATE article as
+        update_sql = sql.SQL(
+            """
             UPDATE {} 
             SET vflag = 1 
             WHERE article_id = %s
-        """).format(sql.Identifier(ARTICLES_TABLE_NAME))
+        """
+        ).format(sql.Identifier(ARTICLES_TABLE_NAME))
 
         cur.execute(update_sql, (article_id,))
         # ============== CHANGE 14: LOG VFLAG UPDATE ==============
@@ -316,24 +348,29 @@ def chunk_embed_load(method='char-split'):
 
         # ============== ADD: Log total time for this article ==============
         article_time = time.time() - article_start_time
-        logger.info(f"[{i}/{len(rows)}] ✓ Article {article_id} completed in {article_time:.2f}s")
+        logger.info(
+            f"[{i}/{len(rows)}] ✓ Article {article_id} completed in {article_time:.2f}s"
+        )
         # ==================================================================
 
         processed_count += 1
 
     cur.close()
     conn.close()
-    
+
     # ============== CHANGE 15: LOG COMPLETION ==============
-    logger.info(f"=== COMPLETED: Processed {processed_count} articles, Total found: {len(rows)} ===")
+    logger.info(
+        f"=== COMPLETED: Processed {processed_count} articles, Total found: {len(rows)} ==="
+    )
     # =======================================================
 
     return {
-            "status": "success",
-            "message": f"Processed {processed_count} articles",
-            "processed": processed_count,
-            "total_found": len(rows)
-        }
+        "status": "success",
+        "message": f"Processed {processed_count} articles",
+        "processed": processed_count,
+        "total_found": len(rows),
+    }
+
 
 def main():
     # ============== CHANGE 16: LOG MAIN START ==============
@@ -342,10 +379,11 @@ def main():
 
     result = chunk_embed_load("semantic-split")
     print(f"Final result: {result}")
-    
+
     # ============== CHANGE 17: LOG MAIN COMPLETE ==============
     logger.info(f"Loader main function completed: {result}")
     # ==========================================================
+
 
 if __name__ == "__main__":
     main()
