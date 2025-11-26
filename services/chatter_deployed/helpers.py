@@ -9,9 +9,11 @@ Input: query
 Returns: List of tuples: (id, chunk, score) for each matching article
 
 
-2. call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) -> tuple[Optional[str], Optional[str]]:
-=============================================================================================================================
-Call Google Gemini LLM API with the question and context articles to generate a podcast-style response.
+2. call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) ->
+tuple[Optional[str], Optional[str]]:
+===================================================================================================
+Call Google Gemini LLM API with the question and context articles to generate a podcast-style
+response.
 Input: question text + tuple of relevant chunks (with id, chunk text and similarity score)
 Output: tuple of response text + error message
 
@@ -29,11 +31,11 @@ NOT YET USED
 
 """
 
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Optional
 import psycopg
 import json
 import os
-from vertexai.generative_models import GenerativeModel
+# from vertexai.generative_models import GenerativeModel
 
 
 # NEW should work for production and local
@@ -63,7 +65,8 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
 def call_gemini_api(
     question: str, context_articles: List[Tuple[int, str, float]] = None, model=None
 ) -> tuple[Optional[str], Optional[str]]:
-    """Call Google Gemini API with the question and context articles to generate a podcast-style response."""
+    """Call Google Gemini API with the question and context articles to generate a podcast-style
+    response."""
     if not model:
         return None, "Gemini API not configured"
 
@@ -77,7 +80,8 @@ def call_gemini_api(
                 ]
             )
 
-            prompt = f"""You are the host of NewsJuice, a conversational news podcast. Your name is NewsJuice, and you deliver news in a friendly, engaging style.
+            prompt = f"""You are the host of NewsJuice, a conversational news podcast. Your name is
+            NewsJuice, and you deliver news in a friendly, engaging style.
 
 LISTENER'S QUESTION: {question}
 
@@ -85,15 +89,18 @@ RELEVANT NEWS ARTICLES:
 {context_text}
 
 INSTRUCTIONS:
-1. Start by directly addressing the listener's question - NO preamble about "the listener asked" or "the host mentioned"
+1. Start by directly addressing the listener's question - NO preamble about "the listener asked"
+or "the host mentioned"
 2. Use ONLY information from the provided news articles above
-3. If the articles don't answer the question, clearly say "I don't have recent news about that topic in my database"
+3. If the articles don't answer the question, clearly say "I don't have recent news about that topic
+in my database"
 4. Speak naturally as if having a conversation - use "I", "you", "we"
 5. Keep it under 1 minute when spoken (roughly 150-200 words)
 6. End with an invitation for follow-up questions
 
 EXAMPLE GOOD OPENING:
-"Great question! Based on the latest news I have, here's what's happening with [topic] from [news source]..."
+"Great question! Based on the latest news I have, here's what's happening with [topic] from
+[news source]..."
 
 EXAMPLE BAD OPENING (DO NOT USE):
 "The listener asked about... The host will now discuss..."
@@ -102,7 +109,9 @@ Generate your podcast response now:"""
         else:
             prompt = f"""You are a news podcast host. The user has asked: "{question}"
 
-However, no relevant news articles were found to provide context. Please provide a thoughtful response acknowledging this limitation and suggest how the user might find more information about their question."""
+However, no relevant news articles were found to provide context. Please provide a thoughtful
+response acknowledging this limitation and suggest how the user might find more information about
+their question."""
 
         response = model.generate_content(prompt)
         return response.text, None
@@ -111,7 +120,8 @@ However, no relevant news articles were found to provide context. Please provide
 
 
 def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our current workflow.
-    # its use case is to first check if there is previous context already present to pull from for our podcast generation.
+    # its use case is to first check if there is previous context already present to pull from for
+    # our podcast generation.
 
     """Check if the llm_conversations table exists."""
     try:
@@ -120,7 +130,7 @@ def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our 
                 cur.execute(
                     """
                     SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
+                        SELECT FROM information_schema.tables
                         WHERE table_name = 'llm_conversations'
                     );
                 """
@@ -136,8 +146,14 @@ def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our 
         raise
 
 
-# [Z] log conversations scaffolding is here in case we plan to insert conversations into db for context
-def log_conversation(user_id: str, question: str, response: Optional[str], error_message: Optional[str]):
+# [Z] log conversations is here in case we plan to insert conversations into db for context
+def log_conversation(
+    user_id: str,
+    question: str,
+    response: Optional[str],
+    error_message: Optional[str],
+):
+
     """Log the conversation to the database."""
     try:
         # Prepare conversation data as JSON

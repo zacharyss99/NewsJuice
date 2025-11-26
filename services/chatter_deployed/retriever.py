@@ -18,6 +18,14 @@ NOTE: for testing use: #VECTOR_TABLE_NAME = "chunks_vector_test"
 """
 
 import os
+import psycopg
+from pgvector.psycopg import register_vector, Vector
+from psycopg import sql
+from typing import List, Tuple
+
+from google import genai
+from google.genai import types
+import logging
 
 if os.path.exists(".env"):
     from dotenv import load_dotenv
@@ -30,21 +38,20 @@ print(f"[retriever-debug] DATABASE_URL = {os.getenv('DATABASE_URL')}")
 VECTOR_TABLE_NAME = "chunks_vector"
 # VECTOR_TABLE_NAME = "chunks_vector_test"
 
-import psycopg
-from pgvector.psycopg import register_vector, Vector
-from psycopg import sql
-from typing import List, Tuple, Optional
-
 # Configuration
 # DB_URL = os.environ["DATABASE_URL"]
 # DB_URL = os.environ.get("DATABASE_URL",
-#    "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:us-central1:newsdb-instance")
+#    "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:
+#                                                                   us-central1:newsdb-instance")
 DB_URL = os.environ.get(
     "DATABASE_URL"
 )  # [Z] for any script trying to access our GCP DB, assuming we have to specify the path
 if not DB_URL:
     # Fallback for Cloud Run
-    DB_URL = "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:us-central1:newsdb-instance"
+    DB_URL = (
+        "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:"
+        "us-central1:newsdb-instance"
+    )
 
 TIMEOUT = 10.0
 USER_AGENT = "minimal-rag-ingest/0.1"
@@ -66,10 +73,6 @@ EMBEDDING_DIM = 768  # 256
 # ======================================END
 
 # ====FE 15-11-25 ADDED: embedding model switch
-from google import genai
-from google.genai import types
-import logging
-
 logger = logging.getLogger(__name__)
 
 
@@ -81,11 +84,12 @@ class VertexEmbeddings:
             raise RuntimeError("Need to set GOOGLE_CLOUD_PROJECT")
         # Uses ADC via GOOGLE_APPLICATION_CREDENTIALS or gcloud
         self.client = genai.Client(vertexai=True, project=project, location=location)
-        self.model = EMBEDDING_MODEL  # [Z] initialize embedding model, text-embedding-004 from VertexAI
+        self.model = EMBEDDING_MODEL  # [Z] initialize  model, text-embedding-004 from VertexAI
         self.dim = EMBEDDING_DIM  # [Z] embedding dim is 768
         # ============== CHANGE 2: LOG INITIALIZATION ==============
         logger.info(
-            f"VertexEmbeddings initialized - Project: {project}, Location: {location}, Model: {self.model}, Dim: {self.dim}"
+            f"""VertexEmbeddings initialized - Project: {project}, Location: {location},
+            Model: {self.model}, Dim: {self.dim}"""
         )
         # ==========================================================
 

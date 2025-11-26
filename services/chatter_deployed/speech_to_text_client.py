@@ -9,7 +9,6 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
 (Transcribe the audio from frontend using the Google Speech to Text API.)
 """
 
-import os
 from typing import Optional
 
 # Try google cloud speech to text in order to transcribe audio
@@ -58,13 +57,15 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
         # initialize the client, which uses GOOGLE_APPLICATION_CREDENTIALS from env
         client = speech.SpeechClient()
 
-        # create the audio object. This wraps raw audio bytes into a RecognitionAudio object for the Google
+        # create the audio object. This wraps raw audio bytes into a RecognitionAudio
+        # object for the Google
         # Cloud Speech-to-Text. Tells the API the audio data to transcribe.
         audio = speech.RecognitionAudio(content=audio_bytes)
         # [Z]
         # have to try multiple sample rates in case there is something funky from the frontend
         # but usually audio streamed from a browser is 44100 Hz
-        # sample rate is how many audio samples per second, so higher = better quality, larger files. It's like frames per second.
+        # sample rate is how many audio samples per second, so higher = better quality, larger files
+        # It's like frames per second.
         sample_rates_to_try = [44100, 48000, 16000, 22050, 32000]
 
         print("[speech-to-text] Trying multiple sample rates...")
@@ -86,30 +87,40 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
             try:
                 # [Z]
                 # Perform transcription
-                # recognize is what the Google Cloud Speech  to Text API uses to understand audio, in order for transcription
+                # recognize is what the Google Cloud Speech  to Text API uses to understand audio,
+                # in order for transcription
                 response = client.recognize(config=config, audio=audio)
                 # response is essentially one giant dictionary that contaisn the
-                # speech to text transcription version : degree of confidence model has that that is the ground truth transcription
+                # speech to text transcription version : degree of confidence model has that that is
+                # the ground truth transcription
 
                 # Debug: Print full response
                 print(f"[speech-to-text] Response received: {len(response.results)} results")
                 # [Z]
                 # Here we actually transcript the text in the event the response is recognized.
-                # processes phrase/sentence segments (response.results is multiple transcription segments)
-                # alternatives[0] = best interpretation of that segment. alternatives is a list of potential phrases
-                # the given audio segment could be. confidence reflects confidence for entire segment.
+                # processes phrase/sentence segments (response.results is multiple transcription
+                # segments)
+                # alternatives[0] = best interpretation of that segment. alternatives is a list of
+                # potential phrases
+                # the given audio segment could be. confidence reflects confidence for segment.
                 transcript_parts = []
                 for i, result in enumerate(response.results):
                     if (
                         result.alternatives
-                    ):  # result is a specific SEGMENT of the transcription. results[0] is the first phrase of audio --> "Hello Newsjuice"
+                    ):  # result is a specific SEGMENT of the transcription. results[0] is the first
+                        # phrase of audio --> "Hello Newsjuice"
                         transcript_text = result.alternatives[
                             0
-                        ].transcript  # Result alternatives are different interpretations of the same segment
+                        ].transcript  # Result alternatives are different interpretations of segment
                         confidence = (
-                            result.alternatives[0].confidence if hasattr(result.alternatives[0], "confidence") else None
+                            result.alternatives[0].confidence
+                            if hasattr(result.alternatives[0], "confidence")
+                            else None
                         )
-                        print(f"[speech-to-text] Result {i}: '{transcript_text}' (confidence: {confidence})")
+                        print(
+                            f"[speech-to-text] Result {i}: '{transcript_text}' "
+                            f"(confidence: {confidence})"
+                        )
                         if transcript_text.strip():  # Only add non-empty transcripts
                             transcript_parts.append(
                                 transcript_text
@@ -118,7 +129,10 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
                 transcript = " ".join(transcript_parts)
 
                 if transcript.strip():
-                    print(f"[speech-to-text] Transcription successful at {sample_rate}Hz: {transcript[:100]}...")
+                    print(
+                        "[speech-to-text] Transcription successful at "
+                        f"{sample_rate}Hz: {transcript[:100]}..."
+                    )
                     return transcript.strip()
                 else:
                     print(f"[speech-to-text] No transcript at {sample_rate}Hz, trying next...")
