@@ -77,9 +77,7 @@ class TestHlsScraper:
         assert scraper.extract_article_publish_date(soup) is None
 
     def test_extract_author_with_by_prefix(self, scraper):
-        soup = BeautifulSoup(
-            '<div class="article-byline__author">By Jane Smith</div>', "html.parser"
-        )
+        soup = BeautifulSoup('<div class="article-byline__author">By Jane Smith</div>', "html.parser")
         assert scraper.extract_article_author(soup) == "Jane Smith"
 
     def test_extract_author_with_links(self, scraper):
@@ -108,9 +106,7 @@ class TestHlsScraper:
         mock_page.content.return_value = article_soup.prettify()
         mock_browser = MagicMock()
         mock_browser.new_page.return_value = mock_page
-        mock_playwright.return_value.__enter__.return_value.chromium.launch.return_value = (
-            mock_browser
-        )
+        mock_playwright.return_value.__enter__.return_value.chromium.launch.return_value = mock_browser
 
         scraper.topic_urls = ["http://fake-topic.com"]
         scraper.db_manager.filter_new_urls.return_value = ["https://hls.harvard.edu/today/test"]

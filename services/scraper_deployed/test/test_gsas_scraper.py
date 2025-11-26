@@ -71,9 +71,7 @@ class TestGsasScraper:
         mock_page.content.side_effect = [topic_soup.prettify(), article_soup.prettify()]
         mock_browser = MagicMock()
         mock_browser.new_page.return_value = mock_page
-        mock_playwright.return_value.__enter__.return_value.chromium.launch.return_value = (
-            mock_browser
-        )
+        mock_playwright.return_value.__enter__.return_value.chromium.launch.return_value = mock_browser
 
         scraper.topic_urls = ["http://fake-topic.com"]
         scraper.db_manager.filter_new_urls.return_value = ["https://gsas.harvard.edu/news/test"]

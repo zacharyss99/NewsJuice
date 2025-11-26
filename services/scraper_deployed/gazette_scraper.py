@@ -55,12 +55,7 @@ class GazetteArticleScraper:
         return url
 
     def extract_article_content(self, html):
-        content = (
-            trafilatura.extract(
-                html, include_comments=False, include_tables=False, favor_recall=True
-            )
-            or ""
-        )
+        content = trafilatura.extract(html, include_comments=False, include_tables=False, favor_recall=True) or ""
         return content.strip()
 
     def extract_article_title(self, entry):
@@ -145,9 +140,7 @@ class GazetteArticleScraper:
                 print(f"Article Title: {article_details['article_title']}")
                 print(f"Article Author: {article_details['article_author']}")
                 print(f"Article Publish Date: {article_details['article_publish_date']}")
-                print(
-                    f"Article Content (first 200 chars): {article_details['article_content'][:200]}"
-                )
+                print(f"Article Content (first 200 chars): {article_details['article_content'][:200]}")
                 print("\n\n")
 
             all_articles_details.append(article_details)
@@ -155,25 +148,13 @@ class GazetteArticleScraper:
         print("\n\nGazette Scraper Summary:")
         print(f"\nTotal number of articles: {len(all_articles_details)}")
         blank_content = len(
-            [
-                d
-                for d in all_articles_details
-                if not d["article_content"] or d["article_content"].strip() == ""
-            ]
+            [d for d in all_articles_details if not d["article_content"] or d["article_content"].strip() == ""]
         )
         blank_author = len(
-            [
-                d
-                for d in all_articles_details
-                if not d["article_author"] or d["article_author"].strip() == ""
-            ]
+            [d for d in all_articles_details if not d["article_author"] or d["article_author"].strip() == ""]
         )
         blank_title = len(
-            [
-                d
-                for d in all_articles_details
-                if not d["article_title"] or d["article_title"].strip() == ""
-            ]
+            [d for d in all_articles_details if not d["article_title"] or d["article_title"].strip() == ""]
         )
         blank_publish_date = len([d for d in all_articles_details if not d["article_publish_date"]])
         print(f"Blank article content: {blank_content}")

@@ -204,21 +204,11 @@ if __name__ == "__main__":
 
     print("GSAS News Scraper Summary")
     print(f"\n\nTotal number of articles: {len(details)}")
-    blank_content = len(
-        [d for d in details if not d["article_content"] or d["article_content"].strip() == ""]
-    )
-    blank_author = len(
-        [d for d in details if not d["article_author"] or d["article_author"].strip() == ""]
-    )
-    blank_title = len(
-        [d for d in details if not d["article_title"] or d["article_title"].strip() == ""]
-    )
+    blank_content = len([d for d in details if not d["article_content"] or d["article_content"].strip() == ""])
+    blank_author = len([d for d in details if not d["article_author"] or d["article_author"].strip() == ""])
+    blank_title = len([d for d in details if not d["article_title"] or d["article_title"].strip() == ""])
     blank_publish_date = len(
-        [
-            d
-            for d in details
-            if not d["article_publish_date"] or d["article_publish_date"].strip() == ""
-        ]
+        [d for d in details if not d["article_publish_date"] or d["article_publish_date"].strip() == ""]
     )
     print(f"Blank article content: {blank_content}")
     print(f"Blank article author: {blank_author}")

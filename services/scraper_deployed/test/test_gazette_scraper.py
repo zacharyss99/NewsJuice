@@ -88,7 +88,7 @@ class TestGazetteScraper:
     @patch("gazette_scraper.trafilatura.extract")
     def test_scrape_flow(self, mock_extract, mock_get, scraper):
         feed_xml = (
-            "<?xml version=\"1.0\"?><rss><channel><item><title>Test</title>"
+            '<?xml version="1.0"?><rss><channel><item><title>Test</title>'
             "<link>https://example.com/article</link></item></channel></rss>"
         )
         mock_get.side_effect = [
@@ -104,7 +104,7 @@ class TestGazetteScraper:
     @patch("gazette_scraper.httpx.get")
     def test_scrape_skip_short_content(self, mock_get, scraper):
         feed_xml = (
-            "<?xml version=\"1.0\"?><rss><channel><item><title>Test</title>"
+            '<?xml version="1.0"?><rss><channel><item><title>Test</title>'
             "<link>https://example.com/short</link></item></channel></rss>"
         )
         mock_get.side_effect = [MagicMock(text=feed_xml), MagicMock(text="<html>short</html>")]

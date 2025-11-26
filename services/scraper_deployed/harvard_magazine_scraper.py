@@ -54,17 +54,14 @@ class HarvardMagazineArticleScraper:
                 if (
                     len(path_segments) == 2  # Article paths need to hae 2 path segments
                     and not path_segments[0].isdigit()
-                    and "/topic/"
-                    not in href  # Removing references to topic pages, focusing only on articles:
+                    and "/topic/" not in href  # Removing references to topic pages, focusing only on articles:
                     and "/browse/issue/" not in href
                 ):
                     article_urls.append(href)
         return article_urls
 
     def extract_article_content(self, soup):
-        container = soup.find(
-            "div", class_="block block-layout-builder block-field-blocknodearticlebody"
-        )
+        container = soup.find("div", class_="block block-layout-builder block-field-blocknodearticlebody")
         if not container:
             print("Content div not found")
             return None
@@ -91,9 +88,7 @@ class HarvardMagazineArticleScraper:
 
         byline = soup.find("div", {"class": "article_header_section__byline"})
         if byline:
-            anchor_names = [
-                a.get_text(strip=True) for a in byline.find_all("a") if a.get_text(strip=True)
-            ]
+            anchor_names = [a.get_text(strip=True) for a in byline.find_all("a") if a.get_text(strip=True)]
             if anchor_names:
                 return ", ".join(anchor_names)
 
@@ -222,21 +217,11 @@ if __name__ == "__main__":
 
     print("Harvard news Scraper Summary")
     print(f"\n\nTotal number of articles: {len(details)}")
-    blank_content = len(
-        [d for d in details if not d["article_content"] or d["article_content"].strip() == ""]
-    )
-    blank_author = len(
-        [d for d in details if not d["article_author"] or d["article_author"].strip() == ""]
-    )
-    blank_title = len(
-        [d for d in details if not d["article_title"] or d["article_title"].strip() == ""]
-    )
+    blank_content = len([d for d in details if not d["article_content"] or d["article_content"].strip() == ""])
+    blank_author = len([d for d in details if not d["article_author"] or d["article_author"].strip() == ""])
+    blank_title = len([d for d in details if not d["article_title"] or d["article_title"].strip() == ""])
     blank_publish_date = len(
-        [
-            d
-            for d in details
-            if not d["article_publish_date"] or d["article_publish_date"].strip() == ""
-        ]
+        [d for d in details if not d["article_publish_date"] or d["article_publish_date"].strip() == ""]
     )
     print(f"Blank article content: {blank_content}")
     print(f"Blank article author: {blank_author}")
