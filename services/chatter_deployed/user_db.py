@@ -16,10 +16,7 @@ def create_user(user_id: str, email: str) -> bool:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    (
-                        "INSERT INTO users (user_id, email) VALUES (%s, %s) "
-                        "ON CONFLICT (user_id) DO NOTHING"
-                    ),
+                    ("INSERT INTO users (user_id, email) VALUES (%s, %s) " "ON CONFLICT (user_id) DO NOTHING"),
                     (user_id, email),
                 )
                 print(f"[db] User created: {user_id}")
@@ -35,10 +32,7 @@ def get_user_preferences(user_id: str) -> Dict[str, str]:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    (
-                        "SELECT preference_key, preference_value FROM user_preferences "
-                        "WHERE user_id = %s"
-                    ),
+                    ("SELECT preference_key, preference_value FROM user_preferences " "WHERE user_id = %s"),
                     (user_id,),
                 )
                 preferences = {}

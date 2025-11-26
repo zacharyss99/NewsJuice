@@ -82,9 +82,7 @@ ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://www.newsjuiceapp.com").split("
 # --------------------------
 # Gemini Config
 # --------------------------
-GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get(
-    "GEMINI_SERVICE_ACCOUNT_PATH", "/secrets/gemini-service-account.json"
-)
+GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get("GEMINI_SERVICE_ACCOUNT_PATH", "/secrets/gemini-service-account.json")
 GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
 GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
 
@@ -298,9 +296,7 @@ async def websocket_chatter(websocket: WebSocket):
                     # if we're processing a previous request, ignore new audio chunks. avoid
                     # overstuffing the audio bujffer
                     if is_processing:
-                        print(
-                            "[websocket] Ignoring audio chunk - still processing previous request"
-                        )
+                        print("[websocket] Ignoring audio chunk - still processing previous request")
                         continue
                     chunk_size = len(message["bytes"])
                     audio_buffer.extend(
@@ -310,9 +306,7 @@ async def websocket_chatter(websocket: WebSocket):
                         "[websocket] Received audio chunk:"
                         f" {chunk_size} bytes, total buffer: {len(audio_buffer)} bytes"
                     )
-                    await websocket.send_json(
-                        {"status": "chunk_received", "size": len(audio_buffer)}
-                    )
+                    await websocket.send_json({"status": "chunk_received", "size": len(audio_buffer)})
 
                 # Handle JSON control messages
                 elif "text" in message:
@@ -323,17 +317,12 @@ async def websocket_chatter(websocket: WebSocket):
                         if data.get("type") == "complete":
                             # Check if we're already processing
                             if is_processing:
-                                print(
-                                    "[websocket] Already processing a request, "
-                                    "ignoring new complete signal"
-                                )
+                                print("[websocket] Already processing a request, " "ignoring new complete signal")
                                 continue
 
                             # Check if we have audio to process
                             if len(audio_buffer) == 0:
-                                print(
-                                    "[websocket] ERROR: No audio received in buffer!"
-                                )
+                                print("[websocket] ERROR: No audio received in buffer!")
                                 print("[websocket] ERROR: No audio received in buffer!")
                                 await websocket.send_json({"error": "No audio received"})
                                 continue
@@ -365,17 +354,13 @@ async def websocket_chatter(websocket: WebSocket):
                                 print(f"[websocket] Transcription complete, text: {preview}...")
                             except Exception as e:
                                 print(f"[websocket] Transcription error: {e}")
-                                await websocket.send_json(
-                                    {"error": f"Transcription failed: {str(e)}"}
-                                )
+                                await websocket.send_json({"error": f"Transcription failed: {str(e)}"})
                                 audio_buffer.clear()
                                 is_processing = False
                                 continue
 
                             if not text:
-                                await websocket.send_json(
-                                    {"error": "Failed to transcribe audio (empty response)"}
-                                )
+                                await websocket.send_json({"error": "Failed to transcribe audio (empty response)"})
                                 audio_buffer.clear()
                                 is_processing = False
                                 continue
@@ -392,30 +377,20 @@ async def websocket_chatter(websocket: WebSocket):
                             original_query = text  # Keep original for podcast generation
 
                             if error or not enhancement_result:
-                                print(
-                                    "[websocket] Query enhancement error:"
-                                    f" {error}, using original query"
-                                )
+                                print("[websocket] Query enhancement error:" f" {error}, using original query")
                                 # Use original query as single sub-query if enhancement fails
                                 enhanced_queries = {"enhanced_query_1": text}
                             else:
                                 # Extract all enhanced_query_N keys from the result
                                 enhanced_queries = {
-                                    k: v
-                                    for k, v in enhancement_result.items()
-                                    if k.startswith("enhanced_query_")
+                                    k: v for k, v in enhancement_result.items() if k.startswith("enhanced_query_")
                                 }
                                 if not enhanced_queries:
                                     # Fallback if format is unexpected
                                     enhanced_queries = {
-                                        "enhanced_query_1": enhancement_result.get(
-                                            "enhanced_query", text
-                                        )
+                                        "enhanced_query_1": enhancement_result.get("enhanced_query", text)
                                     }
-                                print(
-                                    "[websocket] Query enhanced into"
-                                    f" {len(enhanced_queries)} sub-queries"
-                                )
+                                print("[websocket] Query enhanced into" f" {len(enhanced_queries)} sub-queries")
 
                             # Use the helper function to retrieve and generate podcast
                             success = await _retrieve_and_generate_podcast(
@@ -434,10 +409,7 @@ async def websocket_chatter(websocket: WebSocket):
                             # Reset buffer for next request
                             audio_buffer.clear()
                             is_processing = False
-                            print(
-                                "[websocket] Request processing complete, ready for next"
-                                " recording"
-                            )
+                            print("[websocket] Request processing complete, ready for next" " recording")
 
                         elif data.get("type") == "audio":
                             # JSON with base64 audio data
@@ -449,9 +421,7 @@ async def websocket_chatter(websocket: WebSocket):
                             audio_buffer.clear()
                             is_processing = False
                             await websocket.send_json({"status": "reset"})
-                            print(
-                                "[websocket] Reset signal, cleared buffer & processing flag"
-                            )
+                            print("[websocket] Reset signal, cleared buffer & processing flag")
 
                     except json.JSONDecodeError:
                         await websocket.send_json({"error": "Invalid JSON"})

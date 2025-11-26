@@ -35,6 +35,7 @@ from typing import List, Tuple, Optional
 import psycopg
 import json
 import os
+
 # from vertexai.generative_models import GenerativeModel
 
 
@@ -153,7 +154,6 @@ def log_conversation(
     response: Optional[str],
     error_message: Optional[str],
 ):
-
     """Log the conversation to the database."""
     try:
         # Prepare conversation data as JSON

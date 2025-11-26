@@ -48,10 +48,7 @@ DB_URL = os.environ.get(
 )  # [Z] for any script trying to access our GCP DB, assuming we have to specify the path
 if not DB_URL:
     # Fallback for Cloud Run
-    DB_URL = (
-        "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:"
-        "us-central1:newsdb-instance"
-    )
+    DB_URL = "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:" "us-central1:newsdb-instance"
 
 TIMEOUT = 10.0
 USER_AGENT = "minimal-rag-ingest/0.1"
