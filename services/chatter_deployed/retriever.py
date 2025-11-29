@@ -117,8 +117,9 @@ def get_db_connection():
     register_vector(conn)
     return conn
 
-
-def search_articles(query: str, limit: int = 2) -> List[Tuple[int, str, float]]:
+# [Z] this function should really be called get_chunks; it searches the articles table
+# with the query search string (SQL command) and pulls most relevant chunks
+def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, float]]:
     """
     Search for articles using semantic similarity.
 

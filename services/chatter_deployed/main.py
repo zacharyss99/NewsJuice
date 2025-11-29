@@ -184,9 +184,9 @@ async def _retrieve_and_generate_podcast(
     # Print summary of final unique chunks
     print(f"[retriever] After deduplication: {len(all_chunks)} unique chunks")
     for i, (chunk_id, chunk_text, score) in enumerate(all_chunks):
-        print(f"  Final Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:150]}...")
+        print(f"  Final Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text}...")
 
-    if not all_chunks:
+    if not all_chunks: 
         await websocket.send_json({"warning": "No relevant articles found"})
 
     # step 3: call_gemini_api to generate podcast text with all combined chunks
@@ -194,6 +194,7 @@ async def _retrieve_and_generate_podcast(
     # [Z] assuming we combine all these chunks + sub-queries for the podcast generation
     # Combine all enhanced sub-queries for podcast generation
     combined_enhanced_query = "\n".join([enhanced_queries[k] for k in query_keys])
+    print(f"This is the enhanced query {combined_enhanced_query[:100]}")
 
     podcast_text, error = call_gemini_api(combined_enhanced_query, all_chunks, model)
 
