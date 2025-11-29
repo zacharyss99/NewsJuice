@@ -194,9 +194,10 @@ async def _retrieve_and_generate_podcast(
     # [Z] assuming we combine all these chunks + sub-queries for the podcast generation
     # Combine all enhanced sub-queries for podcast generation
     combined_enhanced_query = "\n".join([enhanced_queries[k] for k in query_keys])
-    print(f"This is the enhanced query {combined_enhanced_query[:100]}")
+    print(f"This is the enhanced query {combined_enhanced_query}")
 
     podcast_text, error = call_gemini_api(combined_enhanced_query, all_chunks, model)
+    print(f"Here is the Podcast Text {podcast_text}")
 
     if error or not podcast_text:
         await websocket.send_json({"error": f"LLM error: {error}"})
