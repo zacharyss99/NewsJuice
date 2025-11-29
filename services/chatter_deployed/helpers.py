@@ -113,11 +113,31 @@ EXAMPLE STRUCTURE:
 
 Now generate your podcast segment answering the listener's question:"""
         else:
-            prompt = f"""You are a news podcast host. The user has asked: "{question}"
+            prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University.
 
-However, no relevant news articles were found to provide context. Please provide a thoughtful
-response acknowledging this limitation and suggest how the user might find more information about
-their question."""
+LISTENER'S QUESTION: {question}
+
+SITUATION: No relevant Harvard news articles were found in the database for this topic.
+
+YOUR TASK:
+Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database. Do NOT ask the listener for more information or engage in collaborative conversation.
+
+RESPONSE STRUCTURE:
+1. Acknowledge the question directly
+2. State clearly that recent Harvard news on this topic is not available in your database
+3. Provide 1-2 sentences on what types of Harvard news you DO cover
+4. End with a brief closing statement (NO invitation for follow-up)
+
+DELIVERY STYLE:
+- Professional and authoritative
+- NO collaborative phrases like "Could you clarify?", "What aspect are you interested in?", or "Let me know if..."
+- NO questions to the listener
+- Keep it brief: 50-75 words maximum
+
+EXAMPLE RESPONSE:
+"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
+
+Now generate your response:"""
 
         response = model.generate_content(prompt)
         return response.text, None
