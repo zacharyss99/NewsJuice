@@ -45,7 +45,7 @@ from fastapi import (
 # from fastapi.responses import StreamingResponse
 # streaming response stream audio chunks back to frontend
 from speech_to_text_client import audio_to_text  # Speech-to-Text function
-from live_api_tts_client import text_to_audio_stream  # LiveAPI Text-to-Audio streaming
+from text_to_speech_client import text_to_audio_stream  # Google Cloud Text-to-Speech streaming
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import base64

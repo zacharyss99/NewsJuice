@@ -72,6 +72,7 @@ services:
       # - ./chatter_handler.py:/app/chatter_handler.py
       - ./helpers.py:/app/helpers.py
       - ./retriever.py:/app/retriever.py
+      - ./text_to_speech_client.py:/app/text_to_speech_client.py
     
     restart: unless-stopped
     networks:
