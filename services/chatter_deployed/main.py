@@ -166,8 +166,8 @@ async def _retrieve_and_generate_podcast(
         if chunks:
             # Print each chunk with its similarity score
             print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
-            for i, (chunk_id, chunk_text, score) in enumerate(chunks):
-                print(f"  Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:100]}...")
+            for i, (chunk_id, chunk_text, source_type, score) in enumerate(chunks):
+                print(f"  Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, Score: {score:.4f}): {chunk_text[:100]}...")
             all_chunks.extend(chunks)
 
     # Remove duplicates based on chunk ID (keep first occurrence)
@@ -183,8 +183,8 @@ async def _retrieve_and_generate_podcast(
 
     # Print summary of final unique chunks
     print(f"[retriever] After deduplication: {len(all_chunks)} unique chunks")
-    for i, (chunk_id, chunk_text, score) in enumerate(all_chunks):
-        print(f"  Final Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text}...")
+    for i, (chunk_id, chunk_text, source_type, score) in enumerate(all_chunks):
+        print(f"  Final Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, Score: {score:.4f}): {chunk_text}...")
 
     if not all_chunks: 
         await websocket.send_json({"warning": "No relevant articles found"})

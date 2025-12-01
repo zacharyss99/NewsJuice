@@ -119,16 +119,16 @@ def get_db_connection():
 
 # [Z] this function should really be called get_chunks; it searches the articles table
 # with the query search string (SQL command) and pulls most relevant chunks
-def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, float]]:
+def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, str, float]]:
     """
     Search for articles using semantic similarity.
 
     Args:
         query: The search query string
-        limit: Maximum number of results to return (default: 2)
+        limit: Maximum number of results to return (default: 10)
 
     Returns:
-        List of tuples: (id, chunk, score) for each matching article
+        List of tuples: (id, chunk, source_type, score) for each matching article
     """
     try:
         # Query embedding
@@ -155,7 +155,7 @@ def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, float]]
             # Search for similar chunks
             select_sql = sql.SQL(
                 """
-                SELECT id, chunk, embedding <=> %s AS score
+                SELECT id, chunk, source_type, embedding <=> %s AS score
                 FROM {}
                 ORDER BY embedding <=> %s
                 LIMIT %s;
@@ -169,6 +169,8 @@ def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, float]]
 
     except Exception as e:
         print(f"[retriever] Error searching articles: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 

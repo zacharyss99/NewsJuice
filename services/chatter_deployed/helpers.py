@@ -2,19 +2,19 @@
 HELPER FUNCTIONS (called by main.py in chatter_deployed)
 THE HELPER FUNCTIONS USED CURRENTLY ARE
 
-1. call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
+1. call_retriever_service(query: str) -> List[Tuple[int, str, str, float]]:
 ===================================================================
 Call the retriever service to get relevant articles.
 Input: query
-Returns: List of tuples: (id, chunk, score) for each matching article
+Returns: List of tuples: (id, chunk, source_type, score) for each matching article
 
 
-2. call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) ->
+2. call_gemini_api(question: str, context_articles: List[Tuple[int, str, str, float]] = None) ->
 tuple[Optional[str], Optional[str]]:
 ===================================================================================================
 Call Google Gemini LLM API with the question and context articles to generate a podcast-style
 response.
-Input: question text + tuple of relevant chunks (with id, chunk text and similarity score)
+Input: question text + tuple of relevant chunks (with id, chunk text, source_type, and similarity score)
 Output: tuple of response text + error message
 
 THE HELPER FUNCTIONS NOT YET USED ARE
@@ -45,7 +45,7 @@ if not DB_URL:
     raise RuntimeError("DATABASE_URL environment variable not set")
 
 
-def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
+def call_retriever_service(query: str) -> List[Tuple[int, str, str, float]]:
     """Call the retriever service to get relevant articles."""
     try:
         # Import the retriever function directly since we're in the same environment
@@ -64,7 +64,7 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
 
 
 def call_gemini_api(
-    question: str, context_articles: List[Tuple[int, str, float]] = None, model=None
+    question: str, context_articles: List[Tuple[int, str, str, float]] = None, model=None
 ) -> tuple[Optional[str], Optional[str]]:
     """Call Google Gemini API with the question and context articles to generate a podcast-style
     response."""
@@ -76,8 +76,8 @@ def call_gemini_api(
         if context_articles:
             context_text = "\n\n".join(
                 [
-                    f"News Article {i+1} (Relevance Score: {score:.3f}):\n{chunk}"
-                    for i, (_, chunk, score) in enumerate(context_articles)
+                    f"Article Title: {source_type}\n{chunk}"
+                    for _, chunk, source_type, score in context_articles
                 ]
             )
 
@@ -94,10 +94,10 @@ YOUR TASK:
 3. Present information authoritatively - you are delivering news, not seeking clarification
 4. Structure your response with these elements:
    - OPENING: Directly state the answer to the question
-   - KEY FACTS: Present the most important details with specific numbers, names, and dates
+   - KEY FACTS: Present the most important details with specific numbers, names, and dates. BE SURE TO MENTION THE ARTICLE SOURCE (NEWS TITLE) THE KEY FACT DERIVES FROM WHEN STATING THE KEY FACT.
    - CONTEXT: Provide background information and explain implications
    - CLOSING: Brief summary statement (NO invitation for follow-up questions)
-5. Target 500 words for a comprehensive answer
+5. Target 200 words for a comprehensive answer
 6. If the articles lack sufficient information to answer the question, state: "The latest Harvard news I have doesn't cover that topic in detail."
 
 DELIVERY STYLE:
@@ -107,6 +107,10 @@ DELIVERY STYLE:
 - ABSOLUTELY NO COLLABORATIVE PHRASES LIKE "That's a great summary you provided!", or "Thank you for the information"
 - NO requests for more information from the listener
 - You are INFORMING, not CONVERSING
+- DO NOT use markdown formatting like **bold**, *italics*, or ### headers
+- Write in plain text only - this will be converted to speech
+- When referencing information, naturally mention the article title in your narration
+- Example: "According to the Harvard Gazette article 'Budget Cuts Impact Research,' the university..."
 
 EXAMPLE STRUCTURE:
 "Harvard is facing significant budget challenges this year. According to recent reports, the university posted a $113 million operating deficit in fiscal year 2025 - its first since 2020. This deficit stems from multiple factors, including the Trump administration's temporary termination of nearly all federal research grants in spring 2025, which removed approximately $116 million in sponsored funds overnight. To address these shortfalls, Harvard has implemented several cost-cutting measures: freezing salaries for non-union staff, leaving positions unfilled, and conducting targeted workforce reductions including 38 IT workers in November. The situation is compounded by a scheduled 400 percent increase in the federal endowment tax taking effect in 2027. Despite these challenges, Harvard's endowment grew 11.9 percent to $56.9 billion in fiscal 2025, which financial officers credit as central to navigating this uncertain period."
