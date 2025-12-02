@@ -212,11 +212,25 @@ def search_articles_by_preferences(
         cursor = conn.cursor()
 
         #SQL query the DB w/ category filtering + semantic rankong
+        '''select_sql = sql.SQL("""
+                             SELECT id, chunk, source_type, embedding <=> %s AS score
+                             FROM {table}
+                             WHERE source_type = ANY(%s)
+                               AND summary->>'' = ANY(%s)
+                             ORDER BY
+                                embedding <=> %s,
+                                id DESC
+                             LIMIT %s;
+                            """).format(table=sql.Identifier(VECTOR_TABLE_NAME))
+        print(f"[retriever] Filtering by sources: {sources}")
+        print(f"[retriever] Filtering by categories: {topics}")
+        print(f"[retriever] Limiting to {limit} chunks")'''
+
+        ########test#########
         select_sql = sql.SQL("""
                              SELECT id, chunk, source_type, embedding <=> %s AS score
                              FROM {table}
                              WHERE source_type = ANY(%s)
-                               AND summary->>'category' = ANY(%s)
                              ORDER BY
                                 embedding <=> %s,
                                 id DESC
@@ -227,7 +241,7 @@ def search_articles_by_preferences(
         print(f"[retriever] Limiting to {limit} chunks")
 
         # Execute query
-        cursor.execute(select_sql, (embedding, sources, topics, embedding, limit))
+        cursor.execute(select_sql, (embedding, sources, embedding, limit))
         results = cursor.fetchall()
         
         cursor.close()

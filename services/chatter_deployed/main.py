@@ -46,7 +46,8 @@ from fastapi import (
 # from fastapi.responses import StreamingResponse
 # streaming response stream audio chunks back to frontend
 from speech_to_text_client import audio_to_text  # Speech-to-Text function
-from text_to_speech_client import text_to_audio_stream  # Google Cloud Text-to-Speech streaming
+from text_to_speech_client import text_to_audio_stream, text_to_audio_bytes  # Google Cloud Text-to-Speech streaming and non-streaming
+from gcs_storage import upload_audio_to_gcs  # GCS storage for audio files
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import base64
@@ -111,7 +112,7 @@ except Exception as e:
 
 
 # --------------------------
-# Initialize Gemini Modek
+# Initialize Gemini Model
 # --------------------------
 try:
     if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
@@ -688,9 +689,20 @@ Now generate your daily briefing:"""
             print(f"[daily-brief] Gemini error: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to generate briefing: {str(e)}")
 
-        # Convert to audio (using existing TTS - for now we'll save without audio URL)
-        # TODO: Implement audio generation for daily brief
-        audio_url = None  # Placeholder for now
+        # Convert to audio and upload to GCS
+        print("[daily-brief] Converting text to audio...")
+        audio_bytes = text_to_audio_bytes(podcast_text)
+
+        if not audio_bytes:
+            raise HTTPException(status_code=500, detail="Failed to generate audio from text")
+
+        print("[daily-brief] Uploading audio to GCS...")
+        audio_url = upload_audio_to_gcs(audio_bytes, user_id, filename_prefix="daily-brief")
+
+        if not audio_url:
+            raise HTTPException(status_code=500, detail="Failed to upload audio to storage")
+
+        print(f"[daily-brief] Audio uploaded successfully: {audio_url}")
 
         # Save to audio_history with question_text="Daily Brief"
         save_audio_history(
@@ -708,7 +720,7 @@ Now generate your daily briefing:"""
 
         return {
             "success": True,
-            "text": podcast_text,
+            "podcast_text": podcast_text,
             "audio_url": audio_url,
             "created_at": current_time
         }

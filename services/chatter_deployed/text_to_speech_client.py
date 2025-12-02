@@ -3,13 +3,17 @@
 Converts text to audio using Google Cloud Text-to-Speech API and streams audio chunks in real-time.
 
 
-FUNCTION CONTAINED:
+FUNCTIONS CONTAINED:
 
 async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
+    Stream audio chunks to WebSocket
+
+def text_to_audio_bytes(text: str) -> Optional[bytes]:
+    Convert text to audio bytes (non-streaming version for daily brief)
 
 def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int =
 2) -> bytes:
-(Convert raw PCM audio data to WAV format.)
+    Convert raw PCM audio data to WAV format.
 
 """
 
@@ -135,3 +139,66 @@ def _pcm_to_wav(
     )
 
     return wav_header + pcm_data
+
+
+def text_to_audio_bytes(text: str) -> Optional[bytes]:
+    """
+    Convert text to audio bytes (non-streaming version for daily brief).
+    
+    Args:
+        text: The podcast text to convert to audio
+    
+    Returns:
+        WAV audio file as bytes, or None if conversion fails
+    """
+    try:
+        print(f"[cloud-tts] Starting text-to-audio conversion, text length: {len(text)} chars")
+        
+        # Initialize Google Cloud Text-to-Speech client
+        # Uses ADC (Application Default Credentials) - no API key needed
+        client = texttospeech.TextToSpeechClient()
+        
+        # Configure the synthesis request
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+        
+        # Voice configuration - using a natural-sounding English voice
+        voice = texttospeech.VoiceSelectionParams(
+            language_code="en-US",
+            name="en-US-Studio-O"  # High-quality Studio voice (natural podcaster sound)
+            # Note: Studio voices don't require ssml_gender parameter
+        )
+        
+        # Audio configuration - LINEAR16 (PCM) format at 24kHz
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+            sample_rate_hertz=24000,
+            speaking_rate=1.0,  # Normal speaking speed
+            pitch=0.0  # Normal pitch
+        )
+        
+        print("[cloud-tts] Sending text to Google Cloud Text-to-Speech API...")
+        
+        # Perform the text-to-speech request
+        response = client.synthesize_speech(
+            input=synthesis_input,
+            voice=voice,
+            audio_config=audio_config
+        )
+        
+        print(f"[cloud-tts] Received audio data: {len(response.audio_content)} bytes")
+        
+        # The response contains raw PCM audio data
+        pcm_data = response.audio_content
+        
+        # Convert PCM to WAV format
+        print("[cloud-tts] Converting PCM to WAV format...")
+        wav_data = _pcm_to_wav(pcm_data, sample_rate=24000)
+        
+        print(f"[cloud-tts] Converted to WAV: {len(pcm_data)} bytes PCM -> {len(wav_data)} bytes WAV")
+        return wav_data
+        
+    except Exception as e:
+        print(f"[cloud-tts-error] Failed to convert text to audio: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
