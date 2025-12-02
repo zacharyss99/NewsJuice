@@ -25,7 +25,8 @@ def create_user(user_id: str, email: str) -> bool:
         print(f"[db-error] Failed to create user: {e}")
         return False
 
-
+#user_db.py function, get_user_preferences. This literally grabs the user_prefernece
+#values from the user_preferences table in our CloudSQL db. 
 def get_user_preferences(user_id: str) -> Dict[str, str]:
     "Get all preferences for a user."
     try:
@@ -44,6 +45,7 @@ def get_user_preferences(user_id: str) -> Dict[str, str]:
         print(f"[db-error] Failed to get preferences: {e}")
         return {}
 
+#save user preferences which inserts the user preferred topics + sources into the user_preferences table
 
 def save_user_preferences(user_id: str, preferences: Dict[str, str]) -> bool:
     """Save user preferences (upsert)."""

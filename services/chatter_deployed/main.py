@@ -32,6 +32,7 @@ from dotenv import load_dotenv
 import os
 import logging
 from typing import Dict, Any, Optional
+from datetime import datetime, timezone
 
 # uploadfile handels audio file auploads from frontend
 from fastapi import (
@@ -64,6 +65,7 @@ from user_db import (
 # from chatter_handler import chatter [Z] we do not need the chatter_handler.py script
 from helpers import call_retriever_service, call_gemini_api
 from query_enhancement import enhance_query_with_gemini
+from retriever import search_articles_by_preferences
 
 # from chatter_handler import model
 # from openai import OpenAI [Z] we do not use OpenAI
@@ -543,3 +545,253 @@ async def get_history_endpoint(request: Request, limit: int = 10):
         return {"status": "success", "history": history}
     except AttributeError:
         raise HTTPException(status_code=401, detail="User not authenticated")
+
+
+# --------------------------
+# Daily Brief Endpoints
+# --------------------------
+
+@app.post("/api/daily-brief")
+async def generate_daily_brief_endpoint(request: Request):
+    """Generate a personalized daily news briefing based on user preferences."""
+    try:
+        user_id = request.state.user_id
+        print(f"[daily-brief] Generating for user: {user_id}")
+
+        # Load user preferences from user_preferences table in CloudSQL
+        #  (this function comes from the user_db.py script)
+        preferences = get_user_preferences(user_id)
+        """
+        Example rows for a single user in user_preferences table is 
+        ──────────┬────────────────────────────────┬─────────────────────────────────────────┬─────────────────────┐
+│ user_id  │ preference_key                 │ preference_value                        │ updated_at          │
+├──────────┼────────────────────────────────┼─────────────────────────────────────────┼─────────────────────┤
+│ abc123   │ topics                         │ ["Politics","Technology","Health"]      │ 2025-12-02 10:30:00 │
+├──────────┼────────────────────────────────┼─────────────────────────────────────────┼─────────────────────┤
+│ abc123   │ sources                        │ ["Harvard Gazette","Harvard Crimson"]   │ 2025-12-02 10:30:00 │
+├──────────┼────────────────────────────────┼─────────────────────────────────────────┼─────────────────────┤
+│ abc123   │ last_daily_brief_generated     │ 2025-12-02T14:25:00Z                    │ 2025-12-02 14:25:00 │
+
+so this function is literally pulling the values from the associated preference
+topics_str = preference.get("topics", "[]") pulls the list of preferred topics (inside preference_value) based on the preference_key, "topics".
+        
+        """
+
+        # parse topics and sources from the preferences
+        topics_str = preferences.get("topics", "[]")
+        sources_str = preferences.get("sources", "[]")
+
+        try:
+            #these arrays of topics and sources are stored as JSON strings, so they need to be parsed back
+            #via json.loads()
+            topics = json.loads(topics_str) if isinstance(topics_str, str) else topics_str
+            sources = json.loads(sources_str) if isinstance(sources_str, str) else sources_str
+        except json.JSONDecodeError:
+            topics = []
+            sources = []
+
+        print(f"[daily-brief] Topics: {topics}")
+        print(f"[daily-brief] Sources: {sources}")
+
+        if not topics or not sources:
+            raise HTTPException(
+                status_code=400,
+                detail="No preferences set. Please configure topics and sources first."
+            )
+
+        # retreive the chunks based on their preferred topics and sources
+        #w/ associated parameters (30 chunks, 2 days back)
+        chunks = search_articles_by_preferences(
+            topics=topics,
+            sources=sources,
+            limit=30,
+            days_back=2
+        )
+
+        if not chunks:
+            raise HTTPException(
+                status_code=404,
+                detail="No articles found matching your preferences"
+            )
+
+        print(f"[daily-brief] Retrieved {len(chunks)} chunks")
+
+        # format context for Gemini API so that the podcast generation accuratelty mentions the news source title where the info came from
+        #so context_text is literally a list of [Article Title: "title" \n "chunk"] for however many chunks we return
+        context_text = "\n\n".join([
+            f"Article Title: {source_type}\n{chunk}"
+            for _, chunk, source_type, score in chunks
+        ])
+
+        
+        try:
+            # Create custom prompt for daily brief
+            today_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
+            
+            # build the full prompt for the gemini API call using the DAILY_BRIEF_PROMPT
+            
+            DAILY_BRIEF_PROMPT = """
+        You are a professional news anchor creating a daily briefing for Harvard community members.
+
+        OBJECTIVE:
+        Create an engaging, comprehensive daily news summary covering the most important Harvard news stories from the provided articles.
+
+        STRUCTURE:
+        1. Opening: Brief welcome and overview of today's top stories (mention the date)
+        2. Main stories: Cover 3-5 major developments in detail with proper context
+        3. Quick hits: Mention 2-3 additional noteworthy items briefly
+        4. Closing: Brief wrap-up
+
+        DELIVERY STYLE:
+        - Professional yet conversational tone (like NPR's "The Daily")
+        - Natural narration - NO markdown formatting (**bold**, *italics*, ### headers, etc.)
+        - DO NOT use special characters or formatting - write in plain text only
+        - This will be converted to speech, so write for listening, not reading
+        - Clearly attribute information by naturally mentioning article sources
+        - Example: "According to the Harvard Gazette article 'Research Breakthrough,' scientists have discovered..."
+        - Smooth transitions between topics
+        - Appropriate pacing for audio consumption
+
+        IMPORTANT:
+        - Focus on the most significant and interesting stories
+        - Provide context and explain why stories matter to the Harvard community
+        - Keep total length around 3-5 minutes when spoken (approximately 500-750 words)
+        - Be authoritative and well-informed
+        - Make it engaging - this is the user's personalized morning briefing
+
+        Begin with: "Good morning, this is your Harvard News Daily Brief for [today's date]..."
+
+        End with: "That's your Harvard News Daily Brief. Have a great day!"
+        """
+
+            full_prompt = f"""{DAILY_BRIEF_PROMPT} 
+
+Today's date: {today_date}
+
+Here are the news articles to summarize:
+
+{context_text}
+
+Now generate your daily briefing:"""
+            #this is literally calling the gemini_api directly to generate a podcast
+            # the call_gemini_api() is a script that is solely used for the interactive Q&A
+            #creating a separate helper for one use case is "overkill" according to claude, I think it is actually helpful, but eh
+            response = model.generate_content(full_prompt)
+            podcast_text = response.text
+
+            if not podcast_text:
+                raise HTTPException(status_code=500, detail="Failed to generate briefing text")
+
+            print(f"[daily-brief] Generated text: {len(podcast_text)} chars")
+
+        except Exception as e:
+            print(f"[daily-brief] Gemini error: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to generate briefing: {str(e)}")
+
+        # Convert to audio (using existing TTS - for now we'll save without audio URL)
+        # TODO: Implement audio generation for daily brief
+        audio_url = None  # Placeholder for now
+
+        # Save to audio_history with question_text="Daily Brief"
+        save_audio_history(
+            user_id=user_id,
+            question_text="Daily Brief",
+            podcast_text=podcast_text,
+            audio_url=audio_url
+        )
+
+        # Update last_daily_brief_generated timestamp
+        current_time = datetime.now(timezone.utc).isoformat()
+        save_user_preferences(user_id, {"last_daily_brief_generated": current_time})
+
+        print(f"[daily-brief] Successfully generated and saved")
+
+        return {
+            "success": True,
+            "text": podcast_text,
+            "audio_url": audio_url,
+            "created_at": current_time
+        }
+
+    except HTTPException:
+        raise
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    except Exception as e:
+        print(f"[daily-brief-error] {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate daily brief: {str(e)}")
+
+
+#we check status first to avoid regenerating the same brief multiple times
+#one brief per user per day
+@app.get("/api/daily-brief/status")
+async def check_daily_brief_status_endpoint(request: Request):
+    """Check if daily brief was generated today."""
+    try:
+        user_id = request.state.user_id
+
+        # Load last_daily_brief_generated timestamp
+        preferences = get_user_preferences(user_id)
+        last_generated_str = preferences.get("last_daily_brief_generated")
+
+        if not last_generated_str:
+            return {"generated_today": False}
+
+        # Parse timestamp and check if it's today
+        try:
+            last_generated = datetime.fromisoformat(last_generated_str.replace('Z', '+00:00'))
+            today = datetime.now(timezone.utc).date()
+            last_date = last_generated.date()
+
+            generated_today = (last_date == today)
+
+            return {
+                "generated_today": generated_today,
+                "last_generated": last_generated_str
+            }
+
+        except (ValueError, AttributeError):
+            return {"generated_today": False}
+
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    except Exception as e:
+        print(f"[daily-brief-status-error] {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
+
+#retrieve most recent daily brief from user's history to display existing brief without regenerating
+@app.get("/api/daily-brief/latest")
+async def get_latest_daily_brief_endpoint(request: Request):
+    """Get the most recent daily brief from history."""
+    try:
+        user_id = request.state.user_id
+
+        # Get all history and filter for "Daily Brief"
+        history = get_audio_history(user_id, limit=50)
+
+        # Find most recent daily brief
+        daily_briefs = [h for h in history if h.get("question_text") == "Daily Brief"]
+
+        if not daily_briefs:
+            raise HTTPException(status_code=404, detail="No daily brief found")
+
+        # Return most recent (first in list since get_audio_history returns newest first)
+        latest_brief = daily_briefs[0]
+
+        return {
+            "id": latest_brief.get("id"),
+            "question_text": latest_brief.get("question_text"),
+            "podcast_text": latest_brief.get("podcast_text"),
+            "audio_url": latest_brief.get("audio_url"),
+            "created_at": latest_brief.get("created_at")
+        }
+
+    except HTTPException:
+        raise
+    except AttributeError:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    except Exception as e:
+        print(f"[daily-brief-latest-error] {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get latest brief: {str(e)}")
