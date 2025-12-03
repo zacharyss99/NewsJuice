@@ -4,6 +4,7 @@ import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
+import { useMicVAD } from '@ricky0123/vad-react'
 
 function Podcast() {
   const navigate = useNavigate()
@@ -44,6 +45,32 @@ function Podcast() {
   const savedBriefPosition = useRef(0)  // Saves playback position when pausing for Q&A
   const shouldAutoResume = useRef(false)  // Flag to auto-resume after Q&A
 
+  // ========== VOICE ACTIVITY DETECTION (Phase 2) ==========
+  const [vadEnabled, setVadEnabled] = useState(false) //VAD on/off toggle for the user
+  const [vadReady, setVadReady] = useState(false) // VAD model loaded in and ready, tracks if ML model finished loading
+  const vadRef = useRef(null) //vadRef is the reference to VAD instance so we can control it
+
+  // Handle voice interruption when VAD detects speech
+  const handleVoiceInterruption = () => {
+    console.log('[vad] Voice detected! Interrupting daily brief for Q&A')
+
+    // Only interrupt if daily brief is currently playing
+    if (!briefAudioPlaying || audioMode !== 'PLAYING_BRIEF') {
+      console.log('[vad] Ignoring - brief not playing or wrong mode')
+      return
+    }
+
+    // Pause VAD while we handle Q&A
+    if (vadRef.current) {
+      vadRef.current.pause()
+      console.log('[vad] VAD paused')
+    }
+
+    // Start recording the user's question
+    // Note: startRecording() will auto-pause the daily brief (Phase 1 logic)
+    startRecording()
+  }
+
   // ========== EMOJI/LOGO MAPPINGS ==========
   const TOPIC_EMOJIS = {
     'Politics': '🏛️',
@@ -66,6 +93,61 @@ function Podcast() {
     'Harvard Magazine': '📖',
     'Harvard Kennedy School': '🏛️'
   }
+
+  // adding the VAD HOOK
+  const vad = useMicVAD({
+    startOnLoad: false, 
+
+    onSpeechStart: () => { //onSpeechStart is a callback when VAD detects voice, triggers Q&A
+      console.log('[vad] Speech detected!')
+      handleVoiceInterruption()
+    },
+    onSpeechEnd: () => { //when user stops talking
+    console.log('[vad] Speech ended')
+  },
+  
+  onVADMisfire: () => {
+    console.log('[vad] False positive detected')
+  },
+  
+  // Tuning parameters to control how confident VAD must be to trigger
+  positiveSpeechThreshold: 0.8,
+
+  // Asset paths - tell VAD where to find model and worklet files
+  baseAssetPath: '/',  // Public directory root
+  onnxWASMBasePath: '/',  // ONNX Runtime WASM files location
+
+  // Configure ONNX Runtime to use WASM files from public directory
+  ortConfig: (ort) => {
+    // Set WASM paths to root (public directory)
+    ort.env.wasm.wasmPaths = '/'
+    // Use 1 thread for stability
+    ort.env.wasm.numThreads = 1
+  },
+
+  // Debug
+  onFrameProcessed: (probabilities) => {
+    // Uncomment to see real-time speech probability
+    // console.log('[vad] Speech probability:', probabilities.isSpeech)
+  }
+  })
+
+  // Track VAD readiness and store instance in ref
+  // React Explanation: useEffect is a hook that runs side effects after render
+  // This runs whenever vad.loading, vad.errored, or vad.listening changes
+  useEffect(() => {
+    // Store VAD instance in ref so we can access it from other functions
+    vadRef.current = vad
+
+    if (vad.loading) {
+      console.log('[vad] Loading model...')
+    } else if (vad.errored) {
+      console.error('[vad] Error loading model:', vad.errored)
+    } else if (vad.listening) {
+      setVadReady(true)
+      console.log('[vad] Ready and listening')
+    }
+  }, [vad, vad.loading, vad.errored, vad.listening])
 
   // ========== API HELPER ==========
   const getApiUrl = () => {
@@ -224,17 +306,37 @@ function Podcast() {
         setBriefAudioProgress(0)
         setAudioMode('IDLE')
         shouldAutoResume.current = false  // Brief finished naturally, no auto-resume needed
+
+        // [Phase 2] Pause VAD when brief finishes naturally
+        if (vadEnabled && vadRef.current) {
+          vadRef.current.pause()
+          console.log('[vad] Paused - brief finished')
+        }
       }
     }
 
     if (briefAudioPlaying) {
+      // Pausing the brief
       briefAudioRef.current.pause()
       setBriefAudioPlaying(false)
       setAudioMode('IDLE')
+
+      // [Phase 2] Pause VAD when user manually pauses brief
+      if (vadEnabled && vadRef.current) {
+        vadRef.current.pause()
+        console.log('[vad] Paused - user paused brief')
+      }
     } else {
+      // Playing the brief
       briefAudioRef.current.play()
       setBriefAudioPlaying(true)
       setAudioMode('PLAYING_BRIEF')
+
+      // [Phase 2] Start VAD when brief starts playing (if VAD is enabled)
+      if (vadEnabled && vadRef.current && vadReady) {
+        vadRef.current.start()
+        console.log('[vad] Started - brief playing, listening for voice')
+      }
     }
   }
 
@@ -422,6 +524,12 @@ function Podcast() {
               setAudioMode('PLAYING_BRIEF')
               shouldAutoResume.current = false
               console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
+
+              // [Phase 2] Restart VAD when brief resumes (if VAD is enabled)
+              if (vadEnabled && vadRef.current && vadReady) {
+                vadRef.current.start()
+                console.log('[vad] Restarted - brief resumed, listening for voice again')
+              }
             }, 500)  // Small delay for smooth transition
           }
         }
@@ -696,6 +804,18 @@ function Podcast() {
             title="Preferences"
           >
             <Sliders size={24} />
+          </button>
+          {/* [Phase 2] VAD Toggle Button */}
+          <button
+            onClick={() => setVadEnabled(!vadEnabled)}
+            className={`p-2 rounded-full transition-colors ${
+              vadEnabled
+                ? 'bg-primary-pink hover:bg-pink-600'
+                : 'hover:bg-gray-800'
+            }`}
+            title={vadEnabled ? 'Voice Detection ON (Hands-free)' : 'Voice Detection OFF (Manual)'}
+          >
+            {vadEnabled ? <Mic size={24} /> : <MicOff size={24} />}
           </button>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
