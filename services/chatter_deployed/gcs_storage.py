@@ -65,10 +65,10 @@ def upload_audio_to_gcs(audio_bytes: bytes, user_id: str, filename_prefix: str =
         blob.cache_control = cache_control
         blob.patch()
         
-        # Generate a signed URL (valid for 1 year) since uniform bucket-level access is enabled
+        # Generate a signed URL (valid for 1 day) since uniform bucket-level access is enabled
         # Signed URLs work even when ACLs are disabled
         from datetime import timedelta
-        expiration = timedelta(days=365)  # URL valid for 1 year
+        expiration = timedelta(days=1)  # URL valid for 1 day
         
         # Get credentials for signing
         if sa_key_path and os.path.exists(sa_key_path):
