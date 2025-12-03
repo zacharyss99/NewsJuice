@@ -11,6 +11,7 @@ function Podcast() {
   // ========== DAILY BRIEF STATE ==========
   const [dailyBrief, setDailyBrief] = useState(null)
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false)
+  const [isLoadingBrief, setIsLoadingBrief] = useState(false)
   const [briefAudioPlaying, setBriefAudioPlaying] = useState(false)
   const [briefAudioProgress, setBriefAudioProgress] = useState(0)
   const [briefAudioDuration, setBriefAudioDuration] = useState(0)
@@ -37,6 +38,29 @@ function Podcast() {
   const isRecordingRef = useRef(false)
   const currentAudioUrlRef = useRef(null)
   const preventAutoPlayRef = useRef(false)
+
+  // ========== EMOJI/LOGO MAPPINGS ==========
+  const TOPIC_EMOJIS = {
+    'Politics': '🏛️',
+    'Technology': '💻',
+    'Health': '🏥',
+    'Business': '💼',
+    'Sports': '⚽',
+    'Entertainment': '🎬',
+    'Campus Life': '🎓',
+    'Research': '🔬'
+  }
+
+  const SOURCE_LOGOS = {
+    'Harvard Gazette': '🏛️',
+    'Harvard Crimson': '🗞️',
+    'Harvard Medical School': '⚕️',
+    'Harvard SEAS': '⚙️',
+    'Harvard Law School': '⚖️',
+    'Harvard Business School': '💼',
+    'Harvard Magazine': '📖',
+    'Harvard Kennedy School': '🏛️'
+  }
 
   // ========== API HELPER ==========
   const getApiUrl = () => {
@@ -155,6 +179,7 @@ function Podcast() {
   // Check and auto-generate daily brief if needed
   const checkAndGenerateDailyBrief = async () => {
     console.log('[daily-brief] Checking if generation needed...')
+    setIsLoadingBrief(true)
 
     const generatedToday = await checkDailyBriefStatus()
 
@@ -164,8 +189,10 @@ function Podcast() {
       if (latest) {
         setDailyBrief(latest)
       }
+      setIsLoadingBrief(false)
     } else {
       console.log('[daily-brief] Not generated today, auto-generating...')
+      setIsLoadingBrief(false)
       await generateDailyBrief()
     }
   }
@@ -715,6 +742,15 @@ function Podcast() {
               <h2 className="text-3xl font-bold">Daily News Briefing</h2>
             </div>
 
+            {/* Q&A Active Hint */}
+            {(isRecording || isPlaying) && dailyBrief && (
+              <div className="mb-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg text-center">
+                <p className="text-sm text-blue-300">
+                  💡 Your daily briefing is paused. Scroll up and click the play button to resume listening.
+                </p>
+              </div>
+            )}
+
             {/* Topics */}
             {userTopics.length > 0 && (
               <div className="mb-6">
@@ -725,7 +761,7 @@ function Podcast() {
                       key={index}
                       className="px-4 py-2 bg-red-900/40 border border-red-700/50 rounded-full text-sm"
                     >
-                      {topic}
+                      {TOPIC_EMOJIS[topic] || '📰'} {topic}
                     </span>
                   ))}
                 </div>
@@ -742,7 +778,7 @@ function Podcast() {
                       key={index}
                       className="flex items-center gap-3 px-4 py-2 bg-gray-800/30 rounded-lg border border-gray-700"
                     >
-                      <span className="text-2xl">📰</span>
+                      <span className="text-2xl">{SOURCE_LOGOS[source] || '📰'}</span>
                       <div>
                         <p className="font-medium text-sm">{source}</p>
                         <p className="text-xs text-gray-500">
@@ -756,7 +792,12 @@ function Podcast() {
             )}
 
             {/* Generate or Play */}
-            {isGeneratingBrief ? (
+            {isLoadingBrief ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-primary-pink mb-4"></div>
+                <p className="text-gray-400">Loading today's briefing...</p>
+              </div>
+            ) : isGeneratingBrief ? (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-primary-pink mb-4"></div>
                 <p className="text-gray-400">Generating your personalized briefing...</p>
@@ -786,7 +827,7 @@ function Podcast() {
                 </div>
 
                 <p className="text-center text-sm text-gray-400">
-                  {briefAudioPlaying ? "Playing your briefing..." : "Click to play briefing"}
+                  {briefAudioPlaying ? "Playing your briefing..." : briefAudioRef.current ? "Click to resume briefing" : "Click to play briefing"}
                 </p>
               </div>
             ) : (
@@ -801,8 +842,8 @@ function Podcast() {
               </div>
             )}
 
-            {/* Preferences Prompt */}
-            {userTopics.length === 0 && userSources.length === 0 && (
+            {/* Preferences Prompt - Only show if no preferences AND no brief exists */}
+            {userTopics.length === 0 && userSources.length === 0 && !dailyBrief && !isGeneratingBrief && (
               <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg text-center">
                 <p className="text-sm text-yellow-300 mb-2">
                   No preferences set yet! Configure your topics and sources to get personalized briefings.

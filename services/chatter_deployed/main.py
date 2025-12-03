@@ -522,12 +522,27 @@ async def get_preferences_endpoint(request: Request):
     except AttributeError:
         raise HTTPException(status_code=401, detail="User not authenticated")
 
-
+#Z [ save user preferences endpoint] its an endpoint because its a separate resource
+# CRUD operations; GET /api/user/preferences = read preferences, POST /api/user/preferences = Create/Update preferences
+# DELETE /api/user/preferences = could delete preferences 
+# we have separate endpoints for /api/users (users mgtmt) /api/articles (aticles management) and /api/daily-brief 
+#separate user preferences endpoint from daily brief because user may want to change preferences without generating a dialy brief
 @app.post("/api/user/preferences")
 async def save_preferences_endpoint(request: Request, preferences: Dict[str, Any] = Body(...)):
     """Save user preferences."""
     try:
         user_id = request.state.user_id
+        user_email = request.state.user_email
+
+        # Ensure user exists in database (fallback in case frontend call failed)
+        # This uses ON CONFLICT DO NOTHING, so it's safe to call even if user exists
+        create_user(user_id, user_email)
+
+        #[Z] this saves the user preferences in our user_preferences table in CloudSQL
+#         user_id  | preference_key | preference_value
+#    ---------|----------------|------------------
+#    abc123   | topics         | ["Politics","Tech"]
+#    abc123   | sources        | ["Harvard Gazette"]
         success = save_user_preferences(user_id, preferences)
         if success:
             return {"status": "success", "message": "Preferences saved"}
@@ -599,9 +614,22 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
                 status_code=400,
                 detail="No preferences set. Please configure topics and sources first."
             )
+        #in this search_articles_by_preferneces function we combine topics into a single string
+        #i.e. "politics technology", generate an embedding vector, and do hybrid retrieval SQL query
 
         # retreive the chunks based on their preferred topics and sources
         #w/ associated parameters (30 chunks, 2 days back)
+        """
+        SELECT id, chunk, source_type, embedding <=> %s AS score
+        FROM vector_table
+        WHERE source_type = ANY(['Harvard Gazette', 'Harvard Crimson'])  -- Exact source filter
+        AND summary->>'category' = ANY(['Politics', 'Technology'])      -- Exact category filter
+        ORDER BY
+            embedding <=> %s,  -- Semantic ranking by similarity
+            id DESC            -- Newest first
+        LIMIT 30;
+        """
+
         chunks = search_articles_by_preferences(
             topics=topics,
             sources=sources,
@@ -690,13 +718,29 @@ Now generate your daily briefing:"""
             raise HTTPException(status_code=500, detail=f"Failed to generate briefing: {str(e)}")
 
         # Convert to audio and upload to GCS
+        
         print("[daily-brief] Converting text to audio...")
+        """what audio bytes does is check if text lenght > 4000 bytes, if so
+        split into chunks.
+        for each chunk, call Google TTS API, get PCM audio data, add 0.8s silence between chunks
+        Then join all audio chunks together
+        Convert them from PCM to WAV format with headers
+        Complete WAV file as bytes
+        """
         audio_bytes = text_to_audio_bytes(podcast_text)
 
         if not audio_bytes:
             raise HTTPException(status_code=500, detail="Failed to generate audio from text")
 
         print("[daily-brief] Uploading audio to GCS...")
+        """
+        What upload_audio_to_gcs does is initialize GCS client w/ service account credentials
+        Generates a unique audio filename
+        Uploads the audio to ac215-audio-bucket
+        Sets cache control & signed URL (who can access, how long the audio file lives for inside bucket)
+        Returns URL (audio_url)
+        
+        """
         audio_url = upload_audio_to_gcs(audio_bytes, user_id, filename_prefix="daily-brief")
 
         if not audio_url:
@@ -711,13 +755,14 @@ Now generate your daily briefing:"""
             podcast_text=podcast_text,
             audio_url=audio_url
         )
+        # [Z] GCS bucket also keeps track of q+a audio files for each user
 
         # Update last_daily_brief_generated timestamp
         current_time = datetime.now(timezone.utc).isoformat()
         save_user_preferences(user_id, {"last_daily_brief_generated": current_time})
 
         print(f"[daily-brief] Successfully generated and saved")
-
+        #return the success of generating daily brief to frontend via Websocket
         return {
             "success": True,
             "podcast_text": podcast_text,
@@ -738,6 +783,7 @@ Now generate your daily briefing:"""
 
 #we check status first to avoid regenerating the same brief multiple times
 #one brief per user per day
+#podcast page CHECKS this endpoint on load to avoid re-generating if already done today
 @app.get("/api/daily-brief/status")
 async def check_daily_brief_status_endpoint(request: Request):
     """Check if daily brief was generated today."""
