@@ -226,7 +226,7 @@ def search_articles_by_preferences(
         print(f"[retriever] Filtering by categories: {topics}")
         print(f"[retriever] Limiting to {limit} chunks")'''
 
-        ########test#########
+        ########test with no category filtering#########
         select_sql = sql.SQL("""
                              SELECT id, chunk, source_type, embedding <=> %s AS score
                              FROM {table}

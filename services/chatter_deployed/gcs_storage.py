@@ -8,6 +8,7 @@ upload_audio_to_gcs(audio_bytes: bytes, user_id: str, filename_prefix: str = "da
 
 import os
 from google.cloud import storage
+from google.oauth2 import service_account
 from typing import Optional
 import uuid
 from datetime import datetime
@@ -32,8 +33,21 @@ def upload_audio_to_gcs(audio_bytes: bytes, user_id: str, filename_prefix: str =
         
         print(f"[gcs] Uploading to bucket: {bucket_name}, prefix: {gcs_prefix}")
         
-        # Initialize GCS client (uses Application Default Credentials)
-        client = storage.Client()
+        # Initialize GCS client with explicit credentials
+        # Use the main service account (sa-key.json) instead of ADC
+        # Note: main.py overrides GOOGLE_APPLICATION_CREDENTIALS to gemini-service-account,
+        # so we need to use the original sa-key.json path directly
+        sa_key_path = "/app/sa-key.json"  # Original service account path from docker-compose
+        if os.path.exists(sa_key_path):
+            # Use explicit service account credentials
+            credentials = service_account.Credentials.from_service_account_file(sa_key_path)
+            client = storage.Client(credentials=credentials, project=os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456"))
+            print(f"[gcs] Using service account from: {sa_key_path}")
+        else:
+            # Fallback to ADC (might not work if main.py overrode it)
+            client = storage.Client()
+            print("[gcs] Using Application Default Credentials (fallback)")
+        
         bucket = client.bucket(bucket_name)
         
         # Generate unique filename: podcasts/daily-brief/{user_id}/{timestamp}_{uuid}.wav
@@ -47,17 +61,30 @@ def upload_audio_to_gcs(audio_bytes: bytes, user_id: str, filename_prefix: str =
         blob = bucket.blob(blob_path)
         blob.upload_from_string(audio_bytes, content_type="audio/wav")
         
-        # Set cache control for public access
+        # Set cache control
         blob.cache_control = cache_control
         blob.patch()
         
-        # Make blob publicly readable
-        blob.make_public()
+        # Generate a signed URL (valid for 1 year) since uniform bucket-level access is enabled
+        # Signed URLs work even when ACLs are disabled
+        from datetime import timedelta
+        expiration = timedelta(days=365)  # URL valid for 1 year
         
-        # Return public URL
-        public_url = blob.public_url
-        print(f"[gcs] Uploaded audio successfully: {public_url}")
-        return public_url
+        # Get credentials for signing
+        if sa_key_path and os.path.exists(sa_key_path):
+            credentials = service_account.Credentials.from_service_account_file(sa_key_path)
+        else:
+            # Fallback: try to get credentials from client
+            credentials = client._credentials
+        
+        signed_url = blob.generate_signed_url(
+            expiration=expiration,
+            method='GET',
+            credentials=credentials
+        )
+        
+        print(f"[gcs] Uploaded audio successfully: {signed_url}")
+        return signed_url
         
     except Exception as e:
         print(f"[gcs-error] Failed to upload audio: {e}")
