@@ -39,6 +39,11 @@ function Podcast() {
   const currentAudioUrlRef = useRef(null)
   const preventAutoPlayRef = useRef(false)
 
+  // ========== UNIFIED AUDIO STATE (Phase 1) ==========
+  const [audioMode, setAudioMode] = useState('IDLE')  // IDLE, PLAYING_BRIEF, PAUSED_FOR_QA, PLAYING_QA, RESUMING_BRIEF
+  const savedBriefPosition = useRef(0)  // Saves playback position when pausing for Q&A
+  const shouldAutoResume = useRef(false)  // Flag to auto-resume after Q&A
+
   // ========== EMOJI/LOGO MAPPINGS ==========
   const TOPIC_EMOJIS = {
     'Politics': '🏛️',
@@ -217,15 +222,19 @@ function Podcast() {
       briefAudioRef.current.onended = () => {
         setBriefAudioPlaying(false)
         setBriefAudioProgress(0)
+        setAudioMode('IDLE')
+        shouldAutoResume.current = false  // Brief finished naturally, no auto-resume needed
       }
     }
 
     if (briefAudioPlaying) {
       briefAudioRef.current.pause()
       setBriefAudioPlaying(false)
+      setAudioMode('IDLE')
     } else {
       briefAudioRef.current.play()
       setBriefAudioPlaying(true)
+      setAudioMode('PLAYING_BRIEF')
     }
   }
 
@@ -392,6 +401,7 @@ function Podcast() {
           }
           console.log("[audio] Audio can play, attempting autoplay")
           setIsPlaying(true)
+          setAudioMode('PLAYING_QA')  // [Phase 1] Set mode to PLAYING_QA
           audioPlayerRef.current.play().catch((err) => {
             console.warn("[audio] Autoplay blocked:", err)
           })
@@ -400,6 +410,20 @@ function Podcast() {
         audioPlayerRef.current.onended = () => {
           setIsPlaying(false)
           setStatusMessage("Go ahead, I'm listening")
+
+          // [Phase 1] AUTO-RESUME DAILY BRIEF AFTER Q&A
+          if (shouldAutoResume.current && briefAudioRef.current) {
+            console.log("[auto-resume] Q&A finished, resuming daily brief")
+            setAudioMode('RESUMING_BRIEF')
+            setTimeout(() => {
+              briefAudioRef.current.currentTime = savedBriefPosition.current
+              briefAudioRef.current.play()
+              setBriefAudioPlaying(true)
+              setAudioMode('PLAYING_BRIEF')
+              shouldAutoResume.current = false
+              console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
+            }, 500)  // Small delay for smooth transition
+          }
         }
 
         audioPlayerRef.current.onerror = (e) => {
@@ -426,6 +450,18 @@ function Podcast() {
     try {
       preventAutoPlayRef.current = true
       console.log("[recording] preventAutoPlay flag set to TRUE")
+
+      // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A
+      if (briefAudioRef.current && briefAudioPlaying) {
+        console.log("[auto-resume] Daily brief is playing, pausing for Q&A")
+        const currentPosition = briefAudioRef.current.currentTime
+        savedBriefPosition.current = currentPosition
+        shouldAutoResume.current = true
+        briefAudioRef.current.pause()
+        setBriefAudioPlaying(false)
+        setAudioMode('PAUSED_FOR_QA')
+        console.log(`[auto-resume] Saved brief position: ${currentPosition}s`)
+      }
 
       if (isPlaying) {
         stopPlayback()
