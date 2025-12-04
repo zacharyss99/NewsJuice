@@ -62,6 +62,13 @@ export function useVAD(options = {}) {
           redemptionFrames: options.redemptionFrames || 8,
           preSpeechPadFrames: options.preSpeechPadFrames || 1,
 
+          // Audio constraints - CRITICAL for preventing audio feedback
+          additionalAudioConstraints: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+
           // Asset paths - load from public directory
           baseAssetPath: '/',
           onnxWASMBasePath: '/',
