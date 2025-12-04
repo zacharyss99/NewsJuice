@@ -13,3 +13,6 @@ logs/*.log
 **/.env.local
 **/OLD/
 
+services/deployment/pulumi-plugins/
+services/deployment/pulumi-plugins/
+services/deployment/pulumi-plugins/
