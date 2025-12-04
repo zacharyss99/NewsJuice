@@ -41,7 +41,7 @@ from google.genai import types
 # Langchain
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_experimental.text_splitter import SemanticChunker
+#from langchain_experimental.text_splitter import SemanticChunker
 
 # source: https://api.python.langchain.com/en/latest/text_splitter/langchain_experimental.text_splitter.SemanticChunker.html
 
@@ -159,23 +159,23 @@ def chunk_embed_load(method="char-split"):
     # Prepare semantic splitter once (if requested)
     sem_splitter = None
     processed_count = 0
-    if method == "semantic-split":
+    #if method == "semantic-split":
         # ============== CHANGE 7: LOG SEMANTIC SPLITTER INIT ==============
-        logger.info("Initializing semantic splitter with VertexEmbeddings")
+    #    logger.info("Initializing semantic splitter with VertexEmbeddings")
         # ==================================================================
-        emb = VertexEmbeddings()
+     #   emb = VertexEmbeddings()
         # sem_splitter = SemanticChunker(embeddings=emb)
         # NEW VERSION WITH ALL PARAMETERS SET EXPLICITLY
-        sem_splitter = SemanticChunker(
-            embeddings=emb,
-            breakpoint_threshold_type="percentile",
-            breakpoint_threshold_amount=90,
-            min_chunk_size=None,
+     #   sem_splitter = SemanticChunker(
+      #      embeddings=emb,
+       #     breakpoint_threshold_type="percentile",
+        #    breakpoint_threshold_amount=90,
+         #   min_chunk_size=None,
             # max_chunk_size=None,
             # embedding_batch_size=100
-        )
+        #)
         # ============== CHANGE 8: LOG SPLITTER READY ==============
-        logger.info("Semantic splitter initialized successfully")
+        #logger.info("Semantic splitter initialized successfully")
         # ==========================================================
 
     # FE - Use this when using VERTEX AI for final embedding

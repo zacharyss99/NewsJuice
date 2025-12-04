@@ -23,7 +23,7 @@ from langchain.text_splitter import (
     CharacterTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from langchain_experimental.text_splitter import SemanticChunker
+#from langchain_experimental.text_splitter import SemanticChunker
 from pgvector.psycopg import register_vector
 
 logger = logging.getLogger(__name__)
@@ -237,18 +237,18 @@ class RecursiveChunking(ChunkingStrategy):
         return [d.page_content for d in docs]
 
 
-class SemanticChunking(ChunkingStrategy):
-    """Semantic-based text splitting"""
-
-    def __init__(self, embeddings: VertexEmbeddings):
-        logger.info("Initializing semantic splitter with VertexEmbeddings")
-        self.splitter = SemanticChunker(
-            embeddings=embeddings,
-            breakpoint_threshold_type="percentile",
-            breakpoint_threshold_amount=90,
-            min_chunk_size=None,
-        )
-        logger.info("Semantic splitter initialized successfully")
+#class SemanticChunking(ChunkingStrategy):
+#    """Semantic-based text splitting"""
+#
+#    def __init__(self, embeddings: VertexEmbeddings):
+#        logger.info("Initializing semantic splitter with VertexEmbeddings")
+#        self.splitter = SemanticChunker(
+#            embeddings=embeddings,
+#            breakpoint_threshold_type="percentile",
+#            breakpoint_threshold_amount=90,
+#            min_chunk_size=None,
+#        )
+#        logger.info("Semantic splitter initialized successfully")
 
     def chunk_text(self, text: str) -> List[str]:
         docs = self.splitter.create_documents([text or ""])
@@ -266,9 +266,10 @@ def get_chunking_strategy(
     }
 
     if method == "semantic-split":
-        if embeddings is None:
-            raise ValueError("Semantic chunking requires embeddings")
-        return SemanticChunking(embeddings)
+            #raise ValueError("Semantic chunking requires embeddings")
+        ##if embeddings is None:
+        #return SemanticChunking(embeddings)
+        pass
     elif method in strategies:
         return strategies[method]()
     else:
