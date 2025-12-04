@@ -5,12 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    open: true,
-    // Add headers for WASM files
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin'
-    }
+    open: true
+    // Removed CORS headers - they blocked Google Cloud Storage audio files
+    // VAD now loads locally, so we don't need strict cross-origin policies
   },
   // Only exclude ONNX Runtime from pre-bundling
   // VAD packages need to be pre-bundled to convert CommonJS to ESM

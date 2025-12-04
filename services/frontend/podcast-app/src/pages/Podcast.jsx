@@ -4,7 +4,7 @@ import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
-import { useMicVAD } from '@ricky0123/vad-react'
+import { useVAD } from '../hooks/useVAD'
 
 function Podcast() {
   const navigate = useNavigate()
@@ -45,31 +45,60 @@ function Podcast() {
   const savedBriefPosition = useRef(0)  // Saves playback position when pausing for Q&A
   const shouldAutoResume = useRef(false)  // Flag to auto-resume after Q&A
 
-  // ========== VOICE ACTIVITY DETECTION (Phase 2) ==========
-  const [vadEnabled, setVadEnabled] = useState(false) //VAD on/off toggle for the user
-  const [vadReady, setVadReady] = useState(false) // VAD model loaded in and ready, tracks if ML model finished loading
-  const vadRef = useRef(null) //vadRef is the reference to VAD instance so we can control it
+  // ========== VOICE ACTIVITY DETECTION (Phase 2 - CDN Implementation) ==========
+  const [vadEnabled, setVadEnabled] = useState(false) // VAD on/off toggle for the user
+
+  // Refs to track current playback state (fixes React closure issue)
+  const briefAudioPlayingRef = useRef(false)
+  const audioModeRef = useRef('IDLE')
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    briefAudioPlayingRef.current = briefAudioPlaying
+  }, [briefAudioPlaying])
+
+  useEffect(() => {
+    audioModeRef.current = audioMode
+  }, [audioMode])
 
   // Handle voice interruption when VAD detects speech
   const handleVoiceInterruption = () => {
     console.log('[vad] Voice detected! Interrupting daily brief for Q&A')
+    console.log('[vad] Current state - briefAudioPlaying:', briefAudioPlayingRef.current, 'audioMode:', audioModeRef.current)
 
-    // Only interrupt if daily brief is currently playing
-    if (!briefAudioPlaying || audioMode !== 'PLAYING_BRIEF') {
+    // Only interrupt if daily brief is currently playing (use refs for current values)
+    if (!briefAudioPlayingRef.current || audioModeRef.current !== 'PLAYING_BRIEF') {
       console.log('[vad] Ignoring - brief not playing or wrong mode')
+      console.log('[vad] Debug: briefAudioPlaying =', briefAudioPlayingRef.current, ', audioMode =', audioModeRef.current)
       return
     }
 
     // Pause VAD while we handle Q&A
-    if (vadRef.current) {
-      vadRef.current.pause()
-      console.log('[vad] VAD paused')
+    if (vad) {
+      vad.pause()
+      console.log('[vad] VAD paused for Q&A')
     }
 
     // Start recording the user's question
     // Note: startRecording() will auto-pause the daily brief (Phase 1 logic)
     startRecording()
   }
+
+  // Initialize VAD using our custom hook (loaded from CDN)
+  const vad = useVAD({
+    onSpeechStart: handleVoiceInterruption,
+    onSpeechEnd: () => {
+      console.log('[vad] Speech ended')
+    },
+    onVADMisfire: () => {
+      console.log('[vad] False positive detected')
+    },
+    positiveSpeechThreshold: 0.8,
+    minSpeechFrames: 3,
+    redemptionFrames: 8,
+    preSpeechPadFrames: 1,
+    startOnLoad: false // Don't auto-start, we'll control it manually
+  })
 
   // ========== EMOJI/LOGO MAPPINGS ==========
   const TOPIC_EMOJIS = {
@@ -93,61 +122,6 @@ function Podcast() {
     'Harvard Magazine': '📖',
     'Harvard Kennedy School': '🏛️'
   }
-
-  // adding the VAD HOOK
-  const vad = useMicVAD({
-    startOnLoad: false, 
-
-    onSpeechStart: () => { //onSpeechStart is a callback when VAD detects voice, triggers Q&A
-      console.log('[vad] Speech detected!')
-      handleVoiceInterruption()
-    },
-    onSpeechEnd: () => { //when user stops talking
-    console.log('[vad] Speech ended')
-  },
-  
-  onVADMisfire: () => {
-    console.log('[vad] False positive detected')
-  },
-  
-  // Tuning parameters to control how confident VAD must be to trigger
-  positiveSpeechThreshold: 0.8,
-
-  // Asset paths - tell VAD where to find model and worklet files
-  baseAssetPath: '/',  // Public directory root
-  onnxWASMBasePath: '/',  // ONNX Runtime WASM files location
-
-  // Configure ONNX Runtime to use WASM files from public directory
-  ortConfig: (ort) => {
-    // Set WASM paths to root (public directory)
-    ort.env.wasm.wasmPaths = '/'
-    // Use 1 thread for stability
-    ort.env.wasm.numThreads = 1
-  },
-
-  // Debug
-  onFrameProcessed: (probabilities) => {
-    // Uncomment to see real-time speech probability
-    // console.log('[vad] Speech probability:', probabilities.isSpeech)
-  }
-  })
-
-  // Track VAD readiness and store instance in ref
-  // React Explanation: useEffect is a hook that runs side effects after render
-  // This runs whenever vad.loading, vad.errored, or vad.listening changes
-  useEffect(() => {
-    // Store VAD instance in ref so we can access it from other functions
-    vadRef.current = vad
-
-    if (vad.loading) {
-      console.log('[vad] Loading model...')
-    } else if (vad.errored) {
-      console.error('[vad] Error loading model:', vad.errored)
-    } else if (vad.listening) {
-      setVadReady(true)
-      console.log('[vad] Ready and listening')
-    }
-  }, [vad, vad.loading, vad.errored, vad.listening])
 
   // ========== API HELPER ==========
   const getApiUrl = () => {
@@ -227,6 +201,9 @@ function Podcast() {
 
       const data = await response.json()
       console.log('[daily-brief] Loaded latest:', data)
+      console.log('[daily-brief] Has audio_url?', !!data.audio_url)
+      console.log('[daily-brief] Has podcast_text?', !!data.podcast_text)
+      console.log('[daily-brief] Text length:', data.podcast_text?.length || 0)
       return data
     } catch (error) {
       console.error('[daily-brief] Error loading latest:', error)
@@ -254,6 +231,9 @@ function Podcast() {
 
       const data = await response.json()
       console.log('[daily-brief] Generated:', data)
+      console.log('[daily-brief] Has audio_url?', !!data.audio_url)
+      console.log('[daily-brief] Has podcast_text?', !!data.podcast_text)
+      console.log('[daily-brief] Text length:', data.podcast_text?.length || 0)
 
       setDailyBrief(data)
       setIsGeneratingBrief(false)
@@ -308,8 +288,8 @@ function Podcast() {
         shouldAutoResume.current = false  // Brief finished naturally, no auto-resume needed
 
         // [Phase 2] Pause VAD when brief finishes naturally
-        if (vadEnabled && vadRef.current) {
-          vadRef.current.pause()
+        if (vadEnabled && vad && !vad.loading) {
+          vad.pause()
           console.log('[vad] Paused - brief finished')
         }
       }
@@ -322,8 +302,8 @@ function Podcast() {
       setAudioMode('IDLE')
 
       // [Phase 2] Pause VAD when user manually pauses brief
-      if (vadEnabled && vadRef.current) {
-        vadRef.current.pause()
+      if (vadEnabled && vad && !vad.loading) {
+        vad.pause()
         console.log('[vad] Paused - user paused brief')
       }
     } else {
@@ -333,8 +313,8 @@ function Podcast() {
       setAudioMode('PLAYING_BRIEF')
 
       // [Phase 2] Start VAD when brief starts playing (if VAD is enabled)
-      if (vadEnabled && vadRef.current && vadReady) {
-        vadRef.current.start()
+      if (vadEnabled && vad && !vad.loading && !vad.errored) {
+        vad.start()
         console.log('[vad] Started - brief playing, listening for voice')
       }
     }
@@ -526,8 +506,8 @@ function Podcast() {
               console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
 
               // [Phase 2] Restart VAD when brief resumes (if VAD is enabled)
-              if (vadEnabled && vadRef.current && vadReady) {
-                vadRef.current.start()
+              if (vadEnabled && vad && !vad.loading && !vad.errored) {
+                vad.start()
                 console.log('[vad] Restarted - brief resumed, listening for voice again')
               }
             }, 500)  // Small delay for smooth transition
@@ -559,8 +539,8 @@ function Podcast() {
       preventAutoPlayRef.current = true
       console.log("[recording] preventAutoPlay flag set to TRUE")
 
-      // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A
-      if (briefAudioRef.current && briefAudioPlaying) {
+      // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A (using ref to avoid stale closure)
+      if (briefAudioRef.current && briefAudioPlayingRef.current) {
         console.log("[auto-resume] Daily brief is playing, pausing for Q&A")
         const currentPosition = briefAudioRef.current.currentTime
         savedBriefPosition.current = currentPosition
@@ -569,6 +549,8 @@ function Podcast() {
         setBriefAudioPlaying(false)
         setAudioMode('PAUSED_FOR_QA')
         console.log(`[auto-resume] Saved brief position: ${currentPosition}s`)
+      } else {
+        console.log("[auto-resume] Brief not playing, skipping pause")
       }
 
       if (isPlaying) {
@@ -716,6 +698,26 @@ function Podcast() {
 
     setIsPlaying(false)
     setStatusMessage("Go ahead, I'm listening")
+
+    // [Phase 2] If user manually stops Q&A, resume daily brief
+    if (shouldAutoResume.current && briefAudioRef.current) {
+      console.log("[manual-stop] User stopped Q&A, resuming daily brief")
+      setAudioMode('RESUMING_BRIEF')
+      setTimeout(() => {
+        briefAudioRef.current.currentTime = savedBriefPosition.current
+        briefAudioRef.current.play()
+        setBriefAudioPlaying(true)
+        setAudioMode('PLAYING_BRIEF')
+        shouldAutoResume.current = false
+        console.log(`[manual-stop] Resumed daily brief at ${savedBriefPosition.current}s`)
+
+        // Restart VAD if enabled
+        if (vadEnabled && vad && !vad.loading && !vad.errored) {
+          vad.start()
+          console.log('[vad] Restarted - brief resumed after manual Q&A stop')
+        }
+      }, 300)
+    }
   }
 
   // Handle call button
