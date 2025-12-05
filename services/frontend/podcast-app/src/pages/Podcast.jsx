@@ -1,12 +1,25 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles } from 'lucide-react'
+import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
 
 function Podcast() {
   const navigate = useNavigate()
+
+  // ========== DAILY BRIEF STATE ==========
+  const [dailyBrief, setDailyBrief] = useState(null)
+  const [isGeneratingBrief, setIsGeneratingBrief] = useState(false)
+  const [isLoadingBrief, setIsLoadingBrief] = useState(false)
+  const [briefAudioPlaying, setBriefAudioPlaying] = useState(false)
+  const [briefAudioProgress, setBriefAudioProgress] = useState(0)
+  const [briefAudioDuration, setBriefAudioDuration] = useState(0)
+  const [userTopics, setUserTopics] = useState([])
+  const [userSources, setUserSources] = useState([])
+  const briefAudioRef = useRef(null)
+
+  // ========== Q&A STATE (EXISTING) ==========
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [statusMessage, setStatusMessage] = useState("Go ahead, I'm listening")
@@ -14,7 +27,7 @@ function Podcast() {
   const [showOrbSelector, setShowOrbSelector] = useState(false)
   const [selectedOrb, setSelectedOrb] = useState(1)
 
-  // WebSocket and audio refs
+  // WebSocket and audio refs (EXISTING)
   const wsRef = useRef(null)
   const audioContextRef = useRef(null)
   const mediaStreamRef = useRef(null)
@@ -22,36 +35,233 @@ function Podcast() {
   const audioBufferRef = useRef([])
   const audioPlayerRef = useRef(null)
   const isStreamingAudioRef = useRef(false)
-  const isRecordingRef = useRef(false) // Use ref for audio processor to avoid state timing issues
+  const isRecordingRef = useRef(false)
+  const currentAudioUrlRef = useRef(null)
+  const preventAutoPlayRef = useRef(false)
 
-  const newsTopics = [
-    "Women's Volleyball",
-    "Cutting-Edge AI",
-    "Job Market Trends",
-    "Climate Action",
-    "Space Exploration"
-  ]
+  // ========== UNIFIED AUDIO STATE (Phase 1) ==========
+  const [audioMode, setAudioMode] = useState('IDLE')  // IDLE, PLAYING_BRIEF, PAUSED_FOR_QA, PLAYING_QA, RESUMING_BRIEF
+  const savedBriefPosition = useRef(0)  // Saves playback position when pausing for Q&A
+  const shouldAutoResume = useRef(false)  // Flag to auto-resume after Q&A
 
-  const sources = [
-    {
-      title: "Trump Administration Bars Harvard from Enrolling Foreign Students",
-      source: "AP",
-      domain: "apnews.com",
-      date: "August 12th, 2025"
-    },
-    {
-      title: "Harvard Students Protest the Admissions Office Protesting the New Legislation",
-      source: "CNN",
-      domain: "thecnn.com",
-      date: "August 7th, 2024"
+  // ========== EMOJI/LOGO MAPPINGS ==========
+  const TOPIC_EMOJIS = {
+    'Politics': '🏛️',
+    'Technology': '💻',
+    'Health': '🏥',
+    'Business': '💼',
+    'Sports': '⚽',
+    'Entertainment': '🎬',
+    'Campus Life': '🎓',
+    'Research': '🔬'
+  }
+
+  const SOURCE_LOGOS = {
+    'Harvard Gazette': '🏛️',
+    'Harvard Crimson': '🗞️',
+    'Harvard Medical School': '⚕️',
+    'Harvard SEAS': '⚙️',
+    'Harvard Law School': '⚖️',
+    'Harvard Business School': '💼',
+    'Harvard Magazine': '📖',
+    'Harvard Kennedy School': '🏛️'
+  }
+
+  // ========== API HELPER ==========
+  const getApiUrl = () => {
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    return isProduction
+      ? 'https://chatter-919568151211.us-central1.run.app'
+      : 'http://localhost:8080'
+  }
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('auth_token')
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
     }
-  ]
+  }
+
+  // ========== DAILY BRIEF FUNCTIONS ==========
+
+  // Load user preferences (topics and sources)
+  const loadUserPreferences = async () => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/user/preferences`, {
+        headers: getAuthHeaders()
+      })
+
+      if (!response.ok) {
+        console.error('[preferences] Failed to load:', response.status)
+        return
+      }
+
+      const data = await response.json()
+      console.log('[preferences] Loaded:', data)
+
+      // Parse JSON arrays from preference_value strings
+      const topics = data.topics ? JSON.parse(data.topics) : []
+      const sources = data.sources ? JSON.parse(data.sources) : []
+
+      setUserTopics(topics)
+      setUserSources(sources)
+    } catch (error) {
+      console.error('[preferences] Error loading:', error)
+    }
+  }
+
+  // Check if daily brief was generated today
+  const checkDailyBriefStatus = async () => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/daily-brief/status`, {
+        headers: getAuthHeaders()
+      })
+
+      if (!response.ok) {
+        console.error('[daily-brief] Status check failed:', response.status)
+        return false
+      }
+
+      const data = await response.json()
+      return data.generated_today
+    } catch (error) {
+      console.error('[daily-brief] Error checking status:', error)
+      return false
+    }
+  }
+
+  // Load latest daily brief from history
+  const loadLatestDailyBrief = async () => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/daily-brief/latest`, {
+        headers: getAuthHeaders()
+      })
+
+      if (!response.ok) {
+        console.error('[daily-brief] Failed to load latest:', response.status)
+        return null
+      }
+
+      const data = await response.json()
+      console.log('[daily-brief] Loaded latest:', data)
+      return data
+    } catch (error) {
+      console.error('[daily-brief] Error loading latest:', error)
+      return null
+    }
+  }
+
+  // Generate new daily brief
+  const generateDailyBrief = async () => {
+    setIsGeneratingBrief(true)
+
+    try {
+      console.log('[daily-brief] Generating...')
+
+      const response = await fetch(`${getApiUrl()}/api/daily-brief`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
+
+      if (!response.ok) {
+        console.error('[daily-brief] Generation failed:', response.status)
+        setIsGeneratingBrief(false)
+        return
+      }
+
+      const data = await response.json()
+      console.log('[daily-brief] Generated:', data)
+
+      setDailyBrief(data)
+      setIsGeneratingBrief(false)
+    } catch (error) {
+      console.error('[daily-brief] Error generating:', error)
+      setIsGeneratingBrief(false)
+    }
+  }
+
+  // Check and auto-generate daily brief if needed
+  const checkAndGenerateDailyBrief = async () => {
+    console.log('[daily-brief] Checking if generation needed...')
+    setIsLoadingBrief(true)
+
+    const generatedToday = await checkDailyBriefStatus()
+
+    if (generatedToday) {
+      console.log('[daily-brief] Already generated today, loading latest...')
+      const latest = await loadLatestDailyBrief()
+      if (latest) {
+        setDailyBrief(latest)
+      }
+      setIsLoadingBrief(false)
+    } else {
+      console.log('[daily-brief] Not generated today, auto-generating...')
+      setIsLoadingBrief(false)
+      await generateDailyBrief()
+    }
+  }
+
+  // Play daily brief audio
+  const playDailyBrief = () => {
+    if (!dailyBrief || !dailyBrief.audio_url) {
+      console.warn('[daily-brief] No audio URL available')
+      return
+    }
+
+    if (!briefAudioRef.current) {
+      briefAudioRef.current = new Audio(dailyBrief.audio_url)
+
+      // Update progress
+      briefAudioRef.current.ontimeupdate = () => {
+        setBriefAudioProgress(briefAudioRef.current.currentTime)
+        setBriefAudioDuration(briefAudioRef.current.duration)
+      }
+
+      // Reset on end
+      briefAudioRef.current.onended = () => {
+        setBriefAudioPlaying(false)
+        setBriefAudioProgress(0)
+        setAudioMode('IDLE')
+        shouldAutoResume.current = false  // Brief finished naturally, no auto-resume needed
+      }
+    }
+
+    if (briefAudioPlaying) {
+      briefAudioRef.current.pause()
+      setBriefAudioPlaying(false)
+      setAudioMode('IDLE')
+    } else {
+      briefAudioRef.current.play()
+      setBriefAudioPlaying(true)
+      setAudioMode('PLAYING_BRIEF')
+    }
+  }
+
+  // Format date for display
+  const formatDate = (timestamp) => {
+    if (!timestamp) return ''
+
+    const date = new Date(timestamp)
+    const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
+    return date.toLocaleDateString('en-US', options)
+  }
+
+  // Format time for audio player (MM:SS)
+  const formatTime = (seconds) => {
+    if (isNaN(seconds)) return '0:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // ========== Q&A FUNCTIONS (EXISTING) ==========
 
   // WebSocket URL
   const getWebSocketUrl = () => {
     const isProduction = window.location.hostname.includes('newsjuiceapp.com')
     const protocol = isProduction ? 'wss' : 'ws'
-    const host = isProduction 
+    const host = isProduction
       ? 'chatter-919568151211.us-central1.run.app'
       : 'localhost:8080'
     const token = localStorage.getItem('auth_token')
@@ -62,29 +272,27 @@ function Podcast() {
   const connectWebSocket = () => {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(getWebSocketUrl())
-      
+
       ws.onopen = () => {
         console.log("[ws] Connected")
         wsRef.current = ws
         resolve()
       }
-      
+
       ws.onerror = (error) => {
         console.error("[ws] Error:", error)
         reject(error)
       }
-      
+
       ws.onclose = () => {
         console.log("[ws] Disconnected")
         wsRef.current = null
       }
-      
+
       ws.onmessage = async (event) => {
         if (event.data instanceof Blob) {
-          // Received audio bytes
           handleAudioChunk(event.data)
         } else {
-          // Received JSON status message
           try {
             const data = JSON.parse(event.data)
             handleStatusMessage(data)
@@ -99,7 +307,7 @@ function Podcast() {
   // Handle status messages from backend
   const handleStatusMessage = (data) => {
     const status = data.status
-    
+
     switch(status) {
       case "chunk_received":
         break
@@ -145,90 +353,131 @@ function Podcast() {
       console.log("[audio] Starting to accumulate audio chunks")
       isStreamingAudioRef.current = true
     }
-    
+
     audioBufferRef.current.push(chunk)
     console.log(`[audio] Accumulated ${audioBufferRef.current.length} chunks (${chunk.size} bytes)`)
   }
 
   // Finalize and play audio
   const finalizeAudio = () => {
+    if (isRecordingRef.current || preventAutoPlayRef.current) {
+      console.log("[audio] Skipping audio playback - recording in progress or auto-play prevented")
+      audioBufferRef.current = []
+      isStreamingAudioRef.current = false
+      return
+    }
+
     if (audioBufferRef.current.length === 0) {
       console.warn("[audio] No audio chunks to finalize")
       return
     }
-    
+
     console.log(`[audio] Finalizing audio: ${audioBufferRef.current.length} chunks`)
-    
+
+    if (currentAudioUrlRef.current) {
+      console.log("[audio] Revoking previous audio URL")
+      URL.revokeObjectURL(currentAudioUrlRef.current)
+      currentAudioUrlRef.current = null
+    }
+
     const mimeTypes = ['audio/wav', 'audio/wave', 'audio/x-wav']
-    
+
     for (const mimeType of mimeTypes) {
       try {
         const audioBlob = new Blob(audioBufferRef.current, { type: mimeType })
         const audioUrl = URL.createObjectURL(audioBlob)
-        
-        // Create audio element if it doesn't exist
+
+        currentAudioUrlRef.current = audioUrl
+
         if (!audioPlayerRef.current) {
           audioPlayerRef.current = new Audio()
         }
-        
+
         audioPlayerRef.current.src = audioUrl
         audioPlayerRef.current.oncanplay = () => {
+          if (isRecordingRef.current || preventAutoPlayRef.current) {
+            console.log("[audio] oncanplay - Skipping playback, recording active")
+            return
+          }
           console.log("[audio] Audio can play, attempting autoplay")
           setIsPlaying(true)
+          setAudioMode('PLAYING_QA')  // [Phase 1] Set mode to PLAYING_QA
           audioPlayerRef.current.play().catch((err) => {
             console.warn("[audio] Autoplay blocked:", err)
           })
         }
-        
+
         audioPlayerRef.current.onended = () => {
           setIsPlaying(false)
           setStatusMessage("Go ahead, I'm listening")
-          URL.revokeObjectURL(audioUrl)
+
+          // [Phase 1] AUTO-RESUME DAILY BRIEF AFTER Q&A
+          if (shouldAutoResume.current && briefAudioRef.current) {
+            console.log("[auto-resume] Q&A finished, resuming daily brief")
+            setAudioMode('RESUMING_BRIEF')
+            setTimeout(() => {
+              briefAudioRef.current.currentTime = savedBriefPosition.current
+              briefAudioRef.current.play()
+              setBriefAudioPlaying(true)
+              setAudioMode('PLAYING_BRIEF')
+              shouldAutoResume.current = false
+              console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
+            }, 500)  // Small delay for smooth transition
+          }
         }
-        
+
         audioPlayerRef.current.onerror = (e) => {
           console.error(`[audio] Error playing audio with ${mimeType}:`, e)
         }
-        
+
         break
       } catch (e) {
         console.warn(`[audio] Failed to create blob with ${mimeType}:`, e)
       }
     }
-    
-    // Reset for next recording
+
     audioBufferRef.current = []
     isStreamingAudioRef.current = false
   }
 
   // Start recording
   const startRecording = async () => {
-    // Prevent starting a new recording if already recording (check both state and ref)
     if (isRecording || isRecordingRef.current) {
       console.log("[recording] Already recording, ignoring start request")
       return
     }
-    
+
     try {
-      // Stop any ongoing playback
+      preventAutoPlayRef.current = true
+      console.log("[recording] preventAutoPlay flag set to TRUE")
+
+      // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A
+      if (briefAudioRef.current && briefAudioPlaying) {
+        console.log("[auto-resume] Daily brief is playing, pausing for Q&A")
+        const currentPosition = briefAudioRef.current.currentTime
+        savedBriefPosition.current = currentPosition
+        shouldAutoResume.current = true
+        briefAudioRef.current.pause()
+        setBriefAudioPlaying(false)
+        setAudioMode('PAUSED_FOR_QA')
+        console.log(`[auto-resume] Saved brief position: ${currentPosition}s`)
+      }
+
       if (isPlaying) {
         stopPlayback()
       }
 
-      // If WebSocket exists but is not open, close it and create a new one
       if (wsRef.current && wsRef.current.readyState !== WebSocket.OPEN) {
         console.log("[recording] WebSocket not open, closing and reconnecting...")
         wsRef.current.close()
         wsRef.current = null
       }
 
-      // Connect WebSocket
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         setStatusMessage("Connecting...")
         await connectWebSocket()
       }
 
-      // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -241,19 +490,16 @@ function Podcast() {
 
       mediaStreamRef.current = stream
 
-      // Create AudioContext
       const AudioContext = window.AudioContext || window.webkitAudioContext
       const audioContext = new AudioContext()
       audioContextRef.current = audioContext
 
       const source = audioContext.createMediaStreamSource(stream)
 
-      // Create ScriptProcessorNode to capture audio
       const bufferSize = 4096
       const processor = audioContext.createScriptProcessor(bufferSize, 1, 1)
 
       processor.onaudioprocess = (e) => {
-        // Use ref instead of state to avoid timing issues
         if (!isRecordingRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
           return
         }
@@ -261,13 +507,11 @@ function Podcast() {
         const inputData = e.inputBuffer.getChannelData(0)
         const pcmData = new Int16Array(inputData.length)
 
-        // Convert float32 to int16 PCM
         for (let i = 0; i < inputData.length; i++) {
           const sample = Math.max(-1, Math.min(1, inputData[i]))
           pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF
         }
 
-        // Send audio chunk to backend
         try {
           wsRef.current.send(pcmData.buffer)
           console.log(`[recording] Sent audio chunk: ${pcmData.buffer.byteLength} bytes`)
@@ -280,7 +524,6 @@ function Podcast() {
       source.connect(processor)
       processor.connect(audioContext.destination)
 
-      // Set both state and ref
       isRecordingRef.current = true
       setIsRecording(true)
       setStatusMessage("Listening...")
@@ -291,117 +534,78 @@ function Podcast() {
     }
   }
 
-  // [Z] below is the old Stop recording function; implementing new functionality
-  // // Stop recording
-  // const stopRecording = () => {
-  //   console.log("[recording] Stopping recording...")
-    
-  //   // Wait a bit to ensure last chunks are sent before stopping
-  //   setTimeout(() => {
-  //     // Stop the recording flag (ref) to stop sending new chunks
-  //     isRecordingRef.current = false
-      
-  //     // Wait a bit more for any in-flight chunks to be sent
-  //     setTimeout(() => {
-  //       // Disconnect processor to stop audio capture
-  //       if (processorRef.current) {
-  //         processorRef.current.disconnect()
-  //         processorRef.current = null
-  //       }
-
-  //       // Stop media stream
-  //       if (mediaStreamRef.current) {
-  //         mediaStreamRef.current.getTracks().forEach(track => track.stop())
-  //         mediaStreamRef.current = null
-  //       }
-
-  //       // Close audio context
-  //       if (audioContextRef.current) {
-  //         audioContextRef.current.close()
-  //         audioContextRef.current = null
-  //       }
-
-  //       // Update UI state
-  //       setIsRecording(false)
-
-  //       // Send complete signal to backend
-  //       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-  //         console.log("[recording] Sending complete signal to backend")
-  //         wsRef.current.send(JSON.stringify({ type: "complete" }))
-  //         setStatusMessage("Processing...")
-  //       } else {
-  //         console.error("[recording] WebSocket not ready! State:", wsRef.current?.readyState)
-  //         setStatusMessage("Error: Connection not ready")
-  //       }
-  //     }, 200) // Additional delay for in-flight chunks
-  //   }, 200) // Initial delay before stopping recording flag
-  // }
-
-  // [Z] new stop recording functionality
+  // Stop recording
   const stopRecording = () => {
-  console.log("[recording] Stopping recording...")
-  
-  // IMPORTANT: Set ref to false immediately so next startRecording() can proceed
-  isRecordingRef.current = false
-  
-  // Wait a bit to ensure last chunks are sent before disconnecting audio
-  setTimeout(() => {
-    // Disconnect processor to stop audio capture
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
+    console.log("[recording] Stopping recording...")
 
-    // Stop media stream
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop())
-      mediaStreamRef.current = null
-    }
+    isRecordingRef.current = false
 
-    // Close audio context
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
+    setTimeout(() => {
+      preventAutoPlayRef.current = false
+      console.log("[recording] preventAutoPlay flag reset to FALSE - next podcast can auto-play")
+    }, 500)
 
-    // Update UI state
-    setIsRecording(false)
-
-    // Send complete signal to backend ONLY if WebSocket is open
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log("[recording] Sending complete signal to backend")
-      wsRef.current.send(JSON.stringify({ type: "complete" }))
-      setStatusMessage("Processing...")
-    } else {
-      // WebSocket not ready - this might happen if you released the button too quickly
-      console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
-      
-      // If there's no WebSocket or it's closed, reset to listening state
-      if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-        setStatusMessage("Go ahead, I'm listening")
-      } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
-        // Still connecting - wait for it to open, then send complete signal
-        setStatusMessage("Connecting...")
-        const originalWs = wsRef.current
-        
-        originalWs.addEventListener('open', () => {
-          if (wsRef.current === originalWs && originalWs.readyState === WebSocket.OPEN) {
-            console.log("[recording] WebSocket opened after delay, sending complete signal")
-            originalWs.send(JSON.stringify({ type: "complete" }))
-            setStatusMessage("Processing...")
-          }
-        }, { once: true })
+    setTimeout(() => {
+      if (processorRef.current) {
+        processorRef.current.disconnect()
+        processorRef.current = null
       }
-    }
-  }, 200) // Single delay for cleanup
-}
+
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+      }
+
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+
+      setIsRecording(false)
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        console.log("[recording] Sending complete signal to backend")
+        wsRef.current.send(JSON.stringify({ type: "complete" }))
+        setStatusMessage("Processing...")
+      } else {
+        console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
+
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+          setStatusMessage("Go ahead, I'm listening")
+        } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
+          setStatusMessage("Connecting...")
+          const originalWs = wsRef.current
+
+          originalWs.addEventListener('open', () => {
+            if (wsRef.current === originalWs && originalWs.readyState === WebSocket.OPEN) {
+              console.log("[recording] WebSocket opened after delay, sending complete signal")
+              originalWs.send(JSON.stringify({ type: "complete" }))
+              setStatusMessage("Processing...")
+            }
+          }, { once: true })
+        }
+      }
+    }, 200)
+  }
 
   // Stop playback
   const stopPlayback = () => {
+    console.log("[playback] Stopping playback and cleaning up")
+
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause()
       audioPlayerRef.current.currentTime = 0
+      audioPlayerRef.current.src = ''
+
+      audioPlayerRef.current.onended = null
+      audioPlayerRef.current.onerror = null
     }
+
+    if (currentAudioUrlRef.current) {
+      URL.revokeObjectURL(currentAudioUrlRef.current)
+      currentAudioUrlRef.current = null
+    }
+
     setIsPlaying(false)
     setStatusMessage("Go ahead, I'm listening")
   }
@@ -417,6 +621,14 @@ function Podcast() {
       startRecording()
     }
   }
+
+  // ========== LIFECYCLE ==========
+
+  // Load preferences and daily brief on mount
+  useEffect(() => {
+    loadUserPreferences()
+    checkAndGenerateDailyBrief()
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -436,8 +648,13 @@ function Podcast() {
       if (audioPlayerRef.current) {
         audioPlayerRef.current.pause()
       }
+      if (briefAudioRef.current) {
+        briefAudioRef.current.pause()
+      }
     }
   }, [])
+
+  // ========== UI HELPERS ==========
 
   const handleOrbSelection = (orbId) => {
     if (orbId !== null) {
@@ -456,6 +673,8 @@ function Podcast() {
 
   const SelectedOrbComponent = getOrbComponent()
 
+  // ========== RENDER ==========
+
   return (
     <div className="min-h-screen bg-primary-darker text-white relative overflow-hidden">
       {/* Background gradient */}
@@ -469,13 +688,22 @@ function Podcast() {
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-lg font-semibold">Hi, I'm NJ</h1>
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="p-2 hover:bg-gray-800 rounded-full transition-colors"
-        >
-          <Menu size={24} />
-        </button>
+        <h1 className="text-lg font-semibold">AI Daily News Briefing</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/preferences')}
+            className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+            title="Preferences"
+          >
+            <Sliders size={24} />
+          </button>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+          >
+            <Menu size={24} />
+          </button>
+        </div>
       </div>
 
       {/* Hamburger Menu */}
@@ -535,114 +763,218 @@ function Podcast() {
         )}
       </AnimatePresence>
 
-      {/* Main Content - Split Screen Layout */}
-      <div className="relative z-10 flex flex-col lg:flex-row lg:h-[calc(100vh-80px)]">
-        {/* Right Half - Orb and Controls */}
-        <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-6 py-6 lg:py-12 relative lg:order-2 min-h-[80vh] lg:min-h-0">
-          {/* Status Message */}
-          <motion.div
-            key={statusMessage}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8 px-6 py-3 bg-gray-800/50 rounded-full border border-gray-700 backdrop-blur-sm max-w-md text-center"
-          >
-            <p className="text-sm text-gray-300">{statusMessage}</p>
-          </motion.div>
+      {/* Main Content Container */}
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-6 space-y-12">
 
-          {/* Animated Orb */}
-          <div className="mb-12 relative">
-            <SelectedOrbComponent isPlaying={isPlaying} size="large" />
-            <button
-              onClick={() => setShowOrbSelector(true)}
-              className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 rounded-full text-xs flex items-center gap-2 border border-gray-600 transition-all"
-            >
-              <Sparkles size={14} />
-              <span>Change Style</span>
-            </button>
-          </div>
-
-          {/* Call Button */}
-          <div className="flex items-center gap-6 mt-8">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              className="w-16 h-16 bg-gray-800/50 hover:bg-red-900/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-red-500 transition-all"
-            >
-              <PhoneOff size={24} className="text-red-400" />
-            </motion.button>
-
-            <motion.button
-              onClick={handleCallButton}
-              whileTap={{ scale: 0.95 }}
-              className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                isRecording
-                  ? 'bg-red-600 shadow-red-500/50'
-                  : 'bg-gradient-to-br from-primary-pink to-pink-600 shadow-primary-pink/50'
-              }`}
-            >
-              {isRecording ? <Mic size={32} className="animate-pulse" /> : <Phone size={32} />}
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              className="w-16 h-16 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 transition-all"
-            >
-              <MicOff size={24} className="text-gray-400" />
-            </motion.button>
-          </div>
-
-          {/* Instructions */}
-          <div className="mt-8 text-center text-gray-500 text-sm max-w-md">
-            <p>Click the call button to start recording, click again to send</p>
-          </div>
-        </div>
-
-        {/* Left Half - News and Sources */}
-        <div className="w-full lg:w-1/2 px-6 py-6 overflow-y-auto lg:order-1">
-          {/* News Topics */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">News</h2>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {newsTopics.map((topic, index) => (
-                <button
-                  key={index}
-                  className="px-6 py-3 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-sm whitespace-nowrap border border-gray-700 transition-colors"
-                >
-                  {topic}
-                </button>
-              ))}
+        {/* ========== SECTION 1: DAILY BRIEFING (PRIMARY, TOP) ========== */}
+        <section>
+          <div className="bg-gradient-to-br from-red-900/30 to-red-800/20 rounded-3xl p-8 border border-red-800/50 shadow-2xl">
+            {/* Date and Title */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 text-gray-300 mb-2">
+                <Clock size={18} />
+                <span className="text-sm">{formatDate(dailyBrief?.created_at || new Date().toISOString())}</span>
+              </div>
+              <h2 className="text-3xl font-bold">Daily News Briefing</h2>
             </div>
-          </div>
 
-          {/* Sources */}
-          <div>
-            <h2 className="text-2xl font-semibold mb-6">Sources</h2>
-            <div className="space-y-4 pb-6">
-              {sources.map((source, index) => (
-                <div
-                  key={index}
-                  className="bg-gradient-to-br from-gray-800/30 to-gray-900/30 rounded-2xl p-5 border border-gray-700 hover:border-primary-pink/30 transition-all cursor-pointer"
-                >
-                  <h3 className="font-semibold mb-2 leading-snug">{source.title}</h3>
-                  <div className="flex items-center gap-3 text-sm text-gray-400">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-red-600 rounded flex items-center justify-center text-xs font-bold">
-                        {source.source}
+            {/* Q&A Active Hint */}
+            {(isRecording || isPlaying) && dailyBrief && (
+              <div className="mb-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg text-center">
+                <p className="text-sm text-blue-300">
+                  💡 Your daily briefing is paused. Scroll up and click the play button to resume listening.
+                </p>
+              </div>
+            )}
+
+            {/* Topics */}
+            {userTopics.length > 0 && (
+              <div className="mb-6">
+                <p className="text-sm text-gray-400 mb-3">Today's coverage:</p>
+                <div className="flex flex-wrap gap-2">
+                  {userTopics.map((topic, index) => (
+                    <span
+                      key={index}
+                      className="px-4 py-2 bg-red-900/40 border border-red-700/50 rounded-full text-sm"
+                    >
+                      {TOPIC_EMOJIS[topic] || '📰'} {topic}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sources */}
+            {userSources.length > 0 && (
+              <div className="mb-6">
+                <p className="text-sm text-gray-400 mb-3">Sources for today's briefing:</p>
+                <div className="space-y-2">
+                  {userSources.map((source, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 px-4 py-2 bg-gray-800/30 rounded-lg border border-gray-700"
+                    >
+                      <span className="text-2xl">{SOURCE_LOGOS[source] || '📰'}</span>
+                      <div>
+                        <p className="font-medium text-sm">{source}</p>
+                        <p className="text-xs text-gray-500">
+                          {source.toLowerCase().replace(/\s+/g, '')}.harvard.edu
+                        </p>
                       </div>
-                      <span>{source.domain}</span>
                     </div>
-                    <span>•</span>
-                    <span>{source.date}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Generate or Play */}
+            {isLoadingBrief ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-primary-pink mb-4"></div>
+                <p className="text-gray-400">Loading today's briefing...</p>
+              </div>
+            ) : isGeneratingBrief ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-primary-pink mb-4"></div>
+                <p className="text-gray-400">Generating your personalized briefing...</p>
+              </div>
+            ) : dailyBrief ? (
+              <div className="space-y-4">
+                {/* Play Button and Progress */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={playDailyBrief}
+                    className="w-16 h-16 bg-gradient-to-br from-primary-pink to-pink-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-primary-pink/50 transition-all"
+                  >
+                    {briefAudioPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
+                  </button>
+                  <div className="flex-1">
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-pink to-pink-500 transition-all"
+                        style={{ width: `${briefAudioDuration > 0 ? (briefAudioProgress / briefAudioDuration) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <span>{formatTime(briefAudioProgress)}</span>
+                      <span>{formatTime(briefAudioDuration)}</span>
+                    </div>
                   </div>
                 </div>
-              ))}
+
+                <p className="text-center text-sm text-gray-400">
+                  {briefAudioPlaying ? "Playing your briefing..." : briefAudioRef.current ? "Click to resume briefing" : "Click to play briefing"}
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-400 mb-4">No daily brief available yet.</p>
+                <button
+                  onClick={generateDailyBrief}
+                  className="px-8 py-3 bg-gradient-to-r from-primary-pink to-pink-500 rounded-full font-semibold hover:shadow-lg hover:shadow-primary-pink/50 transition-all"
+                >
+                  Generate Daily Brief
+                </button>
+              </div>
+            )}
+
+            {/* Preferences Prompt - Only show if no preferences AND no brief exists */}
+            {userTopics.length === 0 && userSources.length === 0 && !dailyBrief && !isGeneratingBrief && (
+              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg text-center">
+                <p className="text-sm text-yellow-300 mb-2">
+                  No preferences set yet! Configure your topics and sources to get personalized briefings.
+                </p>
+                <button
+                  onClick={() => navigate('/preferences')}
+                  className="text-sm text-primary-pink hover:underline"
+                >
+                  Set Preferences →
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ========== DIVIDER ========== */}
+        <div className="border-t border-gray-800"></div>
+
+        {/* ========== SECTION 2: INTERACTIVE Q&A (SECONDARY, BELOW) ========== */}
+        <section>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-2">Ask About Today's News</h2>
+            <p className="text-gray-400">Click the microphone and speak your question</p>
+          </div>
+
+          {/* Two Column Layout: Orb on right, controls on left */}
+          <div className="flex flex-col lg:flex-row lg:gap-12 items-center">
+
+            {/* Left: Controls and Status */}
+            <div className="w-full lg:w-1/2 flex flex-col items-center lg:items-start space-y-6">
+              {/* Status Message */}
+              <motion.div
+                key={statusMessage}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full px-6 py-3 bg-gray-800/50 rounded-full border border-gray-700 backdrop-blur-sm text-center"
+              >
+                <p className="text-sm text-gray-300">{statusMessage}</p>
+              </motion.div>
+
+              {/* Call Buttons */}
+              <div className="flex items-center gap-6">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  className="w-16 h-16 bg-gray-800/50 hover:bg-red-900/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-red-500 transition-all"
+                >
+                  <PhoneOff size={24} className="text-red-400" />
+                </motion.button>
+
+                <motion.button
+                  onClick={handleCallButton}
+                  whileTap={{ scale: 0.95 }}
+                  className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                    isRecording
+                      ? 'bg-red-600 shadow-red-500/50'
+                      : 'bg-gradient-to-br from-primary-pink to-pink-600 shadow-primary-pink/50'
+                  }`}
+                >
+                  {isRecording ? <Mic size={32} className="animate-pulse" /> : <Phone size={32} />}
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  className="w-16 h-16 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 transition-all"
+                >
+                  <MicOff size={24} className="text-gray-400" />
+                </motion.button>
+              </div>
+
+              {/* Instructions */}
+              <div className="text-center lg:text-left text-gray-500 text-sm">
+                <p>Click the call button to start recording, click again to send</p>
+              </div>
+            </div>
+
+            {/* Right: Animated Orb */}
+            <div className="w-full lg:w-1/2 flex flex-col items-center mt-8 lg:mt-0">
+              <div className="relative">
+                <SelectedOrbComponent isPlaying={isPlaying} size="large" />
+                <button
+                  onClick={() => setShowOrbSelector(true)}
+                  className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 rounded-full text-xs flex items-center gap-2 border border-gray-600 transition-all"
+                >
+                  <Sparkles size={14} />
+                  <span>Change Style</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Orb Selector Modal */}
       {showOrbSelector && (
-        <OrbSelector 
+        <OrbSelector
           onSelect={handleOrbSelection}
           currentSelection={selectedOrb}
         />

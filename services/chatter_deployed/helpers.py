@@ -2,19 +2,19 @@
 HELPER FUNCTIONS (called by main.py in chatter_deployed)
 THE HELPER FUNCTIONS USED CURRENTLY ARE
 
-1. call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
+1. call_retriever_service(query: str) -> List[Tuple[int, str, str, float]]:
 ===================================================================
 Call the retriever service to get relevant articles.
 Input: query
-Returns: List of tuples: (id, chunk, score) for each matching article
+Returns: List of tuples: (id, chunk, source_type, score) for each matching article
 
 
-2. call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]] = None) ->
+2. call_gemini_api(question: str, context_articles: List[Tuple[int, str, str, float]] = None) ->
 tuple[Optional[str], Optional[str]]:
 ===================================================================================================
 Call Google Gemini LLM API with the question and context articles to generate a podcast-style
 response.
-Input: question text + tuple of relevant chunks (with id, chunk text and similarity score)
+Input: question text + tuple of relevant chunks (with id, chunk text, source_type, and similarity score)
 Output: tuple of response text + error message
 
 THE HELPER FUNCTIONS NOT YET USED ARE
@@ -45,7 +45,7 @@ if not DB_URL:
     raise RuntimeError("DATABASE_URL environment variable not set")
 
 
-def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
+def call_retriever_service(query: str) -> List[Tuple[int, str, str, float]]:
     """Call the retriever service to get relevant articles."""
     try:
         # Import the retriever function directly since we're in the same environment
@@ -55,7 +55,7 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
         from retriever import search_articles
 
         print(f"[retriever] Searching for: '{query[:50]}...'")
-        articles = search_articles(query, limit=2)
+        articles = search_articles(query, limit=10)
         print(f"[retriever] Found {len(articles)} relevant chunks")
         return articles
     except Exception as e:
@@ -64,7 +64,7 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, float]]:
 
 
 def call_gemini_api(
-    question: str, context_articles: List[Tuple[int, str, float]] = None, model=None
+    question: str, context_articles: List[Tuple[int, str, str, float]] = None, model=None
 ) -> tuple[Optional[str], Optional[str]]:
     """Call Google Gemini API with the question and context articles to generate a podcast-style
     response."""
@@ -76,48 +76,78 @@ def call_gemini_api(
         if context_articles:
             context_text = "\n\n".join(
                 [
-                    f"News Article {i+1} (Relevance Score: {score:.3f}):\n{chunk}"
-                    for i, (_, chunk, score) in enumerate(context_articles)
+                    f"Article Title: {source_type}\n{chunk}"
+                    for _, chunk, source_type, score in context_articles
                 ]
             )
 
-            prompt = f"""You are the host of NewsJuice, a conversational news podcast. Your name is
-            NewsJuice, and you deliver news in a friendly, engaging style.
+            prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University. Your role is to deliver factual, informative summaries based on news article chunks.
 
 LISTENER'S QUESTION: {question}
 
-RELEVANT NEWS ARTICLES:
+NEWS ARTICLES TO REFERENCE:
 {context_text}
 
-INSTRUCTIONS:
-1. Start by directly addressing the listener's question - NO preamble about "the listener asked"
-or "the host mentioned"
-2. Use ONLY information from the provided news articles above
-3. If the articles don't answer the question, clearly say "I don't have recent news about that topic
-in my database"
-4. Speak naturally as if having a conversation - use "I", "you", "we"
-5. Keep it under 1 minute when spoken (roughly 150-200 words)
-6. End with an invitation for follow-up questions
+YOUR TASK:
+1. Synthesize the information from the news article chunks above into a clear, factual podcast segment
+2. Directly answer the listener's question using specific details, numbers, and quotes from the article chunks
+3. Present information authoritatively - you are delivering news, not seeking clarification
+4. Structure your response with these elements:
+   - OPENING: Directly state the answer to the question
+   - KEY FACTS: Present the most important details with specific numbers, names, and dates. BE SURE TO MENTION THE ARTICLE SOURCE (NEWS TITLE) THE KEY FACT DERIVES FROM WHEN STATING THE KEY FACT.
+   - CONTEXT: Provide background information and explain implications
+   - CLOSING: Brief summary statement (NO invitation for follow-up questions)
+5. Target 200 words for a comprehensive answer
+6. If the articles lack sufficient information to answer the question, state: "The latest Harvard news I have doesn't cover that topic in detail."
 
-EXAMPLE GOOD OPENING:
-"Great question! Based on the latest news I have, here's what's happening with [topic] from
-[news source]..."
+DELIVERY STYLE:
+- Professional but conversational tone
+- Use specific numbers, names, dates, and quotes from the articles
+- NO collaborative phrases like "Great question!", "What do you think?", or "Let me know if you want more details"
+- ABSOLUTELY NO COLLABORATIVE PHRASES LIKE "That's a great summary you provided!", or "Thank you for the information"
+- NO requests for more information from the listener
+- You are INFORMING, not CONVERSING
+- DO NOT use markdown formatting like **bold**, *italics*, or ### headers
+- Write in plain text only - this will be converted to speech
+- When referencing information, naturally mention the article title in your narration
+- Example: "According to the Harvard Gazette article 'Budget Cuts Impact Research,' the university..."
 
-EXAMPLE BAD OPENING (DO NOT USE):
-"The listener asked about... The host will now discuss..."
+EXAMPLE STRUCTURE:
+"Harvard is facing significant budget challenges this year. According to recent reports, the university posted a $113 million operating deficit in fiscal year 2025 - its first since 2020. This deficit stems from multiple factors, including the Trump administration's temporary termination of nearly all federal research grants in spring 2025, which removed approximately $116 million in sponsored funds overnight. To address these shortfalls, Harvard has implemented several cost-cutting measures: freezing salaries for non-union staff, leaving positions unfilled, and conducting targeted workforce reductions including 38 IT workers in November. The situation is compounded by a scheduled 400 percent increase in the federal endowment tax taking effect in 2027. Despite these challenges, Harvard's endowment grew 11.9 percent to $56.9 billion in fiscal 2025, which financial officers credit as central to navigating this uncertain period."
 
-Generate your podcast response now:"""
+Now generate your podcast segment answering the listener's question:"""
         else:
-            prompt = f"""You are a news podcast host. The user has asked: "{question}"
+            prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University.
 
-However, no relevant news articles were found to provide context. Please provide a thoughtful
-response acknowledging this limitation and suggest how the user might find more information about
-their question."""
+LISTENER'S QUESTION: {question}
+
+SITUATION: No relevant Harvard news articles were found in the database for this topic.
+
+YOUR TASK:
+Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database. Do NOT ask the listener for more information or engage in collaborative conversation.
+
+RESPONSE STRUCTURE:
+1. Acknowledge the question directly
+2. State clearly that recent Harvard news on this topic is not available in your database
+3. Provide 1-2 sentences on what types of Harvard news you DO cover
+4. End with a brief closing statement (NO invitation for follow-up)
+
+DELIVERY STYLE:
+- Professional and authoritative
+- NO collaborative phrases like "Could you clarify?", "What aspect are you interested in?", or "Let me know if..."
+- NO questions to the listener
+- Keep it brief: 50-75 words maximum
+
+EXAMPLE RESPONSE:
+"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
+
+Now generate your response:"""
 
         response = model.generate_content(prompt)
         return response.text, None
     except Exception as e:
         return None, str(e)
+
 
 
 def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our current workflow.
