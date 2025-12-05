@@ -5,7 +5,7 @@ Main app file for chatter service as a FastAPI
 
 ENDPOINTS CONTAINED:
 
-@app.get("/healthz")
+@app.get("/health")
 For checking whether the app works
 
 @app.post("/api/chatter")
@@ -112,34 +112,53 @@ except Exception as e:
 
 
 # --------------------------
-# Initialize Gemini Model
+# Initialize Gemini Model 
 # --------------------------
+#try:
+#    if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
+#        # set credentials file path for Vertex AI
+#        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GEMINI_SERVICE_ACCOUNT_PATH
+#
+#        # initialize model
+#        model = GenerativeModel(
+#            model_name=(
+#                f"projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_REGION}/"
+#                "publishers/google/models/gemini-2.5-flash"
+#            )
+#        )
+#    else:
+#        model = None
+#except Exception as e:
+#    print(f"[gemini-error] Failed to configure service account: {e}")
+#    model = None
+
+
+
+# --------------------------------------------
+# Initialize Gemini Model _ WORKLOAD IDENTITY
+# -------------------------------------------
 try:
-    if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
-        # set credentials file path for Vertex AI
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GEMINI_SERVICE_ACCOUNT_PATH
-
-        # initialize model
-        model = GenerativeModel(
-            model_name=(
-                f"projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_REGION}/"
-                "publishers/google/models/gemini-2.5-flash"
-            )
-        )
-    else:
-        model = None
+    # Use default credentials (Workload Identity in GKE, service account in Cloud Run)
+    model = GenerativeModel(model_name="gemini-2.5-flash")
+    print("[gemini] Model initialized with default credentials")
 except Exception as e:
-    print(f"[gemini-error] Failed to configure service account: {e}")
+    print(f"[gemini-error] Failed to initialize model: {e}")
     model = None
-
-
 # --------------------------
 # Health
 # --------------------------
+
+@app.get("/")
+async def root() -> Dict[str, bool]:
+    return {"ok": True}
+
 @app.get("/healthz")
 async def healthz_root() -> Dict[str, bool]:
     return {"ok": True}
 
+@app.get("/health")
+async def health_check() -> Dict[str, bool]:
+    return {"ok": True}
 
 # --------------------------
 # Helper Functions

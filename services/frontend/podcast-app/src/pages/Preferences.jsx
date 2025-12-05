@@ -34,10 +34,10 @@ function Preferences() {
 
   // API helper functions
   const getApiUrl = () => {
-    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
     return isProduction
-      ? 'https://chatter-919568151211.us-central1.run.app'
-      : 'http://localhost:8080'
+      ? 'http://136.113.170.71'
+      : 'http://136.113.170.71'
   }
 
   const getAuthHeaders = () => {
@@ -219,7 +219,7 @@ function Preferences() {
                   </div>
                 )}
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">=ð</span>
+                  <span className="text-2xl">=ï¿½</span>
                   <div>
                     <p className="font-semibold">{source}</p>
                     <p className="text-xs opacity-70">

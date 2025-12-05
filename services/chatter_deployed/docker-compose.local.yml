@@ -9,7 +9,7 @@ services:
       - "--port=5432"
       - "newsjuice-123456:us-central1:newsdb-instance"
     volumes:
-      - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
+      - ../../../../secrets/sa-key.json:/secrets/sa-key.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
     ports:
@@ -63,8 +63,8 @@ services:
     
     volumes:
       # Mount service account keys (read-only)
-      - ../../../secrets/sa-key.json:/app/sa-key.json:ro
-      - ../../../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
+      - ../../../../secrets/sa-key.json:/app/sa-key.json:ro
+      - ../../../../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
       
       # Optional: Mount code for hot-reload during development
       # Uncomment these lines if you want to edit code without rebuilding

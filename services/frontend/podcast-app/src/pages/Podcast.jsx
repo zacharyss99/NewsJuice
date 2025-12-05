@@ -181,10 +181,10 @@ function Podcast() {
 
   // ========== API HELPER ==========
   const getApiUrl = () => {
-    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
     return isProduction
-      ? 'https://chatter-919568151211.us-central1.run.app'
-      : 'http://localhost:8080'
+      ? 'http://136.113.170.71'
+      : 'http://136.113.170.71'
   }
 
   const getAuthHeaders = () => {
@@ -447,15 +447,28 @@ function Podcast() {
   // ========== Q&A FUNCTIONS (EXISTING) ==========
 
   // WebSocket URL
+//  const getWebSocketUrl = () => {
+//    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+//    const protocol = isProduction ? 'wss' : 'ws'
+//    const host = isProduction
+//      ? 'http://136.113.170.71'
+//      : 'http://136.113.170.71'
+//    const token = localStorage.getItem('auth_token')
+//    return `${protocol}://${host}/ws/chat${token ? `?token=${token}` : ''}`
+//  }
+
+  // NEW FOR PULUMI
   const getWebSocketUrl = () => {
-    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
-    const protocol = isProduction ? 'wss' : 'ws'
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+    const protocol = isProduction ? 'ws' : 'ws'  // Use ws for IP address (no SSL)
     const host = isProduction
-      ? 'chatter-919568151211.us-central1.run.app'
+      ? '136.113.170.71:80'
       : 'localhost:8080'
-    const token = localStorage.getItem('auth_token')
-    return `${protocol}://${host}/ws/chat${token ? `?token=${token}` : ''}`
+    return `${protocol}://${host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
   }
+
+// return `${protocol}://${host}/ws/chat?token=${currentUser?.accessToken || ''}`
+
 
   // Connect WebSocket
   const connectWebSocket = () => {
