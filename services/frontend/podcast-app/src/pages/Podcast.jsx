@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause } from 'lucide-react'
+import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
+import { useVAD } from '../hooks/useVAD'
 
 function Podcast() {
   const navigate = useNavigate()
@@ -43,6 +44,117 @@ function Podcast() {
   const [audioMode, setAudioMode] = useState('IDLE')  // IDLE, PLAYING_BRIEF, PAUSED_FOR_QA, PLAYING_QA, RESUMING_BRIEF
   const savedBriefPosition = useRef(0)  // Saves playback position when pausing for Q&A
   const shouldAutoResume = useRef(false)  // Flag to auto-resume after Q&A
+  const inFollowUpMode = useRef(false)  // Flag to track if user is asking follow-up questions (prevents auto-resume)
+
+  // ========== VOICE ACTIVITY DETECTION (Phase 2 - CDN Implementation) ==========
+  const [vadEnabled, setVadEnabled] = useState(false) // VAD on/off toggle for the user
+
+  // Refs to track current playback state (fixes React closure issue)
+  const briefAudioPlayingRef = useRef(false)
+  const audioModeRef = useRef('IDLE')
+  const vadEnabledRef = useRef(false)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    briefAudioPlayingRef.current = briefAudioPlaying
+  }, [briefAudioPlaying])
+
+  useEffect(() => {
+    audioModeRef.current = audioMode
+  }, [audioMode])
+
+  useEffect(() => {
+    vadEnabledRef.current = vadEnabled
+  }, [vadEnabled])
+
+  // Handle voice interruption when VAD detects speech
+  const handleVoiceInterruption = () => {
+    console.log('[vad] Voice detected!')
+    console.log('[vad] Current state - briefAudioPlaying:', briefAudioPlayingRef.current, 'audioMode:', audioModeRef.current, 'vadEnabled:', vadEnabledRef.current)
+
+    // Check if VAD is enabled - if not, ignore the interruption
+    if (!vadEnabledRef.current) {
+      console.log('[vad] Ignoring - VAD is disabled by user')
+      return
+    }
+
+    // CASE 1: User is interrupting the daily brief to ask a question
+    if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      console.log('[vad] Interrupting daily brief to start Q&A')
+
+      // Reset follow-up mode (this is the first question)
+      inFollowUpMode.current = false
+
+      // Pause VAD during recording (to avoid detecting own speech)
+      if (vad) {
+        vad.pause()
+        console.log('[vad] VAD paused during recording')
+      }
+
+      // Start recording the user's question
+      startRecording()
+      return
+    }
+
+    // CASE 2: User is interrupting the Q&A answer to ask a follow-up question
+    if (audioModeRef.current === 'PLAYING_QA') {
+      console.log('[vad] User interrupted Q&A answer - starting follow-up question')
+
+      // Mark that we're in follow-up mode (prevents auto-resume to brief)
+      inFollowUpMode.current = true
+      console.log('[vad] Entered follow-up mode - brief will stay paused')
+
+      // Stop current Q&A playback
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause()
+        audioPlayerRef.current.currentTime = 0
+      }
+
+      // Pause VAD during recording
+      if (vad) {
+        vad.pause()
+        console.log('[vad] VAD paused during follow-up recording')
+      }
+
+      // Start recording the follow-up question
+      // Note: Brief stays paused - user can ask multiple follow-ups
+      startRecording()
+      return
+    }
+
+    // CASE 3: Ignore in other states
+    console.log('[vad] Ignoring - not in interruptible state')
+    console.log('[vad] Debug: briefAudioPlaying =', briefAudioPlayingRef.current, ', audioMode =', audioModeRef.current)
+  }
+
+  // Initialize VAD using our custom hook (loaded from CDN)
+  const vad = useVAD({
+    onSpeechStart: handleVoiceInterruption,
+    onSpeechEnd: () => {
+      console.log('[vad] Speech ended')
+    },
+    onVADMisfire: () => {
+      console.log('[vad] False positive detected')
+    },
+    // Higher threshold = less sensitive, reduces false positives from speaker audio
+    positiveSpeechThreshold: 0.9,  // Increased from 0.8 to avoid detecting brief playback
+    minSpeechFrames: 5,  // Increased from 3 to require more consecutive speech frames
+    redemptionFrames: 8,
+    preSpeechPadFrames: 1,
+    startOnLoad: false // Don't auto-start, we'll control it manually
+  })
+
+  // Handle VAD toggle - stop VAD when user turns it off
+  useEffect(() => {
+    if (!vadEnabled && vad && !vad.loading && !vad.errored) {
+      console.log('[vad] VAD disabled by user - stopping VAD')
+      vad.pause()
+    } else if (vadEnabled && vad && !vad.loading && !vad.errored && briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      // If user enables VAD while brief is playing, start listening
+      console.log('[vad] VAD enabled by user while brief playing - starting VAD')
+      vad.start()
+    }
+  }, [vadEnabled, vad])
 
   // ========== EMOJI/LOGO MAPPINGS ==========
   const TOPIC_EMOJIS = {
@@ -145,6 +257,9 @@ function Podcast() {
 
       const data = await response.json()
       console.log('[daily-brief] Loaded latest:', data)
+      console.log('[daily-brief] Has audio_url?', !!data.audio_url)
+      console.log('[daily-brief] Has podcast_text?', !!data.podcast_text)
+      console.log('[daily-brief] Text length:', data.podcast_text?.length || 0)
       return data
     } catch (error) {
       console.error('[daily-brief] Error loading latest:', error)
@@ -172,6 +287,9 @@ function Podcast() {
 
       const data = await response.json()
       console.log('[daily-brief] Generated:', data)
+      console.log('[daily-brief] Has audio_url?', !!data.audio_url)
+      console.log('[daily-brief] Has podcast_text?', !!data.podcast_text)
+      console.log('[daily-brief] Text length:', data.podcast_text?.length || 0)
 
       setDailyBrief(data)
       setIsGeneratingBrief(false)
@@ -224,17 +342,64 @@ function Podcast() {
         setBriefAudioProgress(0)
         setAudioMode('IDLE')
         shouldAutoResume.current = false  // Brief finished naturally, no auto-resume needed
+
+        // [Phase 2] Pause VAD when brief finishes naturally
+        if (vadEnabled && vad && !vad.loading) {
+          vad.pause()
+          console.log('[vad] Paused - brief finished')
+        }
       }
     }
 
     if (briefAudioPlaying) {
+      // Pausing the brief
       briefAudioRef.current.pause()
       setBriefAudioPlaying(false)
       setAudioMode('IDLE')
+
+      // [Phase 2] Pause VAD when user manually pauses brief
+      if (vadEnabled && vad && !vad.loading) {
+        vad.pause()
+        console.log('[vad] Paused - user paused brief')
+      }
     } else {
+      // Playing the brief - first stop any Q&A audio that might be playing
+      if (audioPlayerRef.current && (isPlaying || audioMode === 'PLAYING_QA')) {
+        console.log('[daily-brief] Stopping Q&A audio before playing brief')
+        audioPlayerRef.current.pause()
+        audioPlayerRef.current.currentTime = 0
+        audioPlayerRef.current.src = ''
+        audioPlayerRef.current.onended = null
+        audioPlayerRef.current.onerror = null
+
+        // Clean up audio URL
+        if (currentAudioUrlRef.current) {
+          URL.revokeObjectURL(currentAudioUrlRef.current)
+          currentAudioUrlRef.current = null
+        }
+
+        setIsPlaying(false)
+      }
+
+      // Clear any pending Q&A audio chunks
+      audioBufferRef.current = []
+      isStreamingAudioRef.current = false
+      console.log('[daily-brief] Cleared pending Q&A audio buffer')
+
+      // Exit follow-up mode and reset auto-resume
+      inFollowUpMode.current = false
+      shouldAutoResume.current = false
+
+      // Play the brief
       briefAudioRef.current.play()
       setBriefAudioPlaying(true)
       setAudioMode('PLAYING_BRIEF')
+
+      // [Phase 2] Start VAD when brief starts playing (if VAD is enabled)
+      if (vadEnabled && vad && !vad.loading && !vad.errored) {
+        vad.start()
+        console.log('[vad] Started - brief playing, listening for voice')
+      }
     }
   }
 
@@ -253,6 +418,30 @@ function Podcast() {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Skip forward 10 seconds
+  const skipForward = () => {
+    if (briefAudioRef.current && dailyBrief) {
+      const newTime = Math.min(
+        briefAudioRef.current.currentTime + 10,
+        briefAudioRef.current.duration || briefAudioProgress + 10
+      )
+      briefAudioRef.current.currentTime = newTime
+      console.log(`[daily-brief] Skipped forward to ${newTime}s`)
+    }
+  }
+
+  // Skip backward 10 seconds
+  const skipBackward = () => {
+    if (briefAudioRef.current && dailyBrief) {
+      const newTime = Math.max(
+        briefAudioRef.current.currentTime - 10,
+        0
+      )
+      briefAudioRef.current.currentTime = newTime
+      console.log(`[daily-brief] Skipped backward to ${newTime}s`)
+    }
   }
 
   // ========== Q&A FUNCTIONS (EXISTING) ==========
@@ -349,6 +538,12 @@ function Podcast() {
 
   // Handle audio chunks from backend
   const handleAudioChunk = (chunk) => {
+    // Don't accumulate chunks if daily brief is playing (user returned to brief)
+    if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      console.log("[audio] Ignoring Q&A audio chunk - daily brief is playing")
+      return
+    }
+
     if (!isStreamingAudioRef.current) {
       console.log("[audio] Starting to accumulate audio chunks")
       isStreamingAudioRef.current = true
@@ -362,6 +557,14 @@ function Podcast() {
   const finalizeAudio = () => {
     if (isRecordingRef.current || preventAutoPlayRef.current) {
       console.log("[audio] Skipping audio playback - recording in progress or auto-play prevented")
+      audioBufferRef.current = []
+      isStreamingAudioRef.current = false
+      return
+    }
+
+    // Don't play Q&A audio if daily brief is currently playing (user returned to brief)
+    if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      console.log("[audio] Skipping Q&A audio playback - daily brief is playing")
       audioBufferRef.current = []
       isStreamingAudioRef.current = false
       return
@@ -399,12 +602,24 @@ function Podcast() {
             console.log("[audio] oncanplay - Skipping playback, recording active")
             return
           }
+          // Final safety check: don't play Q&A if daily brief is playing
+          if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+            console.log("[audio] oncanplay - Skipping Q&A playback, daily brief is playing")
+            return
+          }
           console.log("[audio] Audio can play, attempting autoplay")
           setIsPlaying(true)
           setAudioMode('PLAYING_QA')  // [Phase 1] Set mode to PLAYING_QA
           audioPlayerRef.current.play().catch((err) => {
             console.warn("[audio] Autoplay blocked:", err)
           })
+
+          // [Phase 2] Restart VAD during Q&A playback so user can ask follow-up questions
+          if (vadEnabled && vad && !vad.loading && !vad.errored) {
+            vad.start()
+            console.log('[vad] Restarted during Q&A playback - user can ask follow-ups')
+            setStatusMessage("🎤 Playing answer... (Speak to ask a follow-up question)")
+          }
         }
 
         audioPlayerRef.current.onended = () => {
@@ -412,7 +627,8 @@ function Podcast() {
           setStatusMessage("Go ahead, I'm listening")
 
           // [Phase 1] AUTO-RESUME DAILY BRIEF AFTER Q&A
-          if (shouldAutoResume.current && briefAudioRef.current) {
+          // Don't auto-resume if user is in follow-up mode (asking multiple questions)
+          if (shouldAutoResume.current && briefAudioRef.current && !inFollowUpMode.current) {
             console.log("[auto-resume] Q&A finished, resuming daily brief")
             setAudioMode('RESUMING_BRIEF')
             setTimeout(() => {
@@ -422,7 +638,16 @@ function Podcast() {
               setAudioMode('PLAYING_BRIEF')
               shouldAutoResume.current = false
               console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
+
+              // [Phase 2] Restart VAD when brief resumes (if VAD is enabled)
+              if (vadEnabled && vad && !vad.loading && !vad.errored) {
+                vad.start()
+                console.log('[vad] Restarted - brief resumed, listening for voice again')
+              }
             }, 500)  // Small delay for smooth transition
+          } else if (inFollowUpMode.current) {
+            console.log("[follow-up] Q&A finished but in follow-up mode - brief stays paused")
+            setStatusMessage("Ask another question or return to daily brief")
           }
         }
 
@@ -451,8 +676,8 @@ function Podcast() {
       preventAutoPlayRef.current = true
       console.log("[recording] preventAutoPlay flag set to TRUE")
 
-      // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A
-      if (briefAudioRef.current && briefAudioPlaying) {
+      // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A (using ref to avoid stale closure)
+      if (briefAudioRef.current && briefAudioPlayingRef.current) {
         console.log("[auto-resume] Daily brief is playing, pausing for Q&A")
         const currentPosition = briefAudioRef.current.currentTime
         savedBriefPosition.current = currentPosition
@@ -461,6 +686,8 @@ function Podcast() {
         setBriefAudioPlaying(false)
         setAudioMode('PAUSED_FOR_QA')
         console.log(`[auto-resume] Saved brief position: ${currentPosition}s`)
+      } else {
+        console.log("[auto-resume] Brief not playing, skipping pause")
       }
 
       if (isPlaying) {
@@ -563,9 +790,15 @@ function Podcast() {
 
       setIsRecording(false)
 
+      // Include daily brief ID for context-aware Q&A
+      const completeMessage = {
+        type: "complete",
+        daily_brief_id: dailyBrief?.id || null  // Pass brief ID if available
+      }
+
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        console.log("[recording] Sending complete signal to backend")
-        wsRef.current.send(JSON.stringify({ type: "complete" }))
+        console.log("[recording] Sending complete signal to backend with daily_brief_id:", dailyBrief?.id)
+        wsRef.current.send(JSON.stringify(completeMessage))
         setStatusMessage("Processing...")
       } else {
         console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
@@ -578,8 +811,8 @@ function Podcast() {
 
           originalWs.addEventListener('open', () => {
             if (wsRef.current === originalWs && originalWs.readyState === WebSocket.OPEN) {
-              console.log("[recording] WebSocket opened after delay, sending complete signal")
-              originalWs.send(JSON.stringify({ type: "complete" }))
+              console.log("[recording] WebSocket opened after delay, sending complete signal with daily_brief_id:", dailyBrief?.id)
+              originalWs.send(JSON.stringify(completeMessage))
               setStatusMessage("Processing...")
             }
           }, { once: true })
@@ -608,6 +841,76 @@ function Podcast() {
 
     setIsPlaying(false)
     setStatusMessage("Go ahead, I'm listening")
+
+    // [Phase 2] If user manually stops Q&A, resume daily brief
+    if (shouldAutoResume.current && briefAudioRef.current) {
+      console.log("[manual-stop] User stopped Q&A, resuming daily brief")
+      setAudioMode('RESUMING_BRIEF')
+      setTimeout(() => {
+        briefAudioRef.current.currentTime = savedBriefPosition.current
+        briefAudioRef.current.play()
+        setBriefAudioPlaying(true)
+        setAudioMode('PLAYING_BRIEF')
+        shouldAutoResume.current = false
+        console.log(`[manual-stop] Resumed daily brief at ${savedBriefPosition.current}s`)
+
+        // Restart VAD if enabled
+        if (vadEnabled && vad && !vad.loading && !vad.errored) {
+          vad.start()
+          console.log('[vad] Restarted - brief resumed after manual Q&A stop')
+        }
+      }, 300)
+    }
+  }
+
+  // Manually return to daily brief (used when user is done asking follow-up questions)
+  const returnToDailyBrief = () => {
+    console.log("[return-to-brief] User manually returning to daily brief")
+
+    // Fully stop Q&A audio (complete cleanup)
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      audioPlayerRef.current.currentTime = 0
+      audioPlayerRef.current.src = ''  // Clear the source to stop playback completely
+      audioPlayerRef.current.onended = null
+      audioPlayerRef.current.onerror = null
+    }
+
+    // Clean up audio URL
+    if (currentAudioUrlRef.current) {
+      URL.revokeObjectURL(currentAudioUrlRef.current)
+      currentAudioUrlRef.current = null
+    }
+
+    // Clear any pending Q&A audio chunks that might still be coming in
+    audioBufferRef.current = []
+    isStreamingAudioRef.current = false
+    console.log("[return-to-brief] Cleared pending Q&A audio buffer")
+
+    // Update playback state
+    setIsPlaying(false)
+
+    // Exit follow-up mode
+    inFollowUpMode.current = false
+
+    // Resume daily brief
+    if (shouldAutoResume.current && briefAudioRef.current) {
+      setAudioMode('RESUMING_BRIEF')
+      setTimeout(() => {
+        briefAudioRef.current.currentTime = savedBriefPosition.current
+        briefAudioRef.current.play()
+        setBriefAudioPlaying(true)
+        setAudioMode('PLAYING_BRIEF')
+        shouldAutoResume.current = false
+        console.log(`[return-to-brief] Resumed daily brief at ${savedBriefPosition.current}s`)
+
+        // Restart VAD if enabled
+        if (vadEnabled && vad && !vad.loading && !vad.errored) {
+          vad.start()
+          console.log('[vad] Restarted - brief resumed after returning from follow-ups')
+        }
+      }, 300)
+    }
   }
 
   // Handle call button
@@ -696,6 +999,18 @@ function Podcast() {
             title="Preferences"
           >
             <Sliders size={24} />
+          </button>
+          {/* [Phase 2] VAD Toggle Button */}
+          <button
+            onClick={() => setVadEnabled(!vadEnabled)}
+            className={`p-2 rounded-full transition-colors ${
+              vadEnabled
+                ? 'bg-primary-pink hover:bg-pink-600'
+                : 'hover:bg-gray-800'
+            }`}
+            title={vadEnabled ? 'Voice Detection ON (Hands-free)' : 'Voice Detection OFF (Manual)'}
+          >
+            {vadEnabled ? <Mic size={24} /> : <MicOff size={24} />}
           </button>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -842,12 +1157,34 @@ function Podcast() {
               <div className="space-y-4">
                 {/* Play Button and Progress */}
                 <div className="flex items-center gap-4">
+                  {/* Skip Backward Button */}
+                  <button
+                    onClick={skipBackward}
+                    disabled={!dailyBrief}
+                    className="w-12 h-12 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Skip backward 10 seconds"
+                  >
+                    <SkipBack size={20} />
+                  </button>
+
+                  {/* Play/Pause Button */}
                   <button
                     onClick={playDailyBrief}
                     className="w-16 h-16 bg-gradient-to-br from-primary-pink to-pink-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-primary-pink/50 transition-all"
                   >
                     {briefAudioPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
                   </button>
+
+                  {/* Skip Forward Button */}
+                  <button
+                    onClick={skipForward}
+                    disabled={!dailyBrief}
+                    className="w-12 h-12 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Skip forward 10 seconds"
+                  >
+                    <SkipForward size={20} />
+                  </button>
+
                   <div className="flex-1">
                     <div className="h-2 bg-gray-700 rounded-full overflow-hidden mb-2">
                       <div
@@ -948,6 +1285,20 @@ function Podcast() {
                   <MicOff size={24} className="text-gray-400" />
                 </motion.button>
               </div>
+
+              {/* Return to Daily Brief Button (shows when user is asking follow-up questions) */}
+              {shouldAutoResume.current && !briefAudioPlaying && audioMode !== 'PLAYING_BRIEF' && (
+                <motion.button
+                  onClick={returnToDailyBrief}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all flex items-center gap-2"
+                >
+                  <Play size={20} />
+                  Return to Daily Brief
+                </motion.button>
+              )}
 
               {/* Instructions */}
               <div className="text-center lg:text-left text-gray-500 text-sm">
