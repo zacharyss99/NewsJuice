@@ -180,12 +180,19 @@ function Podcast() {
   }
 
   // ========== API HELPER ==========
+  //const getApiUrl = () => {
+  //  const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+  //  return isProduction
+  //    ? 'http://136.113.170.71'
+  //    : 'http://136.113.170.71'
+ // }
+
   const getApiUrl = () => {
-    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
-    return isProduction
-      ? 'http://136.113.170.71'
-      : 'http://136.113.170.71'
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    return isProduction ? '' : 'http://localhost:8080'
   }
+
+
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('auth_token')
@@ -458,14 +465,24 @@ function Podcast() {
 //  }
 
   // NEW FOR PULUMI
+  //const getWebSocketUrl = () => {
+  // const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+  //  const protocol = isProduction ? 'ws' : 'ws'  // Use ws for IP address (no SSL)
+  //  const host = isProduction
+  //    ? '136.113.170.71:80'
+  //    : 'localhost:8080'
+  //  return `${protocol}://${host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+  //}
+
   const getWebSocketUrl = () => {
-    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
-    const protocol = isProduction ? 'ws' : 'ws'  // Use ws for IP address (no SSL)
-    const host = isProduction
-      ? '136.113.170.71:80'
-      : 'localhost:8080'
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    const protocol = isProduction ? 'wss' : 'ws'
+    const host = isProduction ? window.location.host : 'localhost:8080'
     return `${protocol}://${host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
   }
+
+
+
 
 // return `${protocol}://${host}/ws/chat?token=${currentUser?.accessToken || ''}`
 

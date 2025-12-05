@@ -54,7 +54,9 @@ SERVICES = [
         "display_name": "NewsJuice Chatter",
         "source_dir": "/chatter_deployed",
         "extra_envs": [  # Chatter-specific environment variables
-            ("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,http://newsjuiceapp.com,http://www.newsjuiceapp.com"),
+            #("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,http://newsjuiceapp.com,http://www.newsjuiceapp.com"),
+            ("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,https://www.newsjuiceapp.com,https://newsjuiceapp.com"),
+            
             ("AUDIO_BUCKET", "newsjuice-123456-audio-bucket"),
             ("GCS_PREFIX", "podcasts/"),
             ("GOOGLE_API_KEY", "AIzaSyA3rhw0aA-NvMtnG3F6Ivv5UIdYZdUhc1I"),
@@ -628,6 +630,91 @@ if enable_gke:
                 depends_on=[k8s_deployments[service["name"]]]
             ),
         )
+
+
+# ============================================================================
+# HTTPS INGRESS WITH MANAGED CERTIFICATE
+# ============================================================================
+
+if enable_gke:
+    managed_cert = k8s.apiextensions.CustomResource(
+        "managed-cert",
+        api_version="networking.gke.io/v1",
+        kind="ManagedCertificate",
+        metadata=k8s.meta.v1.ObjectMetaArgs(
+            name="newsjuice-cert",
+            namespace="newsjuice",
+        ),
+        spec={
+            "domains": ["www.newsjuiceapp.com"],
+        },
+        opts=pulumi.ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[k8s_namespace]
+        ),
+    )
+
+    ingress = k8s.networking.v1.Ingress(
+        "newsjuice-ingress",
+        metadata=k8s.meta.v1.ObjectMetaArgs(
+            name="newsjuice-ingress",
+            namespace="newsjuice",
+            annotations={
+                "kubernetes.io/ingress.global-static-ip-name": "newsjuice-ip",
+                "networking.gke.io/managed-certificates": "newsjuice-cert",
+                "kubernetes.io/ingress.class": "gce",
+            },
+        ),
+        spec=k8s.networking.v1.IngressSpecArgs(
+            rules=[
+                k8s.networking.v1.IngressRuleArgs(
+                    host="www.newsjuiceapp.com",
+                    http=k8s.networking.v1.HTTPIngressRuleValueArgs(
+                        paths=[
+                            k8s.networking.v1.HTTPIngressPathArgs(
+                                path="/api/*",
+                                path_type="ImplementationSpecific",
+                                backend=k8s.networking.v1.IngressBackendArgs(
+                                    service=k8s.networking.v1.IngressServiceBackendArgs(
+                                        name="chatter-service",
+                                        port=k8s.networking.v1.ServiceBackendPortArgs(number=80),
+                                    ),
+                                ),
+                            ),
+                            k8s.networking.v1.HTTPIngressPathArgs(
+                                path="/ws/*",
+                                path_type="ImplementationSpecific",
+                                backend=k8s.networking.v1.IngressBackendArgs(
+                                    service=k8s.networking.v1.IngressServiceBackendArgs(
+                                        name="chatter-service",
+                                        port=k8s.networking.v1.ServiceBackendPortArgs(number=80),
+                                    ),
+                                ),
+                            ),
+                            k8s.networking.v1.HTTPIngressPathArgs(
+                                path="/*",
+                                path_type="ImplementationSpecific",
+                                backend=k8s.networking.v1.IngressBackendArgs(
+                                    service=k8s.networking.v1.IngressServiceBackendArgs(
+                                        name="frontend-service",
+                                        port=k8s.networking.v1.ServiceBackendPortArgs(number=80),
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        opts=pulumi.ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[managed_cert]
+        ),
+    )
+
+    pulumi.export("ingress_url", "https://www.newsjuiceapp.com")
+
+
 
 # ============================================================================
 # EXPORTS

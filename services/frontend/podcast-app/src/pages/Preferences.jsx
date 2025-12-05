@@ -33,11 +33,16 @@ function Preferences() {
   ]
 
   // API helper functions
+  //const getApiUrl = () => {
+  //  const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+  //  return isProduction
+  //    ? 'http://136.113.170.71'
+  //    : 'http://136.113.170.71'
+  //}
+
   const getApiUrl = () => {
-    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
-    return isProduction
-      ? 'http://136.113.170.71'
-      : 'http://136.113.170.71'
+    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+    return isProduction ? '' : 'http://localhost:8080'
   }
 
   const getAuthHeaders = () => {
