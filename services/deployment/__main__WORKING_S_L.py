@@ -1,9 +1,13 @@
 """
-NewsJuice Infrastructure - Multi-Service Deployment with Scheduler
-===================================================================
-Deploys: Loader + Scraper to Cloud Run + GKE
-Includes: Cloud Scheduler for automated daily triggers
-===================================================================
+NewsJuice Infrastructure - Multi-Service Deployment
+==================================================
+CHANGES FROM SINGLE-SERVICE VERSION:
+1. NEW: SERVICES list configuration
+2. NEW: Loops to deploy multiple services
+3. CHANGED: Shared service account for all services
+4. NEW: Multiple Cloud Run services (loader + scraper)
+5. NEW: Multiple K8s deployments in same namespace
+==================================================
 """
 
 import pulumi
@@ -33,7 +37,7 @@ gke_node_count = config.get_int("gke_node_count") or 2
 gke_machine_type = config.get("gke_machine_type") or "e2-standard-2"
 
 # ============================================================================
-# SERVICES CONFIGURATION - Define all services here
+# NEW: SERVICES CONFIGURATION - Define all services here
 # ============================================================================
 SERVICES = [
     {
@@ -47,7 +51,7 @@ SERVICES = [
         "source_dir": "/scraper_deployed",
     },
 ]
-# To add more services, just add to this list!
+# To add more services later, just add to this list!
 # ============================================================================
 
 # ============================================================================
@@ -81,7 +85,8 @@ artifact_repo = gcp.artifactregistry.Repository(
 )
 
 # ============================================================================
-# SHARED SERVICE ACCOUNT FOR ALL SERVICES
+# CHANGED: SHARED SERVICE ACCOUNT FOR ALL SERVICES
+# (Was: loader_service_account, Now: service_account for all)
 # ============================================================================
 
 service_account = gcp.serviceaccount.Account(
@@ -112,15 +117,16 @@ vertex_user_binding = gcp.projects.IAMMember(
 )
 
 # ============================================================================
-# BUILD DOCKER IMAGES FOR ALL SERVICES
+# NEW: BUILD DOCKER IMAGES FOR ALL SERVICES (LOOP)
+# (Was: Single loader_image, Now: service_images dict with multiple images)
 # ============================================================================
 
 docker_registry_address = f"{region}-docker.pkg.dev"
 docker_access_token = get_gcloud_access_token()
 
-service_images = {}
+service_images = {}  # NEW: Store multiple images
 
-for service in SERVICES:
+for service in SERVICES:  # NEW: Loop through all services
     service_images[service["name"]] = docker_build.Image(
         f"{service['name']}-image",
         context=docker_build.BuildContextArgs(
@@ -150,14 +156,15 @@ for service in SERVICES:
     )
 
 # ============================================================================
-# DEPLOY ALL SERVICES TO CLOUD RUN
+# NEW: DEPLOY ALL SERVICES TO CLOUD RUN (LOOP)
+# (Was: Single cloudrun_service, Now: cloudrun_services dict with multiple)
 # ============================================================================
 
 connection_name = f"{project}:{region}:{db_instance_name}"
-cloudrun_services = {}
+cloudrun_services = {}  # NEW: Store multiple Cloud Run services
 
 if enable_cloudrun:
-    for service in SERVICES:
+    for service in SERVICES:  # NEW: Loop through all services
         cloudrun_services[service["name"]] = gcp.cloudrun.Service(
             f"{service['name']}-cloudrun",
             name=f"newsjuice-{service['name']}",
@@ -243,79 +250,15 @@ if enable_cloudrun:
         )
 
 # ============================================================================
-# CLOUD SCHEDULER - Trigger services on a schedule
-# ============================================================================
-
-if enable_cloudrun:
-    # Scheduler service account
-    scheduler_sa = gcp.serviceaccount.Account(
-        "scheduler-sa",
-        account_id="newsjuice-scheduler-sa",
-        display_name="NewsJuice Scheduler Service Account",
-    )
-
-    # Allow scheduler to invoke Cloud Run services
-    for service in SERVICES:
-        gcp.cloudrun.IamMember(
-            f"{service['name']}-scheduler-invoker",
-            service=cloudrun_services[service["name"]].name,
-            location=region,
-            role="roles/run.invoker",
-            member=scheduler_sa.email.apply(lambda email: f"serviceAccount:{email}"),
-        )
-
-    # Scraper scheduler - runs daily at 6 AM UTC
-    scraper_scheduler = gcp.cloudscheduler.Job(
-        "scraper-scheduler",
-        name="newsjuice-scraper-daily",
-        description="Trigger scraper daily at 6 AM UTC",
-        schedule="0 6 * * *",
-        time_zone="UTC",
-        http_target=gcp.cloudscheduler.JobHttpTargetArgs(
-            uri=cloudrun_services["scraper"].statuses[0].url.apply(
-                lambda url: f"{url}/process"
-            ),
-            http_method="POST",
-            oidc_token=gcp.cloudscheduler.JobHttpTargetOidcTokenArgs(
-                service_account_email=scheduler_sa.email,
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=[cloudrun_services["scraper"]]
-        ),
-    )
-
-    # Loader scheduler - runs daily at 7 AM UTC (after scraper)
-    loader_scheduler = gcp.cloudscheduler.Job(
-        "loader-scheduler",
-        name="newsjuice-loader-daily",
-        description="Trigger loader daily at 7 AM UTC (after scraper)",
-        schedule="0 7 * * *",
-        time_zone="UTC",
-        http_target=gcp.cloudscheduler.JobHttpTargetArgs(
-            uri=cloudrun_services["loader"].statuses[0].url.apply(
-                lambda url: f"{url}/process"
-            ),
-            http_method="POST",
-            oidc_token=gcp.cloudscheduler.JobHttpTargetOidcTokenArgs(
-                service_account_email=scheduler_sa.email,
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=[cloudrun_services["loader"]]
-        ),
-    )
-
-# ============================================================================
-# GKE CLUSTER + KUBERNETES DEPLOYMENT
+# GKE CLUSTER + NEW: DEPLOY ALL SERVICES TO KUBERNETES (LOOP)
 # ============================================================================
 
 gke_cluster = None
 node_pool = None
 k8s_provider = None
 k8s_namespace = None
-k8s_deployments = {}
-k8s_services = {}
+k8s_deployments = {}  # NEW: Store multiple deployments
+k8s_services = {}     # NEW: Store multiple K8s services
 
 if enable_gke:
     # GKE service account
@@ -468,7 +411,9 @@ if enable_gke:
         ),
     )
 
-    # Deploy all services to Kubernetes
+    # ========================================================================
+    # NEW: DEPLOY ALL SERVICES TO KUBERNETES (LOOP)
+    # ========================================================================
     for service in SERVICES:
         # Create deployment for each service
         k8s_deployments[service["name"]] = k8s.apps.v1.Deployment(
@@ -574,7 +519,7 @@ if enable_gke:
         )
 
 # ============================================================================
-# EXPORTS
+# CHANGED: EXPORTS - Now exports URLs for ALL services
 # ============================================================================
 
 # Always export these
@@ -582,11 +527,11 @@ pulumi.export("artifact_repo", artifact_repo.name)
 pulumi.export("connection_name", connection_name)
 pulumi.export("database_url_format", f"postgresql://USER:PASSWORD@/DATABASE?host=/cloudsql/{connection_name}")
 
-# Export all service images
+# NEW: Export all service images
 for service in SERVICES:
     pulumi.export(f"{service['name']}_image", service_images[service["name"]].ref)
 
-# Cloud Run exports
+# NEW: Export Cloud Run URLs for all services
 if enable_cloudrun:
     pulumi.export("cloudrun_enabled", True)
     for service in SERVICES:
@@ -594,12 +539,10 @@ if enable_cloudrun:
             f"cloudrun_{service['name']}_url",
             cloudrun_services[service["name"]].statuses[0].url
         )
-    pulumi.export("scraper_schedule", "Daily at 6 AM UTC")
-    pulumi.export("loader_schedule", "Daily at 7 AM UTC")
 else:
     pulumi.export("cloudrun_enabled", False)
 
-# GKE exports
+# NEW: Export GKE URLs for all services
 if enable_gke and gke_cluster:
     pulumi.export("gke_enabled", True)
     pulumi.export("gke_cluster_name", gke_cluster.name)

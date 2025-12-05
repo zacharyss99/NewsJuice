@@ -14,5 +14,4 @@ logs/*.log
 **/OLD/
 
 services/deployment/pulumi-plugins/
-services/deployment/pulumi-plugins/
-services/deployment/pulumi-plugins/
+
