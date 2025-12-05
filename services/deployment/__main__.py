@@ -1,7 +1,7 @@
 """
 NewsJuice Infrastructure - Multi-Service Deployment with Scheduler
 ===================================================================
-Deploys: Loader + Scraper to Cloud Run + GKE
+Deploys: Loader + Scraper + Chatter to Cloud Run + GKE  # CHANGED: Added Chatter
 Includes: Cloud Scheduler for automated daily triggers
 ===================================================================
 """
@@ -35,16 +35,36 @@ gke_machine_type = config.get("gke_machine_type") or "e2-standard-2"
 # ============================================================================
 # SERVICES CONFIGURATION - Define all services here
 # ============================================================================
+# CHANGED: Added extra_envs field to all services, added chatter service
 SERVICES = [
     {
         "name": "loader",
         "display_name": "NewsJuice Loader",
         "source_dir": "/loader_deployed",
+        "extra_envs": [],  # CHANGED: Added extra_envs field
     },
     {
         "name": "scraper",
         "display_name": "NewsJuice Scraper",
         "source_dir": "/scraper_deployed",
+        "extra_envs": [],  # CHANGED: Added extra_envs field
+    },
+    {   # CHANGED: Added entire chatter service
+        "name": "chatter",
+        "display_name": "NewsJuice Chatter",
+        "source_dir": "/chatter_deployed",
+        "extra_envs": [  # Chatter-specific environment variables
+            ("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,http://newsjuiceapp.com,http://www.newsjuiceapp.com"),
+            ("AUDIO_BUCKET", "newsjuice-123456-audio-bucket"),
+            ("GCS_PREFIX", "podcasts/"),
+            ("GOOGLE_API_KEY", "AIzaSyA3rhw0aA-NvMtnG3F6Ivv5UIdYZdUhc1I"),
+        ],
+    },
+    {   # Added frontend here:
+        "name": "frontend",
+        "display_name": "NewsJuice Frontend",
+        "source_dir": "/frontend",
+        "extra_envs": [],
     },
 ]
 # To add more services, just add to this list!
@@ -110,6 +130,30 @@ vertex_user_binding = gcp.projects.IAMMember(
     role="roles/aiplatform.user",
     member=service_account.email.apply(lambda email: f"serviceAccount:{email}"),
 )
+
+
+# ============================================================================
+# AUDIO BUCKET PUBLIC ACCESS
+# ============================================================================
+
+audio_bucket = gcp.storage.Bucket(
+    "audio-bucket",
+    name=f"{project}-audio-bucket",
+    location=region,
+    uniform_bucket_level_access=True,
+    force_destroy=False,
+    opts=pulumi.ResourceOptions(
+        retain_on_delete=True
+    ),
+)
+
+audio_bucket_public = gcp.storage.BucketIAMMember(
+    "audio-bucket-public",
+    bucket=audio_bucket.name,
+    role="roles/storage.objectViewer",
+    member="allUsers",
+)
+
 
 # ============================================================================
 # BUILD DOCKER IMAGES FOR ALL SERVICES
@@ -177,6 +221,7 @@ if enable_cloudrun:
                                     "memory": "2Gi",
                                 },
                             ),
+                            # CHANGED: Refactored envs to support extra_envs
                             envs=[
                                 gcp.cloudrun.ServiceTemplateSpecContainerEnvArgs(
                                     name="DB_HOST",
@@ -212,6 +257,11 @@ if enable_cloudrun:
                                     name="GCP_REGION",
                                     value=region,
                                 ),
+                            ] + [  # CHANGED: Added extra_envs support
+                                gcp.cloudrun.ServiceTemplateSpecContainerEnvArgs(
+                                    name=env_name,
+                                    value=env_value,
+                                ) for env_name, env_value in service.get("extra_envs", [])
                             ],
                         )
                     ],
@@ -305,6 +355,8 @@ if enable_cloudrun:
             depends_on=[cloudrun_services["loader"]]
         ),
     )
+
+    # CHANGED: Note - No scheduler for chatter (it's user-triggered, not scheduled)
 
 # ============================================================================
 # GKE CLUSTER + KUBERNETES DEPLOYMENT
@@ -494,6 +546,7 @@ if enable_gke:
                                 name=service["name"],
                                 image=service_images[service["name"]].ref,
                                 ports=[k8s.core.v1.ContainerPortArgs(container_port=8080)],
+                                # CHANGED: Refactored env to support extra_envs
                                 env=[
                                     k8s.core.v1.EnvVarArgs(name="DB_HOST", value="127.0.0.1"),
                                     k8s.core.v1.EnvVarArgs(name="DB_NAME", value=db_name),
@@ -518,6 +571,9 @@ if enable_gke:
                                     k8s.core.v1.EnvVarArgs(name="GCP_REGION", value=region),
                                     k8s.core.v1.EnvVarArgs(name="GOOGLE_CLOUD_PROJECT", value=project),
                                     k8s.core.v1.EnvVarArgs(name="GOOGLE_CLOUD_REGION", value=region),
+                                ] + [  # CHANGED: Added extra_envs support
+                                    k8s.core.v1.EnvVarArgs(name=env_name, value=env_value)
+                                    for env_name, env_value in service.get("extra_envs", [])
                                 ],
                                 resources=k8s.core.v1.ResourceRequirementsArgs(
                                     requests={"memory": "512Mi", "cpu": "250m"},

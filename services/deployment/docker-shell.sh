@@ -44,6 +44,8 @@ else
         -v "$(pwd)/pulumi-plugins":/root/.pulumi/plugins \
         -v "$BASE_DIR/../loader_deployed":/loader_deployed \
         -v "$BASE_DIR/../scraper_deployed":/scraper_deployed \
+        -v "$BASE_DIR/../chatter_deployed":/chatter_deployed \
+        -v "$BASE_DIR/../frontend/podcast-app":/frontend \
         -e GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS \
         -e USE_GKE_GCLOUD_AUTH_PLUGIN=True \
         -e GCP_PROJECT=$GCP_PROJECT \
