@@ -31,10 +31,11 @@ NOT YET USED
 
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 import psycopg
 import json
 import os
+from datetime import datetime, timezone
 
 # from vertexai.generative_models import GenerativeModel
 
@@ -45,7 +46,7 @@ if not DB_URL:
     raise RuntimeError("DATABASE_URL environment variable not set")
 
 
-def call_retriever_service(query: str) -> List[Tuple[int, str, str, float]]:
+def call_retriever_service(query: str, limit: int = 10) -> List[Tuple[int, str, str, float]]:
     """Call the retriever service to get relevant articles."""
     try:
         # Import the retriever function directly since we're in the same environment
@@ -55,7 +56,7 @@ def call_retriever_service(query: str) -> List[Tuple[int, str, str, float]]:
         from retriever import search_articles
 
         print(f"[retriever] Searching for: '{query[:50]}...'")
-        articles = search_articles(query, limit=10)
+        articles = search_articles(query, limit=limit)
         print(f"[retriever] Found {len(articles)} relevant chunks")
         return articles
     except Exception as e:
@@ -206,3 +207,136 @@ def log_conversation(
                 print("[db] Conversation logged successfully")
     except Exception as e:
         print(f"[db-error] Failed to log conversation: {e}")
+
+
+# [NEW] Context-Aware Q&A Helper Functions
+
+def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch today's daily brief context (transcript + chunks) for context-aware Q&A.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        Dictionary with:
+        {
+            "id": 123,
+            "transcript": "Good morning, this is your...",
+            "chunks": [
+                {"chunk_id": 1, "chunk_text": "...", "source_type": "...", "score": 0.85},
+                ...
+            ]
+        }
+        Returns None if no daily brief found for today
+    """
+    try:
+        from user_db import get_audio_history
+
+        # Get recent history
+        history = get_audio_history(user_id, limit=10)
+
+        # Find today's daily brief
+        today = datetime.now(timezone.utc).date()
+        for entry in history:
+            if entry.get("question_text") == "Daily Brief":
+                created_at = entry.get("created_at")
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                if created_at.date() == today:
+                    # Found today's brief
+                    source_chunks = entry.get("source_chunks")
+                    # Handle both dict (JSONB from DB) and string (JSON string) formats
+                    if isinstance(source_chunks, dict):
+                        chunks_data = source_chunks
+                    elif isinstance(source_chunks, str):
+                        chunks_data = json.loads(source_chunks)
+                    else:
+                        chunks_data = {"chunks": []}
+
+                    return {
+                        "id": entry.get("id"),
+                        "transcript": entry.get("podcast_text", ""),
+                        "chunks": chunks_data.get("chunks", [])
+                    }
+
+        return None
+    except Exception as e:
+        print(f"[brief-context-error] {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def classify_question_context(question: str, brief_transcript: str, model) -> str:
+    """
+    Classify if a question is about the daily brief content or a general question.
+
+    Args:
+        question: User's question
+        brief_transcript: The daily brief podcast text
+        model: Gemini model instance
+
+    Returns:
+        "CONTEXTUAL" - question is about the daily brief
+        "GENERAL" - question is unrelated to daily brief
+    """
+    try:
+        # Use more of the transcript for better matching (up to 2000 chars)
+        brief_summary = brief_transcript[:2000] if len(brief_transcript) > 2000 else brief_transcript
+        #perhaps pass the entire brief or the chunks themselves instead of brief 
+
+        # Create classification prompt with emphasis on name/entity matching
+        prompt = f"""You are analyzing a user's question to determine if it relates to a daily news briefing they just heard.
+
+DAILY BRIEF CONTENT:
+{brief_summary}
+
+USER'S QUESTION:
+{question}
+
+TASK:
+Determine if the user's question is asking about ANY content mentioned in the daily brief above.
+
+IMPORTANT INSTRUCTIONS:
+1. Check if ANY person names, places, topics, or events in the question appear in the brief
+2. Look for partial matches - if the question mentions "Amanda Claybaugh" and the brief mentions that name, it's CONTEXTUAL
+3. If the question asks for more details about ANYTHING mentioned in the brief, it's CONTEXTUAL
+4. Questions with pronouns like "what did you say about..." or "tell me more about..." are usually CONTEXTUAL
+5. Only classify as GENERAL if the topic is completely absent from the brief
+
+Examples of CONTEXTUAL questions:
+- "How much were those budget cuts?" (if brief mentioned budget cuts)
+- "Tell me more about that research" (if brief mentioned research)
+- "What did Amanda Claybaugh say?" (if brief mentioned Amanda Claybaugh)
+- "Can you expand on the grading report?" (if brief mentioned a grading report)
+- "What did the dean say?" (if brief mentioned a dean)
+
+Examples of GENERAL questions (NOT contextual):
+- "What's Harvard's endowment size?" (if brief didn't mention endowment at all)
+- "Tell me about sports news" (if brief was only about academics and never mentioned sports)
+- "How's the weather?" (unrelated topic never mentioned)
+
+Respond with ONLY ONE word - either "CONTEXTUAL" or "GENERAL":"""
+
+        response = model.generate_content(prompt)
+        classification = response.text.strip().upper()
+
+        # Validate response
+        if "CONTEXTUAL" in classification:
+            print(f"[classification] ✓ Question is CONTEXTUAL to daily brief")
+            return "CONTEXTUAL"
+        elif "GENERAL" in classification:
+            print(f"[classification] ✗ Question is GENERAL (not related to brief)")
+            return "GENERAL"
+        else:
+            # Default to general if unclear
+            print(f"[classification-warning] Unclear response: '{classification}', defaulting to GENERAL")
+            return "GENERAL"
+
+    except Exception as e:
+        print(f"[classification-error] {e}, defaulting to GENERAL")
+        import traceback
+        traceback.print_exc()
+        return "GENERAL"

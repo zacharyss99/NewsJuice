@@ -152,44 +152,86 @@ async def _retrieve_and_generate_podcast(
     original_query: str,
     user_id: Optional[str],
     model: GenerativeModel,
+    use_brief_context: bool = False,  # NEW: Whether to use daily brief context
+    brief_context: Optional[Dict] = None,  # NEW: Daily brief context if available
 ):
     """Retrieve chunks and generate podcast for normal flow and query enhancement."""
-    # step2: call the retriever for each enhanced sub-query (if it exists)
-    await websocket.send_json({"status": "retrieving"})
-    all_chunks = []
 
     # Extract all enhanced_query_N keys and sort them
     query_keys = sorted([k for k in enhanced_queries.keys() if k.startswith("enhanced_query_")])
 
-    # [Z] assume each sub query runs cosine similarity against the DB to pull chunks
-    for query_key in query_keys:
-        sub_query = enhanced_queries[query_key]
-        print(f"[retriever] Running retrieval for sub-query: {sub_query[:50]}...")
-        chunks = call_retriever_service(sub_query)
-        if chunks:
-            # Print each chunk with its similarity score
-            print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
-            for i, (chunk_id, chunk_text, source_type, score) in enumerate(chunks):
-                print(f"  Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, Score: {score:.4f}): {chunk_text[:100]}...")
-            all_chunks.extend(chunks)
+    # ========== NEW: USE BRIEF CONTEXT IF CONTEXTUAL QUESTION ==========
+    if use_brief_context and brief_context:
+        print("[websocket] Using daily brief context for contextual question")
 
-    # Remove duplicates based on chunk ID (keep first occurrence)
-    seen_ids = set()
-    unique_chunks = []
-    for chunk in all_chunks:
-        chunk_id = chunk[0]  # First element is the ID
-        if chunk_id not in seen_ids:
-            seen_ids.add(chunk_id)
-            unique_chunks.append(chunk)
-    # makes sense to only have the unique chunks for all enhanced queries
-    all_chunks = unique_chunks
+        # Start with chunks from daily brief
+        all_chunks = []
+        for chunk_data in brief_context["chunks"]:
+            # Convert back to tuple format: (id, chunk_text, source_type, score)
+            all_chunks.append((
+                chunk_data.get("chunk_id", 0),
+                chunk_data.get("chunk_text", ""),
+                chunk_data.get("source_type", ""),
+                chunk_data.get("score", 0.0)
+            ))
+
+        print(f"[retriever] Using {len(all_chunks)} chunks from daily brief")
+
+        # OPTIONAL: Add a few more chunks from fresh retrieval as fallback
+        # This ensures we have backup if brief chunks don't fully answer
+        # await websocket.send_json({"status": "retrieving_additional"})
+        # for query_key in query_keys:
+        #     sub_query = enhanced_queries[query_key]
+        #     fresh_chunks = call_retriever_service(sub_query, limit=5)  # Fewer chunks
+        #     if fresh_chunks:
+        #         print(f"[retriever] Adding {len(fresh_chunks)} fresh chunks as fallback")
+        #         all_chunks.extend(fresh_chunks)
+
+        # Deduplicate
+        seen_ids = set()
+        unique_chunks = []
+        for chunk in all_chunks:
+            chunk_id = chunk[0]
+            if chunk_id not in seen_ids:
+                seen_ids.add(chunk_id)
+                unique_chunks.append(chunk)
+        all_chunks = unique_chunks
+
+    else:
+        # GENERAL QUESTION: Use full retrieval pipeline (existing behavior)
+        print("[websocket] Using full retrieval for general question")
+        await websocket.send_json({"status": "retrieving"})
+        all_chunks = []
+
+        # [Z] assume each sub query runs cosine similarity against the DB to pull chunks
+        for query_key in query_keys:
+            sub_query = enhanced_queries[query_key]
+            print(f"[retriever] Running retrieval for sub-query: {sub_query[:50]}...")
+            chunks = call_retriever_service(sub_query)
+            if chunks:
+                # Print each chunk with its similarity score
+                print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
+                for i, (chunk_id, chunk_text, source_type, score) in enumerate(chunks):
+                    print(f"  Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, Score: {score:.4f}): {chunk_text[:100]}...")
+                all_chunks.extend(chunks)
+
+        # Remove duplicates based on chunk ID (keep first occurrence)
+        seen_ids = set()
+        unique_chunks = []
+        for chunk in all_chunks:
+            chunk_id = chunk[0]  # First element is the ID
+            if chunk_id not in seen_ids:
+                seen_ids.add(chunk_id)
+                unique_chunks.append(chunk)
+        # makes sense to only have the unique chunks for all enhanced queries
+        all_chunks = unique_chunks
 
     # Print summary of final unique chunks
     print(f"[retriever] After deduplication: {len(all_chunks)} unique chunks")
     for i, (chunk_id, chunk_text, source_type, score) in enumerate(all_chunks):
         print(f"  Final Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, Score: {score:.4f}): {chunk_text}...")
 
-    if not all_chunks: 
+    if not all_chunks:
         await websocket.send_json({"warning": "No relevant articles found"})
 
     # step 3: call_gemini_api to generate podcast text with all combined chunks
@@ -221,6 +263,8 @@ async def _retrieve_and_generate_podcast(
         await websocket.send_json({"status": "complete"})
 
         # Save audio history if user is authenticated
+        # [Z] For Q&A we don't save audio to GCS (just the text)
+
         if user_id:
             save_audio_history(
                 user_id=user_id,
@@ -324,7 +368,7 @@ async def websocket_chatter(websocket: WebSocket):
                             if is_processing:
                                 print("[websocket] Already processing a request, " "ignoring new complete signal")
                                 continue
-
+                                
                             # Check if we have audio to process
                             if len(audio_buffer) == 0:
                                 print("[websocket] ERROR: No audio received in buffer!")
@@ -373,29 +417,67 @@ async def websocket_chatter(websocket: WebSocket):
                             # frontend receives this and updates the UI
                             await websocket.send_json({"status": "transcribed", "text": text})
 
-                            # NEW STEP: Query Enhancement - enhance query once and use it directly
-                            await websocket.send_json({"status": "enhancing_query"})
-                            print("[websocket] Enhancing query...")
+                            # ========== NEW: CHECK FOR DAILY BRIEF CONTEXT ==========
+                            daily_brief_id = data.get("daily_brief_id")  # Frontend will send this
+                            brief_context = None
+                            use_brief_context = False
 
-                            # Enhance the query once
-                            enhancement_result, error = enhance_query_with_gemini(text, model)
+                            if daily_brief_id or user_id:  # Fallback: fetch by user_id if no ID provided
+                                print("[websocket] Checking for daily brief context...")
+                                from helpers import get_daily_brief_context
+                                brief_context = get_daily_brief_context(user_id)
+
+                                if brief_context:
+                                    print(f"[websocket] Found daily brief context: {len(brief_context['chunks'])} chunks")
+                                else:
+                                    print("[websocket] No daily brief context found for today")
+
+                            # ========== CLASSIFY QUESTION IF BRIEF CONTEXT EXISTS ==========
+                            if brief_context:
+                                await websocket.send_json({"status": "classifying_question"})
+                                from helpers import classify_question_context
+                                classification = classify_question_context(text, brief_context["transcript"], model)
+                                print(f"\n{'='*60}")
+                                print(f"[CLASSIFICATION RESULT] {classification}")
+                                print(f"{'='*60}\n")
+
+                                if classification == "CONTEXTUAL":
+                                    use_brief_context = True
+                                    await websocket.send_json({"status": "using_brief_context"})
+
+                            # NEW STEP: Query Enhancement - conditional based on question type
                             original_query = text  # Keep original for podcast generation
 
-                            if error or not enhancement_result:
-                                print("[websocket] Query enhancement error:" f" {error}, using original query")
-                                # Use original query as single sub-query if enhancement fails
+                            if use_brief_context:
+                                # CONTEXTUAL question - use original query, no enhancement
+                                # Preserves brief-specific references like "what did you say about..."
+                                print("\n[STRATEGY] CONTEXTUAL QUESTION - Using daily brief chunks (no query enhancement)")
+                                print(f"[STRATEGY] Original query: {text}\n")
                                 enhanced_queries = {"enhanced_query_1": text}
                             else:
-                                # Extract all enhanced_query_N keys from the result
-                                enhanced_queries = {
-                                    k: v for k, v in enhancement_result.items() if k.startswith("enhanced_query_")
-                                }
-                                if not enhanced_queries:
-                                    # Fallback if format is unexpected
+                                # GENERAL question - enhance query for better retrieval
+                                print("\n[STRATEGY] GENERAL QUESTION - Using full retrieval pipeline with query enhancement\n")
+                                await websocket.send_json({"status": "enhancing_query"})
+                                print("[websocket] Enhancing query for general question...")
+
+                                # Enhance the query once
+                                enhancement_result, error = enhance_query_with_gemini(text, model)
+
+                                if error or not enhancement_result:
+                                    print("[websocket] Query enhancement error:" f" {error}, using original query")
+                                    # Use original query as single sub-query if enhancement fails
+                                    enhanced_queries = {"enhanced_query_1": text}
+                                else:
+                                    # Extract all enhanced_query_N keys from the result
                                     enhanced_queries = {
-                                        "enhanced_query_1": enhancement_result.get("enhanced_query", text)
+                                        k: v for k, v in enhancement_result.items() if k.startswith("enhanced_query_")
                                     }
-                                print("[websocket] Query enhanced into" f" {len(enhanced_queries)} sub-queries")
+                                    if not enhanced_queries:
+                                        # Fallback if format is unexpected
+                                        enhanced_queries = {
+                                            "enhanced_query_1": enhancement_result.get("enhanced_query", text)
+                                        }
+                                    print("[websocket] Query enhanced into" f" {len(enhanced_queries)} sub-queries")
 
                             # Use the helper function to retrieve and generate podcast
                             success = await _retrieve_and_generate_podcast(
@@ -404,6 +486,8 @@ async def websocket_chatter(websocket: WebSocket):
                                 original_query,
                                 user_id,
                                 model,
+                                use_brief_context=use_brief_context,  # NEW: Pass context flag
+                                brief_context=brief_context,  # NEW: Pass daily brief context
                             )
 
                             if not success:
@@ -748,12 +832,27 @@ Now generate your daily briefing:"""
 
         print(f"[daily-brief] Audio uploaded successfully: {audio_url}")
 
+        # [Z] save the chunks for storage (for context-aware Q&A)
+        chunks_data = {
+            "chunks": [
+                {
+                    "chunk_id": chunk_id,
+                    "chunk_text": chunk_text,
+                    "source_type": source_type,
+                    "score": float(score)
+                }
+                for chunk_id, chunk_text, source_type, score in chunks
+            ]
+        }
+        print(f"[daily-brief] Serialized {len(chunks)} chunks for storage")
+
         # Save to audio_history with question_text="Daily Brief"
         save_audio_history(
             user_id=user_id,
             question_text="Daily Brief",
             podcast_text=podcast_text,
-            audio_url=audio_url
+            audio_url=audio_url,
+            source_chunks=json.dumps(chunks_data)  # NEW: Save chunks for context-aware Q&A
         )
         # [Z] GCS bucket also keeps track of q+a audio files for each user
 

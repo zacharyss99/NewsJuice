@@ -78,15 +78,16 @@ def save_audio_history(
     question_text: str,
     podcast_text: str,
     audio_url: Optional[str] = None,
+    source_chunks: Optional[str] = None,  # NEW: JSON string of chunks used for daily brief
 ) -> bool:
     """Save audio history entry."""
     try:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO audio_history (user_id, question_text, podcast_text, audio_url)
-                       VALUES (%s, %s, %s, %s)""",
-                    (user_id, question_text, podcast_text, audio_url),
+                    """INSERT INTO audio_history (user_id, question_text, podcast_text, audio_url, source_chunks)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (user_id, question_text, podcast_text, audio_url, source_chunks),
                 )
                 print(f"[db] Audio history saved for user: {user_id}")
                 return True
@@ -101,7 +102,7 @@ def get_audio_history(user_id: str, limit: int = 10) -> List[Dict]:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """SELECT id, question_text, podcast_text, audio_url, created_at
+                    """SELECT id, question_text, podcast_text, audio_url, source_chunks, created_at
                        FROM audio_history
                        WHERE user_id = %s
                        ORDER BY created_at DESC
@@ -116,7 +117,8 @@ def get_audio_history(user_id: str, limit: int = 10) -> List[Dict]:
                             "question_text": row[1],
                             "podcast_text": row[2],
                             "audio_url": row[3],
-                            "created_at": row[4].isoformat() if row[4] else None,
+                            "source_chunks": row[4],  # NEW: Include source chunks (JSONB/string)
+                            "created_at": row[5].isoformat() if row[5] else None,
                         }
                     )
                 return history

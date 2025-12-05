@@ -52,6 +52,7 @@ function Podcast() {
   // Refs to track current playback state (fixes React closure issue)
   const briefAudioPlayingRef = useRef(false)
   const audioModeRef = useRef('IDLE')
+  const vadEnabledRef = useRef(false)
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -62,10 +63,20 @@ function Podcast() {
     audioModeRef.current = audioMode
   }, [audioMode])
 
+  useEffect(() => {
+    vadEnabledRef.current = vadEnabled
+  }, [vadEnabled])
+
   // Handle voice interruption when VAD detects speech
   const handleVoiceInterruption = () => {
     console.log('[vad] Voice detected!')
-    console.log('[vad] Current state - briefAudioPlaying:', briefAudioPlayingRef.current, 'audioMode:', audioModeRef.current)
+    console.log('[vad] Current state - briefAudioPlaying:', briefAudioPlayingRef.current, 'audioMode:', audioModeRef.current, 'vadEnabled:', vadEnabledRef.current)
+
+    // Check if VAD is enabled - if not, ignore the interruption
+    if (!vadEnabledRef.current) {
+      console.log('[vad] Ignoring - VAD is disabled by user')
+      return
+    }
 
     // CASE 1: User is interrupting the daily brief to ask a question
     if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
@@ -132,6 +143,18 @@ function Podcast() {
     preSpeechPadFrames: 1,
     startOnLoad: false // Don't auto-start, we'll control it manually
   })
+
+  // Handle VAD toggle - stop VAD when user turns it off
+  useEffect(() => {
+    if (!vadEnabled && vad && !vad.loading && !vad.errored) {
+      console.log('[vad] VAD disabled by user - stopping VAD')
+      vad.pause()
+    } else if (vadEnabled && vad && !vad.loading && !vad.errored && briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      // If user enables VAD while brief is playing, start listening
+      console.log('[vad] VAD enabled by user while brief playing - starting VAD')
+      vad.start()
+    }
+  }, [vadEnabled, vad])
 
   // ========== EMOJI/LOGO MAPPINGS ==========
   const TOPIC_EMOJIS = {
@@ -358,6 +381,11 @@ function Podcast() {
         setIsPlaying(false)
       }
 
+      // Clear any pending Q&A audio chunks
+      audioBufferRef.current = []
+      isStreamingAudioRef.current = false
+      console.log('[daily-brief] Cleared pending Q&A audio buffer')
+
       // Exit follow-up mode and reset auto-resume
       inFollowUpMode.current = false
       shouldAutoResume.current = false
@@ -486,6 +514,12 @@ function Podcast() {
 
   // Handle audio chunks from backend
   const handleAudioChunk = (chunk) => {
+    // Don't accumulate chunks if daily brief is playing (user returned to brief)
+    if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      console.log("[audio] Ignoring Q&A audio chunk - daily brief is playing")
+      return
+    }
+
     if (!isStreamingAudioRef.current) {
       console.log("[audio] Starting to accumulate audio chunks")
       isStreamingAudioRef.current = true
@@ -499,6 +533,14 @@ function Podcast() {
   const finalizeAudio = () => {
     if (isRecordingRef.current || preventAutoPlayRef.current) {
       console.log("[audio] Skipping audio playback - recording in progress or auto-play prevented")
+      audioBufferRef.current = []
+      isStreamingAudioRef.current = false
+      return
+    }
+
+    // Don't play Q&A audio if daily brief is currently playing (user returned to brief)
+    if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+      console.log("[audio] Skipping Q&A audio playback - daily brief is playing")
       audioBufferRef.current = []
       isStreamingAudioRef.current = false
       return
@@ -534,6 +576,11 @@ function Podcast() {
         audioPlayerRef.current.oncanplay = () => {
           if (isRecordingRef.current || preventAutoPlayRef.current) {
             console.log("[audio] oncanplay - Skipping playback, recording active")
+            return
+          }
+          // Final safety check: don't play Q&A if daily brief is playing
+          if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
+            console.log("[audio] oncanplay - Skipping Q&A playback, daily brief is playing")
             return
           }
           console.log("[audio] Audio can play, attempting autoplay")
@@ -719,9 +766,15 @@ function Podcast() {
 
       setIsRecording(false)
 
+      // Include daily brief ID for context-aware Q&A
+      const completeMessage = {
+        type: "complete",
+        daily_brief_id: dailyBrief?.id || null  // Pass brief ID if available
+      }
+
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        console.log("[recording] Sending complete signal to backend")
-        wsRef.current.send(JSON.stringify({ type: "complete" }))
+        console.log("[recording] Sending complete signal to backend with daily_brief_id:", dailyBrief?.id)
+        wsRef.current.send(JSON.stringify(completeMessage))
         setStatusMessage("Processing...")
       } else {
         console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
@@ -734,8 +787,8 @@ function Podcast() {
 
           originalWs.addEventListener('open', () => {
             if (wsRef.current === originalWs && originalWs.readyState === WebSocket.OPEN) {
-              console.log("[recording] WebSocket opened after delay, sending complete signal")
-              originalWs.send(JSON.stringify({ type: "complete" }))
+              console.log("[recording] WebSocket opened after delay, sending complete signal with daily_brief_id:", dailyBrief?.id)
+              originalWs.send(JSON.stringify(completeMessage))
               setStatusMessage("Processing...")
             }
           }, { once: true })
@@ -804,6 +857,11 @@ function Podcast() {
       URL.revokeObjectURL(currentAudioUrlRef.current)
       currentAudioUrlRef.current = null
     }
+
+    // Clear any pending Q&A audio chunks that might still be coming in
+    audioBufferRef.current = []
+    isStreamingAudioRef.current = false
+    console.log("[return-to-brief] Cleared pending Q&A audio buffer")
 
     // Update playback state
     setIsPlaying(false)
