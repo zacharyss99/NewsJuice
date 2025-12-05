@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause } from 'lucide-react'
+import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
@@ -418,6 +418,30 @@ function Podcast() {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Skip forward 10 seconds
+  const skipForward = () => {
+    if (briefAudioRef.current && dailyBrief) {
+      const newTime = Math.min(
+        briefAudioRef.current.currentTime + 10,
+        briefAudioRef.current.duration || briefAudioProgress + 10
+      )
+      briefAudioRef.current.currentTime = newTime
+      console.log(`[daily-brief] Skipped forward to ${newTime}s`)
+    }
+  }
+
+  // Skip backward 10 seconds
+  const skipBackward = () => {
+    if (briefAudioRef.current && dailyBrief) {
+      const newTime = Math.max(
+        briefAudioRef.current.currentTime - 10,
+        0
+      )
+      briefAudioRef.current.currentTime = newTime
+      console.log(`[daily-brief] Skipped backward to ${newTime}s`)
+    }
   }
 
   // ========== Q&A FUNCTIONS (EXISTING) ==========
@@ -1133,12 +1157,34 @@ function Podcast() {
               <div className="space-y-4">
                 {/* Play Button and Progress */}
                 <div className="flex items-center gap-4">
+                  {/* Skip Backward Button */}
+                  <button
+                    onClick={skipBackward}
+                    disabled={!dailyBrief}
+                    className="w-12 h-12 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Skip backward 10 seconds"
+                  >
+                    <SkipBack size={20} />
+                  </button>
+
+                  {/* Play/Pause Button */}
                   <button
                     onClick={playDailyBrief}
                     className="w-16 h-16 bg-gradient-to-br from-primary-pink to-pink-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-primary-pink/50 transition-all"
                   >
                     {briefAudioPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
                   </button>
+
+                  {/* Skip Forward Button */}
+                  <button
+                    onClick={skipForward}
+                    disabled={!dailyBrief}
+                    className="w-12 h-12 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Skip forward 10 seconds"
+                  >
+                    <SkipForward size={20} />
+                  </button>
+
                   <div className="flex-1">
                     <div className="h-2 bg-gray-700 rounded-full overflow-hidden mb-2">
                       <div
