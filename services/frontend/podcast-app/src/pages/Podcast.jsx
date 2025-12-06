@@ -47,13 +47,18 @@ function Podcast() {
   const inFollowUpMode = useRef(false)  // Flag to track if user is asking follow-up questions (prevents auto-resume)
 
   // ========== VOICE ACTIVITY DETECTION (Phase 2 - CDN Implementation) ==========
-  const [vadEnabled, setVadEnabled] = useState(false) // VAD on/off toggle for the user
+  // Load VAD preference from localStorage (defaults to false if not set)
+  const [vadEnabled, setVadEnabled] = useState(() => {
+    const saved = localStorage.getItem('vad_enabled')
+    return saved === 'true' // Convert string to boolean
+  })
   const [micPermissionGranted, setMicPermissionGranted] = useState(false) // Track if mic permission granted (for iOS)
 
   // Refs to track current playback state (fixes React closure issue)
   const briefAudioPlayingRef = useRef(false)
   const audioModeRef = useRef('IDLE')
   const vadEnabledRef = useRef(false)
+  const isRecordingInterruptionRef = useRef(false) // Track if we're in an interruption flow
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -66,6 +71,9 @@ function Podcast() {
 
   useEffect(() => {
     vadEnabledRef.current = vadEnabled
+    // Save VAD preference to localStorage whenever it changes
+    localStorage.setItem('vad_enabled', vadEnabled.toString())
+    console.log('[vad] Preference saved:', vadEnabled)
   }, [vadEnabled])
 
   // Handle voice interruption when VAD detects speech
@@ -86,6 +94,10 @@ function Podcast() {
       // Reset follow-up mode (this is the first question)
       inFollowUpMode.current = false
 
+      // Mark that we're in an interruption flow (prevents VAD from being disabled)
+      isRecordingInterruptionRef.current = true
+      console.log('[vad] Interruption mode activated - protecting VAD state')
+
       // Pause VAD during recording (to avoid detecting own speech)
       if (vad) {
         vad.pause()
@@ -104,6 +116,10 @@ function Podcast() {
       // Mark that we're in follow-up mode (prevents auto-resume to brief)
       inFollowUpMode.current = true
       console.log('[vad] Entered follow-up mode - brief will stay paused')
+
+      // Mark that we're in an interruption flow (prevents VAD from being disabled)
+      isRecordingInterruptionRef.current = true
+      console.log('[vad] Interruption mode activated - protecting VAD state')
 
       // Stop current Q&A playback
       if (audioPlayerRef.current) {
@@ -425,7 +441,7 @@ function Podcast() {
       // [iOS VAD Fix] Request microphone permission on iOS (for VAD) before playing
       // This is a user gesture (button click), so iOS will allow it
       const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-      if (isIOS && vadEnabled && !micPermissionGranted) {
+      if (isIOS && vadEnabled && !micPermissionGranted && !isRecordingInterruptionRef.current) {
         console.log('[daily-brief] iOS detected - requesting microphone for VAD')
         const granted = await requestMicrophonePermission()
 
@@ -840,6 +856,10 @@ function Podcast() {
     console.log("[recording] Stopping recording...")
 
     isRecordingRef.current = false
+
+    // Reset interruption mode flag
+    isRecordingInterruptionRef.current = false
+    console.log("[recording] Interruption mode deactivated - VAD state protection removed")
 
     setTimeout(() => {
       preventAutoPlayRef.current = false
