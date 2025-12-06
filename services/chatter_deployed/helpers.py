@@ -145,7 +145,8 @@ YOUR TASK:
    - CONTEXT: Provide background information and explain implications
    - CLOSING: Brief summary statement (NO invitation for follow-up questions)
 5. Target 200 words for a comprehensive answer
-6. If the articles lack sufficient information to answer the question, state: "The latest Harvard news I have doesn't cover that topic in detail."
+6. IMPORTANT: You may make reasonable inferences and draw connections from related information in the articles. If the articles contain relevant context, related topics, or similar subject matter, use that information to provide a helpful answer. Be flexible in interpreting what counts as "relevant" - synonyms, related concepts, and contextual information all count.
+7. ONLY state "The latest Harvard news I have doesn't cover that topic in detail" if the articles are completely unrelated or irrelevant to the question (e.g., asking about sports when only economics articles are provided).
 
 DELIVERY STYLE:
 - Professional but conversational tone

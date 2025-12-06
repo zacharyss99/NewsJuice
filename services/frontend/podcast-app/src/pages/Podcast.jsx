@@ -60,6 +60,12 @@ function Podcast() {
   const vadEnabledRef = useRef(false)
   const isRecordingInterruptionRef = useRef(false) // Track if we're in an interruption flow
 
+  // Refs for audio level tracking and timeout handling (Bug Fix #1)
+  const audioLevelRef = useRef(0)          // Track peak RMS level during recording
+  const audioChunksSentRef = useRef(0)     // Track number of audio chunks sent
+  const recordingTimeoutRef = useRef(null) // Timeout handler for backend response
+  const lastButtonPressRef = useRef(0)     // Timestamp for button debouncing
+
   // Keep refs in sync with state
   useEffect(() => {
     briefAudioPlayingRef.current = briefAudioPlaying
@@ -587,6 +593,13 @@ function Podcast() {
   const handleStatusMessage = (data) => {
     const status = data.status
 
+    // Clear timeout if any backend response received
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current)
+      recordingTimeoutRef.current = null
+      console.log("[ws] Backend responded - timeout cleared")
+    }
+
     switch(status) {
       case "chunk_received":
         break
@@ -764,7 +777,9 @@ function Podcast() {
 
     try {
       preventAutoPlayRef.current = true
-      console.log("[recording] preventAutoPlay flag set to TRUE")
+      audioLevelRef.current = 0
+      audioChunksSentRef.current = 0
+      console.log("[recording] preventAutoPlay flag set to TRUE, audio tracking initialized")
 
       // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A (using ref to avoid stale closure)
       if (briefAudioRef.current && briefAudioPlayingRef.current) {
@@ -824,14 +839,24 @@ function Podcast() {
         const inputData = e.inputBuffer.getChannelData(0)
         const pcmData = new Int16Array(inputData.length)
 
+        // Calculate RMS (Root Mean Square) for audio level tracking
+        let sumSquares = 0
         for (let i = 0; i < inputData.length; i++) {
           const sample = Math.max(-1, Math.min(1, inputData[i]))
           pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF
+          sumSquares += sample * sample
+        }
+        const rms = Math.sqrt(sumSquares / inputData.length)
+
+        // Track peak level during this recording session
+        if (rms > audioLevelRef.current) {
+          audioLevelRef.current = rms
         }
 
         try {
           wsRef.current.send(pcmData.buffer)
-          console.log(`[recording] Sent audio chunk: ${pcmData.buffer.byteLength} bytes`)
+          audioChunksSentRef.current++
+          console.log(`[recording] Sent audio chunk: ${pcmData.buffer.byteLength} bytes, RMS: ${rms.toFixed(4)}`)
         } catch (error) {
           console.error("[recording] Error sending audio chunk:", error)
         }
@@ -860,6 +885,37 @@ function Podcast() {
     // Reset interruption mode flag
     isRecordingInterruptionRef.current = false
     console.log("[recording] Interruption mode deactivated - VAD state protection removed")
+
+    // Check if recording was silent (no meaningful audio detected)
+    const silenceThreshold = 0.01  // Configurable threshold for RMS level
+    const minChunks = 5  // Minimum chunks (~0.5 seconds at 4096 buffer size)
+
+    if (audioLevelRef.current < silenceThreshold || audioChunksSentRef.current < minChunks) {
+      console.warn(`[recording] Silent recording detected - RMS: ${audioLevelRef.current.toFixed(4)}, chunks: ${audioChunksSentRef.current}`)
+
+      // Clean up immediately without sending to backend
+      if (processorRef.current) {
+        processorRef.current.disconnect()
+        processorRef.current = null
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+
+      setIsRecording(false)
+      setStatusMessage("No speech detected. Press the button and speak your question.")
+
+      setTimeout(() => {
+        setStatusMessage("Go ahead, I'm listening")
+      }, 3000)
+
+      return
+    }
 
     setTimeout(() => {
       preventAutoPlayRef.current = false
@@ -890,15 +946,34 @@ function Podcast() {
         daily_brief_id: dailyBrief?.id || null  // Pass brief ID if available
       }
 
+      // Validate WebSocket state before sending
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         console.log("[recording] Sending complete signal to backend with daily_brief_id:", dailyBrief?.id)
         wsRef.current.send(JSON.stringify(completeMessage))
         setStatusMessage("Processing...")
+
+        // Set 30-second timeout for backend response
+        recordingTimeoutRef.current = setTimeout(() => {
+          console.warn("[recording] Backend response timeout - resetting to idle")
+          setStatusMessage("Request timed out. Please try again.")
+
+          // Close WebSocket to force reconnect next time
+          if (wsRef.current) {
+            wsRef.current.close()
+            wsRef.current = null
+          }
+
+          setTimeout(() => {
+            setStatusMessage("Go ahead, I'm listening")
+          }, 3000)
+        }, 30000)  // 30 second timeout
+
       } else {
         console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
 
         if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-          setStatusMessage("Go ahead, I'm listening")
+          setStatusMessage("Connection lost. Please try again.")
+          setTimeout(() => setStatusMessage("Go ahead, I'm listening"), 3000)
         } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
           setStatusMessage("Connecting...")
           const originalWs = wsRef.current
@@ -908,6 +983,17 @@ function Podcast() {
               console.log("[recording] WebSocket opened after delay, sending complete signal with daily_brief_id:", dailyBrief?.id)
               originalWs.send(JSON.stringify(completeMessage))
               setStatusMessage("Processing...")
+
+              // Also set timeout for this delayed send
+              recordingTimeoutRef.current = setTimeout(() => {
+                console.warn("[recording] Backend response timeout - resetting to idle")
+                setStatusMessage("Request timed out. Please try again.")
+                if (wsRef.current) {
+                  wsRef.current.close()
+                  wsRef.current = null
+                }
+                setTimeout(() => setStatusMessage("Go ahead, I'm listening"), 3000)
+              }, 30000)
             }
           }, { once: true })
         }
@@ -915,15 +1001,14 @@ function Podcast() {
     }, 200)
   }
 
-  // Stop playback
-  const stopPlayback = () => {
-    console.log("[playback] Stopping playback and cleaning up")
+  // Stop Q&A playback only (no auto-resume side effects) - Bug Fix #2
+  const stopQAPlaybackOnly = () => {
+    console.log("[playback] Stopping Q&A playback without auto-resume")
 
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause()
       audioPlayerRef.current.currentTime = 0
       audioPlayerRef.current.src = ''
-
       audioPlayerRef.current.onended = null
       audioPlayerRef.current.onerror = null
     }
@@ -934,9 +1019,23 @@ function Podcast() {
     }
 
     setIsPlaying(false)
-    setStatusMessage("Go ahead, I'm listening")
 
-    // [Phase 2] If user manually stops Q&A, resume daily brief
+    // Context-aware status message
+    if (shouldAutoResume.current && briefAudioRef.current) {
+      setStatusMessage("Q&A stopped. Press play above to resume your brief.")
+    } else {
+      setStatusMessage("Go ahead, I'm listening")
+    }
+  }
+
+  // Stop playback
+  const stopPlayback = () => {
+    console.log("[playback] Stopping playback and checking for auto-resume")
+
+    // Use shared cleanup function
+    stopQAPlaybackOnly()
+
+    // [Phase 2] VAD-specific: If user manually stops Q&A, resume daily brief
     if (shouldAutoResume.current && briefAudioRef.current) {
       console.log("[manual-stop] User stopped Q&A, resuming daily brief")
       setAudioMode('RESUMING_BRIEF')
@@ -1009,11 +1108,18 @@ function Podcast() {
 
   // Handle call button
   const handleCallButton = () => {
+    // Debounce: prevent rapid double-presses (< 300ms)
+    const now = Date.now()
+    if (now - lastButtonPressRef.current < 300) {
+      console.log('[call-button] Ignoring rapid press (debounced)')
+      return
+    }
+    lastButtonPressRef.current = now
+
     if (isRecording) {
       stopRecording()
     } else if (isPlaying) {
-      stopPlayback()
-      startRecording()
+      stopQAPlaybackOnly()  // Bug Fix #2: Stop Q&A without starting recording
     } else {
       startRecording()
     }
@@ -1030,6 +1136,10 @@ function Podcast() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Clear recording timeout
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current)
+      }
       if (wsRef.current) {
         wsRef.current.close()
       }
