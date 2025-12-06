@@ -63,6 +63,8 @@ export function useVAD(options = {}) {
           preSpeechPadFrames: options.preSpeechPadFrames || 1,
 
           // Audio constraints - CRITICAL for preventing audio feedback
+          // NOTE: On iOS, getUserMedia() must be called from a user gesture first
+          // (see playDailyBrief() function in Podcast.jsx which pre-requests permission)
           additionalAudioConstraints: {
             echoCancellation: true,
             noiseSuppression: true,

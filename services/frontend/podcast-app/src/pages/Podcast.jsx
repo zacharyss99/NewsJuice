@@ -48,6 +48,7 @@ function Podcast() {
 
   // ========== VOICE ACTIVITY DETECTION (Phase 2 - CDN Implementation) ==========
   const [vadEnabled, setVadEnabled] = useState(false) // VAD on/off toggle for the user
+  const [micPermissionGranted, setMicPermissionGranted] = useState(false) // Track if mic permission granted (for iOS)
 
   // Refs to track current playback state (fixes React closure issue)
   const briefAudioPlayingRef = useRef(false)
@@ -327,8 +328,32 @@ function Podcast() {
     }
   }
 
+  // Request microphone permission for VAD (iOS requires this from a user gesture)
+  const requestMicrophonePermission = async () => {
+    if (micPermissionGranted) {
+      console.log('[mic] Permission already granted')
+      return true
+    }
+
+    try {
+      console.log('[mic] Requesting microphone permission...')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+      // Got permission - stop the stream (we'll use it later for VAD/recording)
+      stream.getTracks().forEach(track => track.stop())
+
+      setMicPermissionGranted(true)
+      console.log('[mic] Microphone permission granted')
+      return true
+    } catch (err) {
+      console.error('[mic] Microphone permission denied:', err)
+      setStatusMessage('⚠️ Microphone access denied. Voice interruption disabled.')
+      return false
+    }
+  }
+
   // Play daily brief audio
-  const playDailyBrief = () => {
+  const playDailyBrief = async () => {
     if (!dailyBrief || !dailyBrief.audio_url) {
       console.warn('[daily-brief] No audio URL available')
       return
@@ -396,6 +421,19 @@ function Podcast() {
       // Exit follow-up mode and reset auto-resume
       inFollowUpMode.current = false
       shouldAutoResume.current = false
+
+      // [iOS VAD Fix] Request microphone permission on iOS (for VAD) before playing
+      // This is a user gesture (button click), so iOS will allow it
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      if (isIOS && vadEnabled && !micPermissionGranted) {
+        console.log('[daily-brief] iOS detected - requesting microphone for VAD')
+        const granted = await requestMicrophonePermission()
+
+        if (!granted) {
+          console.warn('[daily-brief] Mic permission denied - disabling VAD')
+          setVadEnabled(false)
+        }
+      }
 
       // Play the brief
       briefAudioRef.current.play()

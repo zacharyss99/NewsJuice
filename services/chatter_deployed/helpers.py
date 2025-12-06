@@ -73,8 +73,20 @@ def call_gemini_api(
         return None, "Gemini API not configured"
 
     try:
+        # Debug logging to track the bug
+        print(f"[gemini-debug] Received context_articles: {context_articles is not None}")
+        if context_articles is not None:
+            print(f"[gemini-debug] Type: {type(context_articles)}")
+            print(f"[gemini-debug] Length: {len(context_articles)}")
+            if len(context_articles) > 0:
+                print(f"[gemini-debug] First chunk structure: {context_articles[0]}")
+                print(f"[gemini-debug] First chunk types: {[type(x) for x in context_articles[0]]}")
+        else:
+            print(f"[gemini-debug] context_articles is None!")
+
         # Build the prompt with context if articles are provided
         if context_articles:
+            print(f"[gemini-debug] Using WITH-CONTEXT prompt (if block)")
             context_text = "\n\n".join(
                 [
                     f"Article Title: {source_type}\n{chunk}"
@@ -82,7 +94,41 @@ def call_gemini_api(
                 ]
             )
 
-            prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University. Your role is to deliver factual, informative summaries based on news article chunks.
+            print(f"[gemini-debug] Built context_text with {len(context_text)} characters")
+            print(f"[gemini-debug] First 200 chars of context: {context_text[:200]}")
+
+            # FAILSAFE: Check if context_text is actually empty despite having articles
+            if not context_text.strip():
+                print(f"[gemini-error] context_text is empty despite having {len(context_articles)} articles!")
+                print(f"[gemini-error] Sample chunks: {context_articles[:3]}")
+                # Fall through to no-context prompt
+                prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University.
+
+LISTENER'S QUESTION: {question}
+
+SITUATION: No relevant Harvard news articles were found in the database for this topic.
+
+YOUR TASK:
+Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database. Do NOT ask the listener for more information or engage in collaborative conversation.
+
+RESPONSE STRUCTURE:
+1. Acknowledge the question directly
+2. State clearly that recent Harvard news on this topic is not available in your database
+3. Provide 1-2 sentences on what types of Harvard news you DO cover
+4. End with a brief closing statement (NO invitation for follow-up)
+
+DELIVERY STYLE:
+- Professional and authoritative
+- NO collaborative phrases like "Could you clarify?", "What aspect are you interested in?", or "Let me know if..."
+- NO questions to the listener
+- Keep it brief: 50-75 words maximum
+
+EXAMPLE RESPONSE:
+"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
+
+Now generate your response:"""
+            else:
+                prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University. Your role is to deliver factual, informative summaries based on news article chunks.
 
 LISTENER'S QUESTION: {question}
 
@@ -118,6 +164,7 @@ EXAMPLE STRUCTURE:
 
 Now generate your podcast segment answering the listener's question:"""
         else:
+            print(f"[gemini-debug] Using NO-CONTEXT prompt (else block)")
             prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University.
 
 LISTENER'S QUESTION: {question}
@@ -254,6 +301,13 @@ def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
                         chunks_data = json.loads(source_chunks)
                     else:
                         chunks_data = {"chunks": []}
+
+                    # Debug logging for chunk format verification
+                    print(f"[brief-debug] chunks_data type: {type(chunks_data)}")
+                    print(f"[brief-debug] chunks_data keys: {chunks_data.keys() if isinstance(chunks_data, dict) else 'not a dict'}")
+                    if chunks_data.get("chunks"):
+                        print(f"[brief-debug] Number of chunks in chunks_data: {len(chunks_data['chunks'])}")
+                        print(f"[brief-debug] First chunk from DB: {chunks_data['chunks'][0]}")
 
                     return {
                         "id": entry.get("id"),

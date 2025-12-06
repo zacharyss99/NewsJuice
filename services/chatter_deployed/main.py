@@ -183,18 +183,35 @@ async def _retrieve_and_generate_podcast(
     if use_brief_context and brief_context:
         print("[websocket] Using daily brief context for contextual question")
 
+        # Debug logging for brief_context structure
+        print(f"[context-debug] brief_context keys: {brief_context.keys()}")
+        print(f"[context-debug] Number of chunks in brief_context: {len(brief_context.get('chunks', []))}")
+        if brief_context.get("chunks"):
+            first_chunk = brief_context["chunks"][0]
+            print(f"[context-debug] First chunk keys: {first_chunk.keys()}")
+            print(f"[context-debug] First chunk sample: {first_chunk}")
+
         # Start with chunks from daily brief
         all_chunks = []
         for chunk_data in brief_context["chunks"]:
+            # Handle both possible key naming conventions
+            chunk_id = chunk_data.get("chunk_id") or chunk_data.get("id", 0)
+            chunk_text = chunk_data.get("chunk_text") or chunk_data.get("text", "")
+            source_type = chunk_data.get("source_type") or chunk_data.get("source", "")
+            score = chunk_data.get("score", 0.0)
+
+            if not chunk_text:
+                print(f"[context-warning] Empty chunk_text for chunk_id {chunk_id}")
+                continue  # Skip empty chunks
+
             # Convert back to tuple format: (id, chunk_text, source_type, score)
-            all_chunks.append((
-                chunk_data.get("chunk_id", 0),
-                chunk_data.get("chunk_text", ""),
-                chunk_data.get("source_type", ""),
-                chunk_data.get("score", 0.0)
-            ))
+            all_chunks.append((chunk_id, chunk_text, source_type, score))
 
         print(f"[retriever] Using {len(all_chunks)} chunks from daily brief")
+        print(f"[context-debug] Converted {len(all_chunks)} chunks to tuple format")
+        if all_chunks:
+            print(f"[context-debug] First converted chunk: {all_chunks[0]}")
+            print(f"[context-debug] First chunk tuple length: {len(all_chunks[0])}")
 
         # OPTIONAL: Add a few more chunks from fresh retrieval as fallback
         # This ensures we have backup if brief chunks don't fully answer
