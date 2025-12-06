@@ -1,8 +1,10 @@
 """
 NewsJuice Infrastructure - Multi-Service Deployment with Scheduler
 ===================================================================
-Deploys: Loader + Scraper + Chatter to Cloud Run + GKE  # CHANGED: Added Chatter
+Deploys: Loader + Scraper + Chatter + Frontend to Cloud Run + GKE
 Includes: Cloud Scheduler for automated daily triggers
+Includes: HTTPS Ingress with managed certificate
+Includes: WebSocket support via BackendConfig
 ===================================================================
 """
 
@@ -35,42 +37,37 @@ gke_machine_type = config.get("gke_machine_type") or "e2-standard-2"
 # ============================================================================
 # SERVICES CONFIGURATION - Define all services here
 # ============================================================================
-# CHANGED: Added extra_envs field to all services, added chatter service
 SERVICES = [
     {
         "name": "loader",
         "display_name": "NewsJuice Loader",
         "source_dir": "/loader_deployed",
-        "extra_envs": [],  # CHANGED: Added extra_envs field
+        "extra_envs": [],
     },
     {
         "name": "scraper",
         "display_name": "NewsJuice Scraper",
         "source_dir": "/scraper_deployed",
-        "extra_envs": [],  # CHANGED: Added extra_envs field
+        "extra_envs": [],
     },
-    {   # CHANGED: Added entire chatter service
+    {
         "name": "chatter",
         "display_name": "NewsJuice Chatter",
         "source_dir": "/chatter_deployed",
-        "extra_envs": [  # Chatter-specific environment variables
-            #("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,http://newsjuiceapp.com,http://www.newsjuiceapp.com"),
+        "extra_envs": [
             ("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,https://www.newsjuiceapp.com,https://newsjuiceapp.com"),
-            
             ("AUDIO_BUCKET", "newsjuice-123456-audio-bucket"),
             ("GCS_PREFIX", "podcasts/"),
             ("GOOGLE_API_KEY", "AIzaSyA3rhw0aA-NvMtnG3F6Ivv5UIdYZdUhc1I"),
         ],
     },
-    {   # Added frontend here:
+    {
         "name": "frontend",
         "display_name": "NewsJuice Frontend",
         "source_dir": "/frontend",
         "extra_envs": [],
     },
 ]
-# To add more services, just add to this list!
-# ============================================================================
 
 # ============================================================================
 # HELPER FUNCTION FOR DOCKER AUTHENTICATION
@@ -133,7 +130,6 @@ vertex_user_binding = gcp.projects.IAMMember(
     member=service_account.email.apply(lambda email: f"serviceAccount:{email}"),
 )
 
-
 # ============================================================================
 # AUDIO BUCKET PUBLIC ACCESS
 # ============================================================================
@@ -155,7 +151,6 @@ audio_bucket_public = gcp.storage.BucketIAMMember(
     role="roles/storage.objectViewer",
     member="allUsers",
 )
-
 
 # ============================================================================
 # BUILD DOCKER IMAGES FOR ALL SERVICES
@@ -223,7 +218,6 @@ if enable_cloudrun:
                                     "memory": "2Gi",
                                 },
                             ),
-                            # CHANGED: Refactored envs to support extra_envs
                             envs=[
                                 gcp.cloudrun.ServiceTemplateSpecContainerEnvArgs(
                                     name="DB_HOST",
@@ -259,7 +253,7 @@ if enable_cloudrun:
                                     name="GCP_REGION",
                                     value=region,
                                 ),
-                            ] + [  # CHANGED: Added extra_envs support
+                            ] + [
                                 gcp.cloudrun.ServiceTemplateSpecContainerEnvArgs(
                                     name=env_name,
                                     value=env_value,
@@ -285,7 +279,6 @@ if enable_cloudrun:
             ),
         )
 
-        # Make each service publicly accessible
         gcp.cloudrun.IamMember(
             f"{service['name']}-invoker",
             service=cloudrun_services[service["name"]].name,
@@ -299,14 +292,12 @@ if enable_cloudrun:
 # ============================================================================
 
 if enable_cloudrun:
-    # Scheduler service account
     scheduler_sa = gcp.serviceaccount.Account(
         "scheduler-sa",
         account_id="newsjuice-scheduler-sa",
         display_name="NewsJuice Scheduler Service Account",
     )
 
-    # Allow scheduler to invoke Cloud Run services
     for service in SERVICES:
         gcp.cloudrun.IamMember(
             f"{service['name']}-scheduler-invoker",
@@ -316,7 +307,6 @@ if enable_cloudrun:
             member=scheduler_sa.email.apply(lambda email: f"serviceAccount:{email}"),
         )
 
-    # Scraper scheduler - runs daily at 6 AM UTC
     scraper_scheduler = gcp.cloudscheduler.Job(
         "scraper-scheduler",
         name="newsjuice-scraper-daily",
@@ -337,7 +327,6 @@ if enable_cloudrun:
         ),
     )
 
-    # Loader scheduler - runs daily at 7 AM UTC (after scraper)
     loader_scheduler = gcp.cloudscheduler.Job(
         "loader-scheduler",
         name="newsjuice-loader-daily",
@@ -358,8 +347,6 @@ if enable_cloudrun:
         ),
     )
 
-    # CHANGED: Note - No scheduler for chatter (it's user-triggered, not scheduled)
-
 # ============================================================================
 # GKE CLUSTER + KUBERNETES DEPLOYMENT
 # ============================================================================
@@ -372,14 +359,12 @@ k8s_deployments = {}
 k8s_services = {}
 
 if enable_gke:
-    # GKE service account
     gke_sa = gcp.serviceaccount.Account(
         "gke-node-sa",
         account_id="newsjuice-gke-nodes",
         display_name="NewsJuice GKE Node Service Account",
     )
 
-    # IAM bindings for GKE nodes
     gke_storage_binding = gcp.projects.IAMMember(
         "gke-storage-reader",
         project=project,
@@ -415,7 +400,6 @@ if enable_gke:
         member=gke_sa.email.apply(lambda email: f"serviceAccount:{email}"),
     )
 
-    # Create GKE cluster
     gke_cluster = gcp.container.Cluster(
         "newsjuice-cluster",
         name="newsjuice-cluster",
@@ -428,7 +412,6 @@ if enable_gke:
         ),
     )
 
-    # Create node pool
     node_pool = gcp.container.NodePool(
         "newsjuice-node-pool",
         name="newsjuice-pool",
@@ -456,7 +439,6 @@ if enable_gke:
         ),
     )
 
-    # Workload Identity IAM binding
     workload_identity_binding = gcp.serviceaccount.IAMBinding(
         "workload-identity-binding",
         service_account_id=service_account.name,
@@ -469,7 +451,6 @@ if enable_gke:
         ),
     )
 
-    # Create Kubernetes provider
     k8s_provider = k8s.Provider(
         "gke-k8s",
         enable_server_side_apply=True,
@@ -478,7 +459,6 @@ if enable_gke:
         ),
     )
 
-    # Create namespace (shared by all services)
     k8s_namespace = k8s.core.v1.Namespace(
         "newsjuice-namespace",
         metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -490,7 +470,6 @@ if enable_gke:
         ),
     )
 
-    # Create secret (shared by all services)
     k8s_secret = k8s.core.v1.Secret(
         "db-credentials",
         metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -506,7 +485,6 @@ if enable_gke:
         ),
     )
 
-    # Create service account (shared by all services)
     k8s_service_account = k8s.core.v1.ServiceAccount(
         "services-k8s-sa",
         metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -524,7 +502,6 @@ if enable_gke:
 
     # Deploy all services to Kubernetes
     for service in SERVICES:
-        # Create deployment for each service
         k8s_deployments[service["name"]] = k8s.apps.v1.Deployment(
             f"{service['name']}-deployment",
             metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -543,12 +520,10 @@ if enable_gke:
                     spec=k8s.core.v1.PodSpecArgs(
                         service_account_name="newsjuice-services-sa",
                         containers=[
-                            # Service container
                             k8s.core.v1.ContainerArgs(
                                 name=service["name"],
                                 image=service_images[service["name"]].ref,
                                 ports=[k8s.core.v1.ContainerPortArgs(container_port=8080)],
-                                # CHANGED: Refactored env to support extra_envs
                                 env=[
                                     k8s.core.v1.EnvVarArgs(name="DB_HOST", value="127.0.0.1"),
                                     k8s.core.v1.EnvVarArgs(name="DB_NAME", value=db_name),
@@ -573,7 +548,7 @@ if enable_gke:
                                     k8s.core.v1.EnvVarArgs(name="GCP_REGION", value=region),
                                     k8s.core.v1.EnvVarArgs(name="GOOGLE_CLOUD_PROJECT", value=project),
                                     k8s.core.v1.EnvVarArgs(name="GOOGLE_CLOUD_REGION", value=region),
-                                ] + [  # CHANGED: Added extra_envs support
+                                ] + [
                                     k8s.core.v1.EnvVarArgs(name=env_name, value=env_value)
                                     for env_name, env_value in service.get("extra_envs", [])
                                 ],
@@ -582,7 +557,6 @@ if enable_gke:
                                     limits={"memory": "1Gi", "cpu": "500m"},
                                 ),
                             ),
-                            # Cloud SQL Proxy sidecar
                             k8s.core.v1.ContainerArgs(
                                 name="cloud-sql-proxy",
                                 image="gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0",
@@ -614,6 +588,9 @@ if enable_gke:
             metadata=k8s.meta.v1.ObjectMetaArgs(
                 name=f"{service['name']}-service",
                 namespace="newsjuice",
+                annotations={
+                    "cloud.google.com/backend-config": '{"default": "websocket-config"}'
+                } if service["name"] == "chatter" else {},
             ),
             spec=k8s.core.v1.ServiceSpecArgs(
                 type="LoadBalancer",
@@ -631,12 +608,32 @@ if enable_gke:
             ),
         )
 
-
 # ============================================================================
 # HTTPS INGRESS WITH MANAGED CERTIFICATE
 # ============================================================================
 
 if enable_gke:
+    # Backend config for WebSocket support
+    backend_config = k8s.apiextensions.CustomResource(
+        "chatter-websocket-config",
+        api_version="cloud.google.com/v1",
+        kind="BackendConfig",
+        metadata=k8s.meta.v1.ObjectMetaArgs(
+            name="websocket-config",
+            namespace="newsjuice",
+        ),
+        spec={
+            "timeoutSec": 3600,
+            "connectionDraining": {
+                "drainingTimeoutSec": 60,
+            },
+        },
+        opts=pulumi.ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[k8s_namespace]
+        ),
+    )
+
     managed_cert = k8s.apiextensions.CustomResource(
         "managed-cert",
         api_version="networking.gke.io/v1",
@@ -708,28 +705,23 @@ if enable_gke:
         ),
         opts=pulumi.ResourceOptions(
             provider=k8s_provider,
-            depends_on=[managed_cert]
+            depends_on=[managed_cert, backend_config]
         ),
     )
 
     pulumi.export("ingress_url", "https://www.newsjuiceapp.com")
 
-
-
 # ============================================================================
 # EXPORTS
 # ============================================================================
 
-# Always export these
 pulumi.export("artifact_repo", artifact_repo.name)
 pulumi.export("connection_name", connection_name)
 pulumi.export("database_url_format", f"postgresql://USER:PASSWORD@/DATABASE?host=/cloudsql/{connection_name}")
 
-# Export all service images
 for service in SERVICES:
     pulumi.export(f"{service['name']}_image", service_images[service["name"]].ref)
 
-# Cloud Run exports
 if enable_cloudrun:
     pulumi.export("cloudrun_enabled", True)
     for service in SERVICES:
@@ -742,7 +734,6 @@ if enable_cloudrun:
 else:
     pulumi.export("cloudrun_enabled", False)
 
-# GKE exports
 if enable_gke and gke_cluster:
     pulumi.export("gke_enabled", True)
     pulumi.export("gke_cluster_name", gke_cluster.name)
@@ -760,7 +751,6 @@ if enable_gke and gke_cluster:
 else:
     pulumi.export("gke_enabled", False)
 
-# Summary
 pulumi.export("deployment_summary", Output.all(enable_cloudrun, enable_gke).apply(
     lambda args: f"Cloud Run: {'✅ Enabled' if args[0] else '❌ Disabled'}, GKE: {'✅ Enabled' if args[1] else '❌ Disabled'} | Services: {', '.join([s['name'] for s in SERVICES])}"
 ))

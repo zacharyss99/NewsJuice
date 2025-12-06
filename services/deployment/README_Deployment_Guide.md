@@ -1,12 +1,38 @@
 # NewsJuice Deployment Guide
 
-Deploy Loader and Scraper services to Google Cloud Run and GKE (Kubernetes).
+Deploy Loader, Scraper, Chatter and Frontend to Google Cloud Run and GKE (Kubernetes).
+
+NewsJuice is fully deployed with HTTPS!
+
+Final URLs:
+
+Production: https://www.newsjuiceapp.com ✅
+GKE Frontend: http://34.28.40.119
+GKE Chatter: http://136.113.170.71
+
+Features working:
+
+✅ User registration/login (Firebase Auth)
+✅ Preferences saving
+✅ Daily Brief generation & playback
+✅ Microphone/voice Q&A (now works with HTTPS!)
+✅ SSL certificate (Google-managed, auto-renews)
+
+Infrastructure:
+
+✅ GKE cluster with Ingress
+✅ Cloud Run (backup)
+✅ Cloud SQL
+✅ Cloud Scheduler (6 AM scraper, 7 AM loader)
+✅ Pulumi IaC (fully repeatable)
+
+
 
 ## Prerequisites
 
 - Docker installed locally
-- GCP project with billing enabled
-- Service account key (`deployment.json`) with permissions:
+- GCP project with billing enabled (newsjuice-123456)
+- Service account key (`deployment.json` in **secrets** folder in the parent folder of the app) with permissions:
   - Cloud Run Admin
   - Kubernetes Engine Admin
   - Cloud SQL Admin
@@ -60,7 +86,7 @@ pulumi config set --secret db_password YOUR_PASSWORD
 
 ```bash
 cd services/deployment
-./docker-shell.sh
+sh docker-shell.sh
 ```
 
 ### 3. Deploy Infrastructure
@@ -76,13 +102,6 @@ Type `yes` to confirm.
 ## Deployment Outputs
 
 After successful deployment:
-
-| Service | Platform | URL |
-|---------|----------|-----|
-| Loader | Cloud Run | https://newsjuice-loader-xxx.run.app |
-| Scraper | Cloud Run | https://newsjuice-scraper-xxx.run.app |
-| Loader | GKE | http://EXTERNAL-IP |
-| Scraper | GKE | http://EXTERNAL-IP |
 
 View all outputs:
 ```bash
@@ -249,3 +268,100 @@ gcloud run services logs read newsjuice-loader --region=us-central1 --limit=20
 ```
 
 
+HTTPS
+
+Check status (provisioning/active)
+kubectl describe managedcertificate newsjuice-cert -n newsjuice | grep Status
+
+
+
+EXPLORING KUBERNETES DEPLOYMENT
+
+### Pods
+
+```bash
+root@e0d820fde2c9:/app# kubectl get pods -n newsjuice
+NAME                                  READY   STATUS    RESTARTS   AGE
+newsjuice-chatter-6fbcf5b8bd-d2v5f    2/2     Running   0          53m
+newsjuice-chatter-6fbcf5b8bd-vrkhk    2/2     Running   0          53m
+newsjuice-frontend-5bc9db886b-d6d77   2/2     Running   0          26m
+newsjuice-frontend-5bc9db886b-dnkvj   2/2     Running   0          26m
+newsjuice-loader-d57d94895-59579      2/2     Running   0          8h
+newsjuice-loader-d57d94895-vdxv4      2/2     Running   0          8h
+newsjuice-scraper-9f697bcf9-ljjdv     2/2     Running   0          26h
+newsjuice-scraper-9f697bcf9-qkqg4     2/2     Running   0          26h
+```
+```bash
+kubectl logs -n newsjuice <pod-name> -c <container-name>
+```
+
+### Deployment
+
+```bash
+root@e0d820fde2c9:/app# kubectl get deployments -n newsjuice
+NAME                 READY   UP-TO-DATE   AVAILABLE   AGE
+newsjuice-chatter    2/2     2            2           8h
+newsjuice-frontend   2/2     2            2           6h17m
+newsjuice-loader     2/2     2            2           26h
+newsjuice-scraper    2/2     2            2           26h
+```
+
+### Services
+
+```bash
+kubectl get svc -n newsjuice
+```
+
+### Services
+```bash
+root@e0d820fde2c9:/app# kubectl get svc -n newsjuice
+NAME               TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
+chatter-service    LoadBalancer   34.118.238.5     136.113.170.71   80:32185/TCP   8h
+frontend-service   LoadBalancer   34.118.227.57    34.28.40.119     80:30662/TCP   6h18m
+loader-service     LoadBalancer   34.118.235.175   136.114.177.98   80:32501/TCP   26h
+scraper-service    LoadBalancer   34.118.228.50    34.72.210.252    80:32313/TCP   26h
+```
+
+### Ingress
+```bash
+root@e0d820fde2c9:/app# kubectl get ingress -n newsjuice
+NAME                CLASS    HOSTS                  ADDRESS           PORTS   AGE
+newsjuice-ingress   <none>   www.newsjuiceapp.com   136.110.164.121   80      59m
+```
+
+### Certification
+```bash
+kubectl describe managedcertificate newsjuice-cert -n newsjuice
+```
+```
+root@e0d820fde2c9:/app# kubectl describe managedcertificate newsjuice-cert -n newsjuice
+Name:         newsjuice-cert
+Namespace:    newsjuice
+Labels:       <none>
+Annotations:  <none>
+API Version:  networking.gke.io/v1
+Kind:         ManagedCertificate
+Metadata:
+  Creation Timestamp:  2025-12-05T22:43:21Z
+  Generation:          3
+  Resource Version:    1764975426564223020
+  UID:                 90bf5e05-5a56-48c5-8287-48416e7b51a4
+Spec:
+  Domains:
+    www.newsjuiceapp.com
+Status:
+  Certificate Name:    mcrt-a25004c9-72fc-4267-8b43-6796368f3946
+  Certificate Status:  Active
+  Domain Status:
+    Domain:     www.newsjuiceapp.com
+    Status:     Active
+  Expire Time:  2026-03-05T14:43:26.000-08:00
+Events:
+  Type    Reason  Age   From                            Message
+  ----    ------  ----  ----                            -------
+  Normal  Create  60m   managed-certificate-controller  Create SslCertificate mcrt-a25004c9-72fc-4267-8b43-6796368f3946
+```
+### Watch pods in real time
+```bash
+ kubectl get pods -n newsjuice -w
+ ```
