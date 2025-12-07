@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward, StopCircle } from 'lucide-react'
+import { ArrowLeft, Menu, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward, StopCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
@@ -65,6 +65,8 @@ function Podcast() {
   const audioChunksSentRef = useRef(0)     // Track number of audio chunks sent
   const recordingTimeoutRef = useRef(null) // Timeout handler for backend response
   const lastButtonPressRef = useRef(0)     // Timestamp for button debouncing
+  const vadSilenceTimeoutRef = useRef(null) // Timeout for 3-second silence detection in VAD mode
+  const lastAudioChunkTimeRef = useRef(0)   // Timestamp of last audio chunk sent
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -90,6 +92,17 @@ function Podcast() {
     // Check if VAD is enabled - if not, ignore the interruption
     if (!vadEnabledRef.current) {
       console.log('[vad] Ignoring - VAD is disabled by user')
+      return
+    }
+
+    // If we're already recording, cancel any silence timeout (new speech detected)
+    if (isRecordingRef.current && isRecordingInterruptionRef.current) {
+      if (vadSilenceTimeoutRef.current) {
+        clearTimeout(vadSilenceTimeoutRef.current)
+        vadSilenceTimeoutRef.current = null
+        console.log('[vad] New speech detected during recording - cancelled silence timeout')
+      }
+      // Don't start a new recording if already recording
       return
     }
 
@@ -155,6 +168,45 @@ function Podcast() {
     onSpeechStart: handleVoiceInterruption,
     onSpeechEnd: () => {
       console.log('[vad] Speech ended')
+      // When speech ends, start 3-second silence timer
+      // If no new speech is detected within 3 seconds, auto-stop recording
+      if (isRecordingRef.current && isRecordingInterruptionRef.current) {
+        console.log('[vad] Speech ended, starting 3-second silence timer')
+        
+        // Clear any existing timeout
+        if (vadSilenceTimeoutRef.current) {
+          clearTimeout(vadSilenceTimeoutRef.current)
+        }
+        
+        // Set 3-second timeout - if no new speech in 3 seconds, stop recording
+        vadSilenceTimeoutRef.current = setTimeout(() => {
+          if (isRecordingRef.current && isRecordingInterruptionRef.current) {
+            console.log('[vad] 3 seconds of silence after speech ended, auto-stopping recording')
+            console.log('[vad] WebSocket state:', wsRef.current?.readyState, 'chunks sent:', audioChunksSentRef.current)
+            
+            // Ensure WebSocket is ready before stopping
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('[vad] WebSocket ready, calling stopRecording() from silence timeout')
+              stopRecording()
+            } else if (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING) {
+              console.log('[vad] WebSocket connecting, waiting...')
+              // Wait a bit more for WebSocket to open
+              setTimeout(() => {
+                if (isRecordingRef.current && isRecordingInterruptionRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+                  console.log('[vad] WebSocket now open, calling stopRecording()')
+                  stopRecording()
+                } else {
+                  console.warn('[vad] WebSocket still not ready, stopping anyway')
+                  stopRecording()
+                }
+              }, 500)
+            } else {
+              console.warn('[vad] WebSocket not ready, stopping anyway')
+              stopRecording()
+            }
+          }
+        }, 3000) // 3 seconds of silence
+      }
     },
     onVADMisfire: () => {
       console.log('[vad] False positive detected')
@@ -868,10 +920,43 @@ function Podcast() {
           audioLevelRef.current = rms
         }
 
+        // Silence detection threshold - if RMS is above this, we consider it audio
+        const silenceThreshold = 0.01
+        
         try {
-          wsRef.current.send(pcmData.buffer)
-          audioChunksSentRef.current++
-          console.log(`[recording] Sent audio chunk: ${pcmData.buffer.byteLength} bytes, RMS: ${rms.toFixed(4)}`)
+          // Send audio chunk if there's actual audio (not silence)
+          if (rms > silenceThreshold) {
+            wsRef.current.send(pcmData.buffer)
+            audioChunksSentRef.current++
+            lastAudioChunkTimeRef.current = Date.now()
+            
+            // Reset silence timeout when audio is detected (VAD mode only)
+            // This cancels the 3-second timer if user continues speaking
+            if (isRecordingInterruptionRef.current && vadEnabledRef.current) {
+              if (vadSilenceTimeoutRef.current) {
+                clearTimeout(vadSilenceTimeoutRef.current)
+                vadSilenceTimeoutRef.current = null
+                console.log('[vad] Audio detected - cancelled silence timeout')
+              }
+            }
+            
+            console.log(`[recording] Sent audio chunk: ${pcmData.buffer.byteLength} bytes, RMS: ${rms.toFixed(4)}`)
+          } else {
+            // Silent chunk - check if we've exceeded 3 seconds of silence in VAD mode
+            if (isRecordingInterruptionRef.current && vadEnabledRef.current && lastAudioChunkTimeRef.current > 0) {
+              const silenceDuration = Date.now() - lastAudioChunkTimeRef.current
+              // If we've had 3+ seconds of silence and no timeout is set, set one
+              if (silenceDuration >= 3000 && !vadSilenceTimeoutRef.current) {
+                console.log('[vad] 3 seconds of silence detected in audio stream, setting timeout to stop')
+                vadSilenceTimeoutRef.current = setTimeout(() => {
+                  if (isRecordingRef.current && isRecordingInterruptionRef.current) {
+                    console.log('[vad] Silence timeout expired, auto-stopping recording')
+                    stopRecording()
+                  }
+                }, 100) // Small delay to ensure we're still in silence
+              }
+            }
+          }
         } catch (error) {
           console.error("[recording] Error sending audio chunk:", error)
         }
@@ -883,8 +968,12 @@ function Podcast() {
 
       isRecordingRef.current = true
       setIsRecording(true)
+      lastAudioChunkTimeRef.current = Date.now() // Initialize timestamp
       setStatusMessage("Listening...")
       console.log("[recording] Started recording, audio processor active")
+      
+      // Note: Silence timeout is managed by VAD's onSpeechEnd callback
+      // It will start a 3-second timer when speech ends
     } catch (error) {
       console.error('Error starting recording:', error)
       setStatusMessage("Error: " + error.message)
@@ -896,6 +985,13 @@ function Podcast() {
     console.log("[recording] Stopping recording...")
 
     isRecordingRef.current = false
+
+    // Clear silence timeout if it exists
+    if (vadSilenceTimeoutRef.current) {
+      clearTimeout(vadSilenceTimeoutRef.current)
+      vadSilenceTimeoutRef.current = null
+      console.log("[recording] Cleared VAD silence timeout")
+    }
 
     // Reset interruption mode flag
     isRecordingInterruptionRef.current = false
@@ -932,10 +1028,10 @@ function Podcast() {
       return
     }
 
-    setTimeout(() => {
-      preventAutoPlayRef.current = false
-      console.log("[recording] preventAutoPlay flag reset to FALSE - next podcast can auto-play")
-    }, 500)
+    // Reset preventAutoPlay flag immediately when stopping (not delayed)
+    // This ensures audio can play as soon as it arrives from backend
+    preventAutoPlayRef.current = false
+    console.log("[recording] preventAutoPlay flag reset to FALSE immediately - audio can auto-play")
 
     setTimeout(() => {
       if (processorRef.current) {
@@ -1219,18 +1315,6 @@ function Podcast() {
           >
             <Sliders size={24} />
           </button>
-          {/* [Phase 2] VAD Toggle Button */}
-          <button
-            onClick={() => setVadEnabled(!vadEnabled)}
-            className={`p-2 rounded-full transition-colors ${
-              vadEnabled
-                ? 'bg-primary-pink hover:bg-pink-600'
-                : 'hover:bg-gray-800'
-            }`}
-            title={vadEnabled ? 'Voice Detection ON (Hands-free)' : 'Voice Detection OFF (Manual)'}
-          >
-            {vadEnabled ? <Mic size={24} /> : <MicOff size={24} />}
-          </button>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 hover:bg-gray-800 rounded-full transition-colors"
@@ -1480,13 +1564,47 @@ function Podcast() {
 
               {/* Call Buttons */}
               <div className="flex items-center gap-6">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  className="w-16 h-16 bg-gray-800/50 hover:bg-red-900/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-red-500 transition-all"
-                >
-                  <PhoneOff size={24} className="text-red-400" />
-                </motion.button>
+                {/* Voice Detection Toggle Switch */}
+                <div className="flex flex-col items-center gap-2">
+                  <label className="text-xs text-gray-400 font-medium">Voice Detection</label>
+                  <div className="relative inline-flex items-center">
+                    {/* Left label - Voice Detection */}
+                    <span className={`text-xs font-medium mr-2 transition-colors ${
+                      vadEnabled ? 'text-primary-pink' : 'text-gray-500'
+                    }`}>
+                      Voice Detection
+                    </span>
+                    
+                    {/* Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={() => setVadEnabled(!vadEnabled)}
+                      className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-pink focus:ring-offset-2 ${
+                        vadEnabled ? 'bg-primary-pink' : 'bg-gray-600'
+                      }`}
+                      role="switch"
+                      aria-checked={vadEnabled}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          vadEnabled ? 'translate-x-1' : 'translate-x-9'
+                        }`}
+                      />
+                    </button>
+                    
+                    {/* Right label - Manual */}
+                    <span className={`text-xs font-medium ml-2 transition-colors ${
+                      !vadEnabled ? 'text-primary-pink' : 'text-gray-500'
+                    }`}>
+                      Manual
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500 text-center max-w-[100px]">
+                    {vadEnabled ? 'Hands-free' : 'Press to talk'}
+                  </span>
+                </div>
 
+                {/* Main Speak Button */}
                 <motion.button
                   onClick={handleCallButton}
                   whileTap={{ scale: 0.95 }}
@@ -1496,14 +1614,7 @@ function Podcast() {
                       : 'bg-gradient-to-br from-primary-pink to-pink-600 shadow-primary-pink/50'
                   }`}
                 >
-                  {isRecording ? <Mic size={32} className="animate-pulse" /> : <Phone size={32} />}
-                </motion.button>
-
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  className="w-16 h-16 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 transition-all"
-                >
-                  <MicOff size={24} className="text-gray-400" />
+                  {isRecording ? <Mic size={32} className="animate-pulse" /> : <Mic size={32} />}
                 </motion.button>
               </div>
 
