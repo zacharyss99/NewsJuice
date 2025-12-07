@@ -18,8 +18,8 @@ vectors = emb.embed_documents(["text1", "text2"])
 import os
 
 # Table configuration from environment variables
-ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles_test")
-VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector_test")
+ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles")
+VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector")
 
 
 import pandas as pd
