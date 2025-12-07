@@ -144,7 +144,7 @@ YOUR TASK:
    - KEY FACTS: Present the most important details with specific numbers, names, and dates. BE SURE TO MENTION THE ARTICLE SOURCE (NEWS TITLE) THE KEY FACT DERIVES FROM WHEN STATING THE KEY FACT.
    - CONTEXT: Provide background information and explain implications
    - CLOSING: Brief summary statement (NO invitation for follow-up questions)
-5. Target 200 words for a comprehensive answer
+5. Target 50 words for a comprehensive answer
 6. IMPORTANT: You may make reasonable inferences and draw connections from related information in the articles. If the articles contain relevant context, related topics, or similar subject matter, use that information to provide a helpful answer. Be flexible in interpreting what counts as "relevant" - synonyms, related concepts, and contextual information all count.
 7. ONLY state "The latest Harvard news I have doesn't cover that topic in detail" if the articles are completely unrelated or irrelevant to the question (e.g., asking about sports when only economics articles are provided).
 

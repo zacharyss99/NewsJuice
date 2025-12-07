@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward } from 'lucide-react'
+import { ArrowLeft, Menu, Phone, PhoneOff, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward, StopCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
@@ -1409,28 +1409,30 @@ function Podcast() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-400 mb-4">No daily brief available yet.</p>
-                <button
-                  onClick={generateDailyBrief}
-                  className="px-8 py-3 bg-gradient-to-r from-primary-pink to-pink-500 rounded-full font-semibold hover:shadow-lg hover:shadow-primary-pink/50 transition-all"
-                >
-                  Generate Daily Brief
-                </button>
-              </div>
-            )}
-
-            {/* Preferences Prompt - Only show if no preferences AND no brief exists */}
-            {userTopics.length === 0 && userSources.length === 0 && !dailyBrief && !isGeneratingBrief && (
-              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg text-center">
-                <p className="text-sm text-yellow-300 mb-2">
-                  No preferences set yet! Configure your topics and sources to get personalized briefings.
-                </p>
-                <button
-                  onClick={() => navigate('/preferences')}
-                  className="text-sm text-primary-pink hover:underline"
-                >
-                  Set Preferences →
-                </button>
+                {userTopics.length === 0 && userSources.length === 0 ? (
+                  <>
+                    <p className="text-gray-400 mb-4">Set up your preferences to get started!</p>
+                    <p className="text-sm text-gray-500 mb-6">
+                      Configure your topics and sources to receive personalized daily briefings
+                    </p>
+                    <button
+                      onClick={() => navigate('/preferences')}
+                      className="px-8 py-3 bg-gradient-to-r from-primary-pink to-pink-500 rounded-full font-semibold hover:shadow-lg hover:shadow-primary-pink/50 transition-all"
+                    >
+                      Set Preferences
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-400 mb-4">No daily brief available yet.</p>
+                    <button
+                      onClick={generateDailyBrief}
+                      className="px-8 py-3 bg-gradient-to-r from-primary-pink to-pink-500 rounded-full font-semibold hover:shadow-lg hover:shadow-primary-pink/50 transition-all"
+                    >
+                      Generate Daily Brief
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1489,6 +1491,23 @@ function Podcast() {
                   <MicOff size={24} className="text-gray-400" />
                 </motion.button>
               </div>
+
+              {/* Stop Q&A Answer Button (shows when Q&A audio is playing) */}
+              <AnimatePresence>
+                {isPlaying && audioMode === 'PLAYING_QA' && (
+                  <motion.button
+                    onClick={stopQAPlaybackOnly}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-8 py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/50 transition-all flex items-center gap-2"
+                  >
+                    <StopCircle size={20} />
+                    Stop Answer
+                  </motion.button>
+                )}
+              </AnimatePresence>
 
               {/* Return to Daily Brief Button (shows when user is asking follow-up questions) */}
               {shouldAutoResume.current && !briefAudioPlaying && audioMode !== 'PLAYING_BRIEF' && (
