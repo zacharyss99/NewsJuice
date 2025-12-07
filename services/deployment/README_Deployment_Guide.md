@@ -365,3 +365,59 @@ Events:
 ```bash
  kubectl get pods -n newsjuice -w
  ```
+
+### All resources
+```bash
+kubectl get all -n newsjuice
+```
+```
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/newsjuice-chatter-6fbcf5b8bd-d2v5f    2/2     Running   0          62m
+pod/newsjuice-chatter-6fbcf5b8bd-vrkhk    2/2     Running   0          62m
+pod/newsjuice-frontend-5bc9db886b-d6d77   2/2     Running   0          36m
+pod/newsjuice-frontend-5bc9db886b-dnkvj   2/2     Running   0          36m
+pod/newsjuice-loader-d57d94895-59579      2/2     Running   0          9h
+pod/newsjuice-loader-d57d94895-vdxv4      2/2     Running   0          9h
+pod/newsjuice-scraper-9f697bcf9-ljjdv     2/2     Running   0          26h
+pod/newsjuice-scraper-9f697bcf9-qkqg4     2/2     Running   0          26h
+
+NAME                       TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
+service/chatter-service    LoadBalancer   34.118.238.5     136.113.170.71   80:32185/TCP   8h
+service/frontend-service   LoadBalancer   34.118.227.57    34.28.40.119     80:30662/TCP   6h23m
+service/loader-service     LoadBalancer   34.118.235.175   136.114.177.98   80:32501/TCP   26h
+service/scraper-service    LoadBalancer   34.118.228.50    34.72.210.252    80:32313/TCP   26h
+
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/newsjuice-chatter    2/2     2            2           8h
+deployment.apps/newsjuice-frontend   2/2     2            2           6h23m
+deployment.apps/newsjuice-loader     2/2     2            2           26h
+deployment.apps/newsjuice-scraper    2/2     2            2           26h
+
+NAME                                            DESIRED   CURRENT   READY   AGE
+replicaset.apps/newsjuice-chatter-58b6748d8b    0         0         0       4h32m
+replicaset.apps/newsjuice-chatter-59d7985d5d    0         0         0       8h
+replicaset.apps/newsjuice-chatter-64d4ddbc77    0         0         0       6h24m
+replicaset.apps/newsjuice-chatter-67f9bf5c87    0         0         0       8h
+replicaset.apps/newsjuice-chatter-6f956dfcf9    0         0         0       8h
+replicaset.apps/newsjuice-chatter-6fbcf5b8bd    2         2         2       62m
+replicaset.apps/newsjuice-chatter-7b447c8d5     0         0         0       8h
+replicaset.apps/newsjuice-chatter-8569c69bd4    0         0         0       7h47m
+replicaset.apps/newsjuice-chatter-bdcdcf4f5     0         0         0       4h31m
+replicaset.apps/newsjuice-chatter-c458f76c7     0         0         0       5h34m
+replicaset.apps/newsjuice-chatter-c854b888      0         0         0       5h1m
+replicaset.apps/newsjuice-frontend-54f9b46c8b   0         0         0       5h14m
+replicaset.apps/newsjuice-frontend-5bc9db886b   2         2         2       36m
+replicaset.apps/newsjuice-frontend-5c646f8c98   0         0         0       5h41m
+replicaset.apps/newsjuice-frontend-5db685777c   0         0         0       4h9m
+replicaset.apps/newsjuice-frontend-5f44fbffb9   0         0         0       4h18m
+replicaset.apps/newsjuice-frontend-6d86f99b8    0         0         0       6h4m
+replicaset.apps/newsjuice-frontend-767d574c6d   0         0         0       5h43m
+replicaset.apps/newsjuice-frontend-79bb8b7d86   0         0         0       4h17m
+replicaset.apps/newsjuice-frontend-7db8696c4    0         0         0       6h11m
+replicaset.apps/newsjuice-frontend-85c86b98b5   0         0         0       6h23m
+replicaset.apps/newsjuice-frontend-85cd545c8    0         0         0       5h13m
+replicaset.apps/newsjuice-loader-5847b79c4      0         0         0       26h
+replicaset.apps/newsjuice-loader-d57d94895      2         2         2       9h
+replicaset.apps/newsjuice-scraper-9f697bcf9     2         2         2       26h
+```
+

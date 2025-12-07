@@ -541,6 +541,8 @@ function Podcast() {
   //  return `${protocol}://${host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
   //}
 
+  
+  
   const getWebSocketUrl = () => {
     const isProduction = window.location.hostname.includes('newsjuiceapp.com')
     if (isProduction) {
@@ -548,6 +550,19 @@ function Podcast() {
     }
     return `ws://localhost:8080/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
   }
+
+
+
+// FOR FINAL VERSION USE GKE AND NOT CLOUDRUN:
+// 
+//  const getWebSocketUrl = () => {
+//    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+//    if (isProduction) {
+//      // Use same host as the page (GKE Ingress)
+//      return `wss://${window.location.host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+//    }
+//    return `ws://localhost:8080/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+//  }
 
 
 // return `${protocol}://${host}/ws/chat?token=${currentUser?.accessToken || ''}`
