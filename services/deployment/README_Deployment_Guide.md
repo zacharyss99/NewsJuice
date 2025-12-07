@@ -844,3 +844,14 @@ Validate JWT: auth.verify_id_token(token)
 GCP IAM
 
 Grant roles/firebase.admin to GKE service account
+
+
+
+## LOAD TEST
+
+Terminal 1.
+kubectl top pods -n newsjuice --use-protocol-buffers
+Terminal 2.
+k9s -n newsjuice
+Terminal 3.
+hey -z 60s -c 50 https://www.newsjuiceapp.com/api/health

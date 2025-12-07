@@ -584,7 +584,8 @@ class FirebaseAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Skip auth for health check and public endpoints
-        if request.url.path in ["/", "/healthz", "/docs", "/openapi.json"]:
+        # CHANGE CM - if request.url.path in ["/", "/healthz", "/docs", "/openapi.json"]:
+        if request.url.path in ["/", "/health", "/healthz", "/api/health", "/docs", "/openapi.json"]:
             return await call_next(request)
 
         # WebSocket handles auth separately (see below)

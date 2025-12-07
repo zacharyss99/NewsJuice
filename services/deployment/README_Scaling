@@ -1,0 +1,30 @@
+# Scaling
+
+
+
+1. Manual horizontal scaling: 2 pods implemented
+
+2. Horizontal Pod Autoscaler (HPA) - scales pods based on CPU/memory
+min_replicas=2
+max_replicas=10
+average_utilization=50 (CPU)
+
+3. Cluster Autoscaler — scales nodes (already enabled in GKE by default).
+
+
+
+root@32cc13d7288e:/app# kubectl get hpa -n newsjuice
+NAME                    REFERENCE                      TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+newsjuice-chatter-hpa   Deployment/newsjuice-chatter   cpu: 1%/50%   2         10        2          45s
+
+Terminal 1 — Watch HPA:
+kubectl get hpa -n newsjuice -w
+
+Terminal 2 — Watch pods:
+kubectl get pods -n newsjuice -w
+
+Terminal 3 (on your Mac) — Generate heavy load:
+hey -z 120s -c 100 https://www.newsjuiceapp.com/api/health
+
+Watch everything
+k9s -n newsjuice

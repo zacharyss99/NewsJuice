@@ -611,6 +611,47 @@ if enable_gke:
         )
 
     # ==========================================================================
+    # CM CHANGE : HORIZONTAL POD AUTOSCALER FOR CHATTER
+    # ==========================================================================
+    # Automatically scales chatter pods based on CPU utilization
+    # - Scales up when CPU > 50%
+    # - Min 2 pods, max 10 pods
+    # ==========================================================================
+    
+    chatter_hpa = k8s.autoscaling.v2.HorizontalPodAutoscaler(
+        "chatter-hpa",
+        metadata=k8s.meta.v1.ObjectMetaArgs(
+            name="newsjuice-chatter-hpa",
+            namespace="newsjuice",
+        ),
+        spec=k8s.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+            scale_target_ref=k8s.autoscaling.v2.CrossVersionObjectReferenceArgs(
+                api_version="apps/v1",
+                kind="Deployment",
+                name="newsjuice-chatter",
+            ),
+            min_replicas=2,
+            max_replicas=10,
+            metrics=[
+                k8s.autoscaling.v2.MetricSpecArgs(
+                    type="Resource",
+                    resource=k8s.autoscaling.v2.ResourceMetricSourceArgs(
+                        name="cpu",
+                        target=k8s.autoscaling.v2.MetricTargetArgs(
+                            type="Utilization",
+                            average_utilization=50,
+                        ),
+                    ),
+                ),
+            ],
+        ),
+        opts=pulumi.ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[k8s_deployments["chatter"]]
+        ),
+    )    
+
+    # ==========================================================================
     # CM CHANGE 6: NEW - Deploy loader and scraper as Kubernetes CronJobs
     # ==========================================================================
     # CM: CronJobs run on a schedule and terminate after completion.
