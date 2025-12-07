@@ -6,17 +6,17 @@ The NewsJuice app is now fully deployed via pulumi and on GKE (kubernetes) and u
 
 Final URLs:
 
-Production: https://www.newsjuiceapp.com ✅
-GKE Frontend: http://34.28.40.119
-GKE Chatter: http://136.113.170.71
+Production: https://www.newsjuiceapp.com ✅  
+GKE Frontend: http://34.28.40.119  
+GKE Chatter: http://136.113.170.71  
 
 Features working:
 
-✅ User registration/login (Firebase Auth)
-✅ Preferences saving
-✅ Daily Brief generation & playback
-✅ Microphone/voice Q&A
-✅ SSL certificate (Google-managed, auto-renews)
+✅ User registration/login (Firebase Auth)  
+✅ Preferences saving  
+✅ Daily Brief generation & playback  
+✅ Microphone/voice Q&A  
+✅ SSL certificate (Google-managed, auto-renews)  
 
 Infrastructure:
 
@@ -27,15 +27,15 @@ Infrastructure:
 
 ## Prerequisites
 
-- Docker installed locally
-- GCP project with billing enabled (newsjuice-123456)
-- Service account key (`deployment.json` in **secrets** folder in the parent folder of the app) with permissions:
-  - Cloud Run Admin
-  - Kubernetes Engine Admin
-  - Cloud SQL Admin
-  - Artifact Registry Admin
-  - Service Account Admin
-  - IAM Admin
+- Docker installed locally  
+- GCP project with billing enabled (newsjuice-123456)  
+- Service account key (`deployment.json` in **secrets** folder in the parent folder of the app) with permissions:  
+  - Cloud Run Admin  
+  - Kubernetes Engine Admin  
+  - Cloud SQL Admin  
+  - Artifact Registry Admin  
+  - Service Account Admin  
+  - IAM Admin  
 
 ## Directory Structure
 
@@ -249,32 +249,32 @@ Inside your deployment container:
 cd /app
 pulumi destroy
 ```
-Type yes to confirm. This deletes:
+Type yes to confirm. This deletes:  
 
-✅ GKE cluster + nodes + pods
-✅ Load balancers
-✅ Service accounts + IAM bindings
-✅ Artifact Registry images
+✅ GKE cluster + nodes + pods  
+✅ Load balancers  
+✅ Service accounts + IAM bindings  
+✅ Artifact Registry images  
+  
+What stays (not managed by Pulumi):  
 
-What stays (not managed by Pulumi):
+* Cloud SQL database (~$10-50/month)  
+* Pulumi state bucket  
 
-* Cloud SQL database (~$10-50/month)
-* Pulumi state bucket
+Start Fresh Deployment  
+After destroying:  
 
-Start Fresh Deployment
-After destroying:
-
-# Exit container
+### Exit container
 ```bash
 exit
 ```
 
-# Restart container
+### Restart container
 ```bash
 ./docker-shell.sh
 ```
 
-# Inside container
+### Inside container
 ```bash
 cd /app
 pulumi up
@@ -293,12 +293,43 @@ gcloud run services logs read newsjuice-loader --region=us-central1 --limit=20
 ```
 
 
-### HTTPS
+## HTTPS setup
 
-Check status (provisioning/active)
+1. Obtain domain name (e.g. www.domain.com)  
+2. Reserve a static IP
+```bash
+gcloud compute addresses create newsjuice-ip --global
+```
+Check status (provisioning/active)  
 ```bash
 kubectl describe managedcertificate newsjuice-cert -n newsjuice | grep Status
 ```
+3. Configure DNS at domain registrar  
+* type = a  
+* name = wwww  
+* value = 136.110.164.121 (NewsJuice static IP)  
+
+4. Include managed certificate in pulumi __main__  
+5. INnress with SSL in pulumi __main__  
+
+
+## Quick Verification Checklist
+**HTTPS**
+
+ Static IP reserved  
+ DNS A record configured  
+ Certificate status is Active  
+ https://www.newsjuiceapp.com loads without warnings  
+
+**Firebase Auth**  
+  
+ Firebase project created  
+ Google Sign-in enabled  
+ Authorized domains added  
+ Frontend Firebase SDK configured  
+ Backend JWT validation working  
+ GKE service account has Firebase Admin role  
+
 
 # Exploring Kubernetes deployment
 
@@ -324,7 +355,7 @@ newsjuice-chatter    2/2     2            2           8h
 ...
 ```
 
-### Services
+### Services
 
 ```bash
 kubectl get svc -n newsjuice
@@ -786,3 +817,30 @@ CronJob Scraper (6 AM UTC):
 CronJob Loader (7 AM UTC):
   Scheduler → Create Pod → uvicorn :8080 & curl localhost:8080/process → Vertex AI :443 + SQL-proxy :5432 → CloudSQL :5432
 ```
+
+## Appendix 1 Firebase Authentication Setup
+
+
+Firebase Console (console.firebase.google.com)
+
+Create/select project → link to GCP project newsjuice-123456
+Authentication → Sign-in method → Enable Google and/or Email/Password
+Authentication → Settings → Authorized domains → Add www.newsjuiceapp.com
+Project Overview → Add app → Web → Copy config
+
+Frontend
+
+npm install firebase
+Create src/firebase.js with config + auth functions
+Store JWT token: user.getIdToken() → localStorage.setItem('auth_token', token)
+Pass token in WebSocket: wss://...?token=${token}
+
+Backend (Chatter)
+
+pip install firebase-admin
+Initialize: firebase_admin.initialize_app() (uses GKE credentials)
+Validate JWT: auth.verify_id_token(token)
+
+GCP IAM
+
+Grant roles/firebase.admin to GKE service account
