@@ -542,16 +542,22 @@ function Podcast() {
   //}
 
   
-  
+  // CM CHANGE 
+//  const getWebSocketUrl = () => {
+//    const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+//    if (isProduction) {
+//      return `wss://newsjuice-chatter-yln2r3urna-uc.a.run.app/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+//    }
+//    return `ws://localhost:8080/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+//  }
+
   const getWebSocketUrl = () => {
     const isProduction = window.location.hostname.includes('newsjuiceapp.com')
     if (isProduction) {
-      return `wss://newsjuice-chatter-yln2r3urna-uc.a.run.app/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+      return `wss://${window.location.host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
     }
     return `ws://localhost:8080/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
   }
-
-
 
 // FOR FINAL VERSION USE GKE AND NOT CLOUDRUN:
 // 

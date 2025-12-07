@@ -7,7 +7,7 @@ config:
   newsjuice-loader:db_user: postgres
   newsjuice-loader:db_password:
     secure: v1:cnNijZYEjwdTkLER:6R28gJ0M1CtKNKTx05xGdM5PSJ8vRMXFI26Bhw==
-  newsjuice-loader:enable_cloudrun: true
+  newsjuice-loader:enable_cloudrun: false
   newsjuice-loader:enable_gke: true
   newsjuice-loader:gke_node_count: 2
   newsjuice-loader:gke_machine_type: e2-standard-2  # 2 CPUs

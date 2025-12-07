@@ -421,3 +421,336 @@ replicaset.apps/newsjuice-loader-d57d94895      2         2         2       9h
 replicaset.apps/newsjuice-scraper-9f697bcf9     2         2         2       26h
 ```
 
+## Testing CronJobs for scraper and loader
+
+1. List CronJobs
+```bash
+kubectl get cronjobs -n newsjuice
+```
+
+2. List Jobs (created by CronJobs)
+```bash
+kubectl get jobs -n newsjuice
+```
+3. List Pods (created by Jobs)
+```bash
+kubectl get pods -n newsjuice
+```
+Manually trigger a test
+```bash
+kubectl create job --from=cronjob/newsjuice-scraper test-scraper3 -n newsjuice
+```
+5. Watch pods
+```bash
+kubectl get pods -n newsjuice -w
+```
+6. Check logs
+```bash
+kubectl logs -l job-name=test-scraper3 -n newsjuice -c scraper
+```
+
+
+```
+Users
+  │
+  ▼
+GKE Ingress (www.newsjuiceapp.com)
+  │
+  ├── /api/* ──→ Chatter (FastAPI + SQL Proxy) ──→ Cloud SQL
+  ├── /ws/*  ──→ Chatter (WebSockets)          ──→ Cloud SQL
+  └── /*     ──→ Frontend (Nginx + React)
+  
+CronJobs (scheduled, not always-on):
+  ├── Scraper (6 AM UTC) ──→ Cloud SQL
+  └── Loader  (7 AM UTC) ──→ Cloud SQL + Vertex AI
+```
+
+```  
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              NEWSJUICE DEPLOYMENT ARCHITECTURE                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+                                    ┌──────────────┐
+                                    │    USERS     │
+                                    │   Browser    │
+                                    └──────┬───────┘
+                                           │
+                                           │ HTTPS
+                                           ▼
+                              ┌────────────────────────┐
+                              │  www.newsjuiceapp.com  │
+                              │     (DNS → GKE IP)     │
+                              │    136.110.164.121     │
+                              └────────────┬───────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    GOOGLE KUBERNETES ENGINE                              │
+│                                    (newsjuice-cluster)                                   │
+│  ┌────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                              GKE INGRESS (GCE Load Balancer)                       │  │
+│  │                         + Managed SSL Certificate (newsjuice-cert)                 │  │
+│  │  ┌──────────────────┬────────────────────────┬──────────────────────────────────┐  │  │
+│  │  │    /api/*        │        /ws/*           │            /*                    │  │  │
+│  │  │                  │    (WebSockets)        │                                  │  │  │
+│  │  └────────┬─────────┴───────────┬────────────┴─────────────────┬────────────────┘  │  │
+│  └───────────┼─────────────────────┼──────────────────────────────┼───────────────────┘  │
+│              │                     │                              │                      │
+│              ▼                     ▼                              ▼                      │
+│  ┌─────────────────────────────────────────────┐    ┌─────────────────────────────────┐  │
+│  │           CHATTER SERVICE                   │    │      FRONTEND SERVICE           │  │
+│  │           (LoadBalancer)                    │    │      (LoadBalancer)             │  │
+│  │           Port 80 → 8080                    │    │      Port 80 → 8080             │  │
+│  │           + WebSocket BackendConfig         │    │                                 │  │
+│  └─────────────────┬───────────────────────────┘    └───────────────┬─────────────────┘  │
+│                    │                                                │                    │
+│                    ▼                                                ▼                    │
+│  ┌─────────────────────────────────────────────┐    ┌─────────────────────────────────┐  │
+│  │         CHATTER DEPLOYMENT                  │    │     FRONTEND DEPLOYMENT         │  │
+│  │         (2 replicas)                        │    │     (2 replicas)                │  │
+│  │  ┌───────────────────────────────────────┐  │    │  ┌───────────────────────────┐  │  │
+│  │  │ Pod                                   │  │    │  │ Pod                       │  │  │
+│  │  │ ┌─────────────┐  ┌─────────────────┐  │  │    │  │ ┌─────────────────────┐   │  │  │
+│  │  │ │  FastAPI    │  │ Cloud SQL Proxy │  │  │    │  │ │   Nginx (8080)      │   │  │  │
+│  │  │ │  Uvicorn    │  │   (sidecar)     │  │  │    │  │ │   Static files      │   │  │  │
+│  │  │ │  (8080)     │  │   (5432)        │  │  │    │  │ │   React SPA         │   │  │  │
+│  │  │ └──────┬──────┘  └────────┬────────┘  │  │    │  │ └─────────────────────┘   │  │  │
+│  │  └────────┼──────────────────┼───────────┘  │    │  └───────────────────────────┘  │  │
+│  └───────────┼──────────────────┼──────────────┘    └─────────────────────────────────┘  │
+│              │                  │                                                        │
+│              │                  │ ┌─────────────────────────────────────────────────────┐│
+│              │                  │ │              CRONJOBS (Scheduled)                   ││
+│              │                  │ │                                                     ││
+│              │                  │ │  ┌─────────────────────┐ ┌─────────────────────┐    ││
+│              │                  │ │  │  SCRAPER CRONJOB    │ │  LOADER CRONJOB     │    ││
+│              │                  │ │  │  Schedule: 6AM UTC  │ │  Schedule: 7AM UTC  │    ││
+│              │                  │ │  │                     │ │                     │    ││
+│              │                  │ │  │  ┌───────────────┐  │ │  ┌───────────────┐  │    ││
+│              │                  │ │  │  │ Scraper Pod   │  │ │  │ Loader Pod    │  │    ││
+│              │                  │ │  │  │ + SQL Proxy   │──┼─┼──│ + SQL Proxy   │  │    ││
+│              │                  │ │  │  └───────────────┘  │ │  └───────────────┘  │    ││
+│              │                  │ │  └─────────────────────┘ └─────────────────────┘    ││
+│              │                  │ └──────────────────────────────────┬──────────────────┘│
+│              │                  │                                    │                   │
+└──────────────┼──────────────────┼────────────────────────────────────┼───────────────────┘
+               │                  │                                    │
+               │                  └────────────────┬───────────────────┘
+               │                                   │
+               │                                   ▼
+               │                  ┌─────────────────────────────────────┐
+               │                  │         CLOUD SQL (PostgreSQL)      │
+               │                  │         newsdb-instance             │
+               │                  │         + pgvector extension        │
+               └──────────────────│                                     │
+                                  │  ┌─────────────┐  ┌──────────────┐  │
+                                  │  │  articles   │  │chunks_vector │  │
+                                  │  │   table     │  │   table      │  │
+                                  │  └─────────────┘  └──────────────┘  │
+                                  └─────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   OTHER GCP SERVICES                                    │
+│                                                                                         │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────────────────┐  │
+│  │  Artifact Registry  │  │   Cloud Storage     │  │       Vertex AI                 │  │
+│  │  (Docker images)    │  │   (Audio bucket)    │  │   (Embeddings API)              │  │
+│  │                     │  │   Podcast files     │  │   text-embedding-004            │  │
+│  │  - loader:latest    │  │                     │  │                                 │  │
+│  │  - scraper:latest   │  │                     │  │                                 │  │
+│  │  - chatter:latest   │  │                     │  │                                 │  │
+│  │  - frontend:latest  │  │                     │  │                                 │  │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    DATA FLOW                                            │
+│                                                                                         │
+│  1. SCRAPER (6 AM UTC)                                                                  │
+│     └─→ Fetches articles from Harvard news sources                                      │
+│     └─→ Stores raw articles in PostgreSQL (articles table)                              │
+│                                                                                         │
+│  2. LOADER (7 AM UTC)                                                                   │
+│     └─→ Reads new articles from PostgreSQL                                              │
+│     └─→ Chunks text + generates embeddings via Vertex AI                                │
+│     └─→ Stores vectors in PostgreSQL (chunks_vector table with pgvector)                │
+│                                                                                         │
+│  3. CHATTER (On-demand)                                                                 │
+│     └─→ User sends voice/text via WebSocket                                             │
+│     └─→ Semantic search on chunks_vector (pgvector similarity)                          │
+│     └─→ RAG: Retrieved context + LLM generates response                                 │
+│     └─→ TTS generates audio → stored in Cloud Storage                                   │
+│     └─→ Audio URL returned to user                                                      │
+│                                                                                         │
+│  4. FRONTEND (Always-on)                                                                │
+│     └─→ React SPA served by Nginx                                                       │
+│     └─→ WebSocket connection to Chatter for real-time chat                              │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+````
+─────────────────────────────────────────--------
+| Component      | External Port | Internal Port |
+|----------------|---------------|---------------|
+| Ingress        | :443 (HTTPS)  | -             |
+| Services       | :80           | :8080         |
+| All containers | -             | :8080         |
+| SQL Proxy      | -             | :5432         |
+| Cloud SQL      | -             | :5432         |
+─────────────────────────────────────────--------
+```
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              NEWSJUICE PORTS DIAGRAM                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+                                    ┌──────────────┐
+                                    │    USERS     │
+                                    └──────┬───────┘
+                                           │
+                                           │ :443 (HTTPS)
+                                           │ :443 (WSS)
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                GKE INGRESS                                               │
+│                          (Google Cloud Load Balancer)                                    │
+│                                                                                          │
+│   External IP: 136.110.164.121                                                           │
+│   Listening:   :443 (HTTPS/WSS) with managed SSL cert                                    │
+│                :80  (HTTP → redirects to HTTPS)                                          │
+└────────────────────────────────────┬─────────────────────────────────────────────────────┘
+                                     │
+          ┌──────────────────────────┼──────────────────────────┐
+          │                          │                          │
+          │ /api/*                   │ /ws/*                    │ /*
+          │                          │                          │
+          ▼                          ▼                          ▼
+┌──────────────────────────────────────────────┐    ┌─────────────────────────────────────┐
+│         CHATTER-SERVICE (K8s Service)        │    │   FRONTEND-SERVICE (K8s Service)   │
+│         Type: LoadBalancer                   │    │   Type: LoadBalancer                │
+│                                              │    │                                     │
+│   External: :80  ───────┐                    │    │   External: :80  ───────┐           │
+│                         │                    │    │                         │           │
+│   targetPort: 8080 ◄────┘                    │    │   targetPort: 8080 ◄────┘           │
+└──────────────────────────┬───────────────────┘    └───────────────────────┬─────────────┘
+                           │                                                │
+                           ▼                                                ▼
+┌──────────────────────────────────────────────┐    ┌─────────────────────────────────────┐
+│              CHATTER POD                     │    │          FRONTEND POD               │
+│  ┌─────────────────────────────────────────┐ │    │  ┌───────────────────────────────┐  │
+│  │          CHATTER CONTAINER              │ │    │  │      FRONTEND CONTAINER       │  │
+│  │                                         │ │    │  │                               │  │
+│  │   FastAPI + Uvicorn                     │ │    │  │   Nginx                       │  │
+│  │   Listening: :8080                      │ │    │  │   Listening: :8080            │  │
+│  │                                         │ │    │  │   (configured in nginx.conf)  │  │
+│  │   Endpoints:                            │ │    │  │                               │  │
+│  │   - POST /api/chat                      │ │    │  │   Serves:                     │  │
+│  │   - WS   /ws/chat                       │ │    │  │   - Static React files        │  │
+│  │   - POST /process                       │ │    │  │   - SPA routing (/* → index)  │  │
+│  │   - GET  /health                        │ │    │  │                               │  │
+│  └────────────────────┬────────────────────┘ │    │  └───────────────────────────────┘  │
+│                       │                      │    │                                     │
+│                       │ localhost:5432       │    │  (No database connection)           │
+│                       ▼                      │    │                                     │
+│  ┌─────────────────────────────────────────┐ │    └─────────────────────────────────────┘
+│  │       CLOUD-SQL-PROXY CONTAINER         │ │
+│  │       (sidecar)                         │ │
+│  │                                         │ │
+│  │   Listening: :5432                      │ │
+│  │   Connects to Cloud SQL via IAM         │ │
+│  └────────────────────┬────────────────────┘ │
+└───────────────────────┼──────────────────────┘
+                        │
+                        │ :5432 (PostgreSQL protocol)
+                        │ (via private Google network)
+                        ▼
+┌──────────────────────────────────────────────┐
+│              CLOUD SQL                       │
+│              (PostgreSQL)                    │
+│                                              │
+│   Instance: newsdb-instance                  │
+│   Listening: :5432                           │
+│   Database: newsjuice                        │
+└──────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              CRONJOB PODS (Scheduled)                                   │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────┐    ┌─────────────────────────────────────┐
+│              SCRAPER POD                     │    │            LOADER POD               │
+│              (Created at 6 AM UTC)           │    │            (Created at 7 AM UTC)    │
+│  ┌─────────────────────────────────────────┐ │    │  ┌───────────────────────────────┐  │
+│  │          SCRAPER CONTAINER              │ │    │  │       LOADER CONTAINER        │  │
+│  │                                         │ │    │  │                               │  │
+│  │   FastAPI + Uvicorn                     │ │    │  │   FastAPI + Uvicorn           │  │
+│  │   Listening: :8080                      │ │    │  │   Listening: :8080            │  │
+│  │                                         │ │    │  │                               │  │
+│  │   Triggered by:                         │ │    │  │   Triggered by:               │  │
+│  │   curl POST localhost:8080/process      │ │    │  │   curl POST localhost:8080/   │  │
+│  │                                         │ │    │  │        process                │  │
+│  └────────────────────┬────────────────────┘ │    │  └──────────────┬────────────────┘  │
+│                       │                      │    │                 │                   │
+│                       │ localhost:5432       │    │                 │ localhost:5432    │
+│                       ▼                      │    │                 ▼                   │
+│  ┌─────────────────────────────────────────┐ │    │  ┌───────────────────────────────┐  │
+│  │       CLOUD-SQL-PROXY CONTAINER         │ │    │  │   CLOUD-SQL-PROXY CONTAINER   │  │
+│  │       (sidecar)                         │ │    │  │   (sidecar)                   │  │
+│  │       Listening: :5432                  │ │    │  │   Listening: :5432            │  │
+│  └────────────────────┬────────────────────┘ │    │  └──────────────┬────────────────┘  │
+└───────────────────────┼──────────────────────┘    └─────────────────┼───────────────────┘
+                        │                                             │
+                        └──────────────────┬──────────────────────────┘
+                                           │
+                                           │ :5432
+                                           ▼
+                              ┌────────────────────────┐
+                              │       CLOUD SQL        │
+                              │       :5432            │
+                              └────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              PORTS SUMMARY TABLE                                        │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────┬────────────┬────────────┬─────────────────────────────────────────┐
+│ Component           │ External   │ Internal   │ Notes                                   │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ GKE Ingress         │ :443/:80   │ -          │ SSL termination, routes to services     │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ chatter-service     │ :80        │ :8080      │ LoadBalancer → Pod                      │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ frontend-service    │ :80        │ :8080      │ LoadBalancer → Pod                      │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ Chatter container   │ -          │ :8080      │ FastAPI/Uvicorn                         │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ Frontend container  │ -          │ :8080      │ Nginx (nginx.conf: listen 8080)         │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ Scraper container   │ -          │ :8080      │ FastAPI/Uvicorn (CronJob)               │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ Loader container    │ -          │ :8080      │ FastAPI/Uvicorn (CronJob)               │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ Cloud SQL Proxy     │ -          │ :5432      │ Sidecar in each pod                     │
+├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
+│ Cloud SQL           │ -          │ :5432      │ PostgreSQL (private network)            │
+└─────────────────────┴────────────┴────────────┴─────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              REQUEST FLOW WITH PORTS                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+HTTPS Request (API):
+  User :443 → Ingress :443 → chatter-service :80 → chatter-pod :8080 → SQL-proxy :5432 → CloudSQL :5432
+
+WebSocket Connection:
+  User :443 (wss) → Ingress :443 → chatter-service :80 → chatter-pod :8080 (upgrade to WS)
+
+Static Files:
+  User :443 → Ingress :443 → frontend-service :80 → frontend-pod :8080 (nginx)
+
+CronJob (internal):
+  Scheduler → Create Pod → uvicorn :8080 & curl localhost:8080/process → SQL-proxy :5432 → CloudSQL :5432
+```

@@ -25,7 +25,7 @@ ENV PORT=8080
 
 # Only install runtime dependencies (ffmpeg)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

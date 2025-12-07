@@ -1,11 +1,12 @@
 """
-NewsJuice Infrastructure - Multi-Service Deployment with Scheduler
-===================================================================
-Deploys: Loader + Scraper + Chatter + Frontend to Cloud Run + GKE
-Includes: Cloud Scheduler for automated daily triggers
+NewsJuice Infrastructure - Multi-Service Deployment with GKE CronJobs
+=====================================================================
+Deploys: 
+  - Chatter + Frontend to Cloud Run AND GKE (always-on HTTP services)
+  - Loader + Scraper to GKE ONLY as CronJobs (batch processing)
 Includes: HTTPS Ingress with managed certificate
 Includes: WebSocket support via BackendConfig
-===================================================================
+=====================================================================
 """
 
 import pulumi
@@ -68,6 +69,29 @@ SERVICES = [
         "extra_envs": [],
     },
 ]
+
+# ============================================================================
+# CM CHANGE 1: NEW - Service categorization for different deployment types
+# ============================================================================
+# CM: Services deployed to Cloud Run (always-on HTTP services)
+# CM: loader and scraper are NOT in this list - they only run on GKE as CronJobs
+CLOUDRUN_SERVICES = ["chatter", "frontend"]
+
+# CM: Services deployed as GKE CronJobs (batch processing, scheduled)
+CRONJOB_SERVICES = ["loader", "scraper"]
+
+# CM: CronJob schedules in cron format (minute hour day month weekday)
+CRONJOB_SCHEDULES = {
+    "scraper": "0 6 * * *",   # 6 AM UTC daily
+    "loader": "0 7 * * *",    # 7 AM UTC daily (runs after scraper completes)
+}
+
+# CM: Helper function to get service config by name
+def get_service_config(name):
+    return next((s for s in SERVICES if s["name"] == name), None)
+# ============================================================================
+# CM END CHANGE 1
+# ============================================================================
 
 # ============================================================================
 # HELPER FUNCTION FOR DOCKER AUTHENTICATION
@@ -191,7 +215,7 @@ for service in SERVICES:
     )
 
 # ============================================================================
-# DEPLOY ALL SERVICES TO CLOUD RUN
+# DEPLOY SERVICES TO CLOUD RUN
 # ============================================================================
 
 connection_name = f"{project}:{region}:{db_instance_name}"
@@ -199,6 +223,16 @@ cloudrun_services = {}
 
 if enable_cloudrun:
     for service in SERVICES:
+        # ======================================================================
+        # CM CHANGE 2: Skip loader and scraper - they run as GKE CronJobs only
+        # ======================================================================
+        if service["name"] not in CLOUDRUN_SERVICES:
+            pulumi.log.info(f"CM: Skipping Cloud Run for {service['name']} - runs as GKE CronJob")
+            continue
+        # ======================================================================
+        # CM END CHANGE 2
+        # ======================================================================
+            
         cloudrun_services[service["name"]] = gcp.cloudrun.Service(
             f"{service['name']}-cloudrun",
             name=f"newsjuice-{service['name']}",
@@ -292,64 +326,17 @@ if enable_cloudrun:
         )
 
 # ============================================================================
-# CLOUD SCHEDULER - Trigger services on a schedule
+# CM CHANGE 3: REMOVED - Cloud Scheduler section entirely deleted
 # ============================================================================
-
-if enable_cloudrun:
-    scheduler_sa = gcp.serviceaccount.Account(
-        "scheduler-sa",
-        account_id="newsjuice-scheduler-sa",
-        display_name="NewsJuice Scheduler Service Account",
-    )
-
-    for service in SERVICES:
-        gcp.cloudrun.IamMember(
-            f"{service['name']}-scheduler-invoker",
-            service=cloudrun_services[service["name"]].name,
-            location=region,
-            role="roles/run.invoker",
-            member=scheduler_sa.email.apply(lambda email: f"serviceAccount:{email}"),
-        )
-
-    scraper_scheduler = gcp.cloudscheduler.Job(
-        "scraper-scheduler",
-        name="newsjuice-scraper-daily",
-        description="Trigger scraper daily at 6 AM UTC",
-        schedule="0 6 * * *",
-        time_zone="UTC",
-        http_target=gcp.cloudscheduler.JobHttpTargetArgs(
-            uri=cloudrun_services["scraper"].statuses[0].url.apply(
-                lambda url: f"{url}/process"
-            ),
-            http_method="POST",
-            oidc_token=gcp.cloudscheduler.JobHttpTargetOidcTokenArgs(
-                service_account_email=scheduler_sa.email,
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=[cloudrun_services["scraper"]]
-        ),
-    )
-
-    loader_scheduler = gcp.cloudscheduler.Job(
-        "loader-scheduler",
-        name="newsjuice-loader-daily",
-        description="Trigger loader daily at 7 AM UTC (after scraper)",
-        schedule="0 7 * * *",
-        time_zone="UTC",
-        http_target=gcp.cloudscheduler.JobHttpTargetArgs(
-            uri=cloudrun_services["loader"].statuses[0].url.apply(
-                lambda url: f"{url}/process"
-            ),
-            http_method="POST",
-            oidc_token=gcp.cloudscheduler.JobHttpTargetOidcTokenArgs(
-                service_account_email=scheduler_sa.email,
-            ),
-        ),
-        opts=pulumi.ResourceOptions(
-            depends_on=[cloudrun_services["loader"]]
-        ),
-    )
+# CM: The following code block has been REMOVED (was ~50 lines):
+# CM:   - scheduler_sa (service account for Cloud Scheduler)
+# CM:   - IAM bindings for scheduler to invoke Cloud Run
+# CM:   - scraper_scheduler (Cloud Scheduler job for scraper)
+# CM:   - loader_scheduler (Cloud Scheduler job for loader)
+# CM: Scheduling is now handled by Kubernetes CronJobs below
+# ============================================================================
+# CM END CHANGE 3
+# ============================================================================
 
 # ============================================================================
 # GKE CLUSTER + KUBERNETES DEPLOYMENT
@@ -361,6 +348,7 @@ k8s_provider = None
 k8s_namespace = None
 k8s_deployments = {}
 k8s_services = {}
+k8s_cronjobs = {}  # CM CHANGE 4: NEW - Dictionary to store CronJob resources
 
 if enable_gke:
     gke_sa = gcp.serviceaccount.Account(
@@ -504,8 +492,18 @@ if enable_gke:
         ),
     )
 
-    # Deploy all services to Kubernetes
+    # Deploy services to Kubernetes
     for service in SERVICES:
+        # ======================================================================
+        # CM CHANGE 5: Skip CronJob services - they don't get Deployments
+        # ======================================================================
+        if service["name"] in CRONJOB_SERVICES:
+            pulumi.log.info(f"CM: Skipping Deployment for {service['name']} - runs as CronJob")
+            continue
+        # ======================================================================
+        # CM END CHANGE 5
+        # ======================================================================
+        
         k8s_deployments[service["name"]] = k8s.apps.v1.Deployment(
             f"{service['name']}-deployment",
             metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -586,7 +584,7 @@ if enable_gke:
             ),
         )
 
-        # Create LoadBalancer service for each service
+        # Create LoadBalancer service for each Deployment
         k8s_services[service["name"]] = k8s.core.v1.Service(
             f"{service['name']}-k8s-service",
             metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -611,6 +609,154 @@ if enable_gke:
                 depends_on=[k8s_deployments[service["name"]]]
             ),
         )
+
+    # ==========================================================================
+    # CM CHANGE 6: NEW - Deploy loader and scraper as Kubernetes CronJobs
+    # ==========================================================================
+    # CM: CronJobs run on a schedule and terminate after completion.
+    # CM: This replaces Cloud Scheduler + Cloud Run for batch processing.
+    # CM: Benefits:
+    # CM:   - No idle Cloud Run instances
+    # CM:   - Built-in retry logic (backoff_limit)
+    # CM:   - Job history for debugging
+    # CM:   - Native Kubernetes scheduling
+    # ==========================================================================
+    
+    for service_name in CRONJOB_SERVICES:
+        service = get_service_config(service_name)
+        if not service:
+            continue
+            
+        k8s_cronjobs[service_name] = k8s.batch.v1.CronJob(
+            f"{service_name}-cronjob",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name=f"newsjuice-{service_name}",
+                namespace="newsjuice",
+            ),
+            spec=k8s.batch.v1.CronJobSpecArgs(
+                # CM: Schedule in cron format (minute hour day month weekday)
+                schedule=CRONJOB_SCHEDULES.get(service_name, "0 6 * * *"),
+                
+                # CM: Timezone for the schedule
+                time_zone="UTC",
+                
+                # CM: Concurrency policy options:
+                # CM:   "Forbid" - Don't start new job if previous still running
+                # CM:   "Allow" - Allow concurrent runs
+                # CM:   "Replace" - Cancel current job and start new one
+                concurrency_policy="Forbid",
+                
+                # CM: Keep last N jobs for debugging
+                successful_jobs_history_limit=3,
+                failed_jobs_history_limit=3,
+                
+                # CM: Job template defines what runs on each schedule
+                job_template=k8s.batch.v1.JobTemplateSpecArgs(
+                    spec=k8s.batch.v1.JobSpecArgs(
+                        # CM: Number of retries before marking job as failed
+                        backoff_limit=3,
+                        
+                        # CM: Time limit for job execution (1 hour)
+                        active_deadline_seconds=3600,
+                        
+                        # CM: Auto-delete finished jobs after 1 hour
+                        ttl_seconds_after_finished=3600,
+                        
+                        template=k8s.core.v1.PodTemplateSpecArgs(
+                            metadata=k8s.meta.v1.ObjectMetaArgs(
+                                labels={
+                                    "app": f"newsjuice-{service_name}",
+                                    "type": "cronjob"  # CM: Label to identify CronJob pods
+                                },
+                            ),
+                            spec=k8s.core.v1.PodSpecArgs(
+                                service_account_name="newsjuice-services-sa",
+                                
+                                # CM: Important - CronJobs use OnFailure, not Always
+                                # CM: Let Kubernetes handle retries at Job level
+                                restart_policy="OnFailure",
+                                
+                                containers=[
+                                    k8s.core.v1.ContainerArgs(
+                                        name=service_name,
+                                        image=service_images[service_name].ref,
+                                        
+                                        # CM: Command to trigger processing
+                                        # CM: Waits for cloud-sql-proxy, then calls /process
+                                        # CM: IMPORTANT: Adjust this if your service starts
+                                        # CM: processing automatically on container start
+                                        command=[
+                                            "/bin/sh",
+                                            "-c",
+                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -X POST http://localhost:8080/process && wait"
+                                        ],
+                                        
+                                        env=[
+                                            k8s.core.v1.EnvVarArgs(name="DB_HOST", value="127.0.0.1"),
+                                            k8s.core.v1.EnvVarArgs(name="DB_NAME", value=db_name),
+                                            k8s.core.v1.EnvVarArgs(name="DB_USER", value=db_user),
+                                            k8s.core.v1.EnvVarArgs(
+                                                name="DB_PASSWORD",
+                                                value_from=k8s.core.v1.EnvVarSourceArgs(
+                                                    secret_key_ref=k8s.core.v1.SecretKeySelectorArgs(
+                                                        name="db-credentials",
+                                                        key="DB_PASSWORD",
+                                                    ),
+                                                ),
+                                            ),
+                                            k8s.core.v1.EnvVarArgs(name="DB_PORT", value="5432"),
+                                            k8s.core.v1.EnvVarArgs(
+                                                name="DATABASE_URL",
+                                                value=Output.all(db_user, db_password, db_name).apply(
+                                                    lambda args: f"postgresql://{args[0]}:{args[1]}@127.0.0.1:5432/{args[2]}"
+                                                ),
+                                            ),
+                                            k8s.core.v1.EnvVarArgs(name="GCP_PROJECT", value=project),
+                                            k8s.core.v1.EnvVarArgs(name="GCP_REGION", value=region),
+                                            k8s.core.v1.EnvVarArgs(name="GOOGLE_CLOUD_PROJECT", value=project),
+                                            k8s.core.v1.EnvVarArgs(name="GOOGLE_CLOUD_REGION", value=region),
+                                        ] + [
+                                            k8s.core.v1.EnvVarArgs(name=env_name, value=env_value)
+                                            for env_name, env_value in service.get("extra_envs", [])
+                                        ],
+                                        
+                                        # CM: More generous resources for batch processing
+                                        resources=k8s.core.v1.ResourceRequirementsArgs(
+                                            requests={"memory": "1Gi", "cpu": "500m"},
+                                            limits={"memory": "2Gi", "cpu": "1000m"},
+                                        ),
+                                    ),
+                                    
+                                    # CM: Cloud SQL Proxy sidecar (same as Deployments)
+                                    k8s.core.v1.ContainerArgs(
+                                        name="cloud-sql-proxy",
+                                        image="gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0",
+                                        args=[
+                                            "--structured-logs",
+                                            "--port=5432",
+                                            connection_name,
+                                        ],
+                                        security_context=k8s.core.v1.SecurityContextArgs(
+                                            run_as_non_root=True,
+                                        ),
+                                        resources=k8s.core.v1.ResourceRequirementsArgs(
+                                            requests={"memory": "64Mi", "cpu": "50m"},
+                                        ),
+                                    ),
+                                ],
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            opts=pulumi.ResourceOptions(
+                provider=k8s_provider,
+                depends_on=[k8s_service_account, k8s_secret, service_images[service_name]]
+            ),
+        )
+    # ==========================================================================
+    # CM END CHANGE 6
+    # ==========================================================================
 
 # ============================================================================
 # HTTPS INGRESS WITH MANAGED CERTIFICATE
@@ -728,13 +874,21 @@ for service in SERVICES:
 
 if enable_cloudrun:
     pulumi.export("cloudrun_enabled", True)
-    for service in SERVICES:
-        pulumi.export(
-            f"cloudrun_{service['name']}_url",
-            cloudrun_services[service["name"]].statuses[0].url
-        )
-    pulumi.export("scraper_schedule", "Daily at 6 AM UTC")
-    pulumi.export("loader_schedule", "Daily at 7 AM UTC")
+    # =========================================================================
+    # CM CHANGE 7: Updated exports - only show CLOUDRUN_SERVICES
+    # =========================================================================
+    pulumi.export("cloudrun_services", CLOUDRUN_SERVICES)
+    for service_name in CLOUDRUN_SERVICES:
+        if service_name in cloudrun_services:
+            pulumi.export(
+                f"cloudrun_{service_name}_url",
+                cloudrun_services[service_name].statuses[0].url
+            )
+    # CM: Removed exports for loader/scraper Cloud Run URLs
+    # CM: Removed exports for Cloud Scheduler (scraper_schedule, loader_schedule)
+    # =========================================================================
+    # CM END CHANGE 7
+    # =========================================================================
 else:
     pulumi.export("cloudrun_enabled", False)
 
@@ -745,16 +899,45 @@ if enable_gke and gke_cluster:
     pulumi.export("gke_zone", zone)
     pulumi.export("gke_setup_command", f"gcloud container clusters get-credentials newsjuice-cluster --zone={zone} --project={project}")
     
-    for service in SERVICES:
-        pulumi.export(
-            f"gke_{service['name']}_url",
-            k8s_services[service["name"]].status.apply(
-                lambda status: f"http://{status.load_balancer.ingress[0].ip}" if status and status.load_balancer and status.load_balancer.ingress else "pending"
+    # =========================================================================
+    # CM CHANGE 8: Updated GKE exports for new architecture
+    # =========================================================================
+    # CM: Export URLs only for Deployment-based services (chatter, frontend)
+    for service_name in CLOUDRUN_SERVICES:
+        if service_name in k8s_services:
+            pulumi.export(
+                f"gke_{service_name}_url",
+                k8s_services[service_name].status.apply(
+                    lambda status: f"http://{status.load_balancer.ingress[0].ip}" if status and status.load_balancer and status.load_balancer.ingress else "pending"
+                )
             )
-        )
+    
+    # CM: Export CronJob information
+    pulumi.export("gke_cronjob_services", CRONJOB_SERVICES)
+    for service_name in CRONJOB_SERVICES:
+        pulumi.export(f"gke_{service_name}_schedule", CRONJOB_SCHEDULES.get(service_name, "0 6 * * *"))
+    # =========================================================================
+    # CM END CHANGE 8
+    # =========================================================================
 else:
     pulumi.export("gke_enabled", False)
 
+# ============================================================================
+# CM CHANGE 9: Updated deployment summary
+# ============================================================================
 pulumi.export("deployment_summary", Output.all(enable_cloudrun, enable_gke).apply(
-    lambda args: f"Cloud Run: {'✅ Enabled' if args[0] else '❌ Disabled'}, GKE: {'✅ Enabled' if args[1] else '❌ Disabled'} | Services: {', '.join([s['name'] for s in SERVICES])}"
+    lambda args: f"""
+Cloud Run: {'Enabled' if args[0] else 'Disabled'}
+  - Services: {', '.join(CLOUDRUN_SERVICES)}
+  - NOTE: loader/scraper removed from Cloud Run
+GKE: {'Enabled' if args[1] else 'Disabled'}
+  - Deployments (always-on): {', '.join(CLOUDRUN_SERVICES)}
+  - CronJobs (scheduled): {', '.join(CRONJOB_SERVICES)}
+Schedules (UTC):
+  - scraper: {CRONJOB_SCHEDULES.get('scraper', 'N/A')}
+  - loader: {CRONJOB_SCHEDULES.get('loader', 'N/A')}
+"""
 ))
+# ============================================================================
+# CM END CHANGE 9
+# ============================================================================
