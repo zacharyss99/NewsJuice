@@ -1,8 +1,8 @@
 # NewsJuice Deployment Guide
 
-Deploy Loader, Scraper, Chatter and Frontend to Google Cloud Run and GKE (Kubernetes).
+Please find a detailed Deployment Architecture diagam below.
 
-NewsJuice is fully deployed with HTTPS!
+The NewsJuice app is now fully deployed via pulumi and on GKE (kubernetes) and up and running.
 
 Final URLs:
 
@@ -15,17 +15,14 @@ Features working:
 ✅ User registration/login (Firebase Auth)
 ✅ Preferences saving
 ✅ Daily Brief generation & playback
-✅ Microphone/voice Q&A (now works with HTTPS!)
+✅ Microphone/voice Q&A
 ✅ SSL certificate (Google-managed, auto-renews)
 
 Infrastructure:
 
 ✅ GKE cluster with Ingress
-✅ Cloud Run (backup)
 ✅ Cloud SQL
-✅ Cloud Scheduler (6 AM scraper, 7 AM loader)
 ✅ Pulumi IaC (fully repeatable)
-
 
 
 ## Prerequisites
@@ -48,11 +45,34 @@ services/
 │   ├── __main__.py           # Pulumi infrastructure code
 │   ├── Pulumi.yaml           # Pulumi project config
 │   ├── Pulumi.dev.yaml       # Environment config (secrets)
+│   ├── pyproject.toml        # Python dependencies for Pulumi
 │   ├── Dockerfile            # Deployment container
 │   ├── docker-shell.sh       # Start deployment container
 │   └── docker-entrypoint.sh  # Container setup script
 ├── loader_deployed/          # Loader service code
-└── scraper_deployed/         # Scraper service code
+│   ├── main.py               # FastAPI app
+│   ├── Dockerfile            # Loader container image
+│   ├── pyproject.toml        # Python dependencies
+│   └── ...
+├── scraper_deployed/         # Scraper service code
+│   ├── main.py               # FastAPI app
+│   ├── Dockerfile            # Scraper container image
+│   ├── pyproject.toml        # Python dependencies
+│   └── ...
+├── chatter_deployed/         # Chatter service code (API + WebSocket)
+│   ├── main.py               # FastAPI app + WebSocket handlers
+│   ├── Dockerfile            # Chatter container image
+│   ├── pyproject.toml        # Python dependencies
+│   └── ...
+└── frontend/                 # Frontend React app
+    ├── src/
+    │   ├── pages/
+    │   │   └── Podcast.jsx   # WebSocket connection (⚠️ hardcoded URL to fix)
+    │   └── ...
+    ├── Dockerfile            # Nginx + React build
+    ├── nginx.conf            # Nginx config (listen :8080)
+    ├── package.json          # Node dependencies
+    └── ...
 ```
 
 ## Quick Start
@@ -77,7 +97,7 @@ config:
   newsjuice-loader:gke_machine_type: e2-standard-2
 ```
 
-To encrypt password:
+To encrypt password (for GC SQL database):
 ```bash
 pulumi config set --secret db_password YOUR_PASSWORD
 ```
@@ -94,10 +114,8 @@ sh docker-shell.sh
 Inside container:
 ```bash
 cd /app
-pulumi up
+pulumi up --yes
 ```
-
-Type `yes` to confirm.
 
 ## Deployment Outputs
 
@@ -110,7 +128,7 @@ pulumi stack output
 
 ## Common Commands
 
-### Check Status
+### Check Status 
 ```bash
 # Cloud Run services
 gcloud run services list --region=us-central1
@@ -134,6 +152,10 @@ kubectl logs -n newsjuice -l app=newsjuice-loader -c loader --tail=50
 ### Update Deployment
 ```bash
 # After code changes, redeploy
+pulumi up
+
+# After aborts
+pulumi refresh
 pulumi up
 ```
 
@@ -178,15 +200,19 @@ Common fixes:
 
 ## Cost Estimates
 
-| Component | Monthly Cost |
-|-----------|-------------|
-| Cloud Run (2 services) | ~$10 |
-| GKE Cluster | ~$75 |
-| GKE Nodes (2x e2-standard-2) | ~$100 |
-| Cloud SQL | ~$10-50 |
-| Load Balancers (2) | ~$40 |
-| **Total (Cloud Run only)** | **~$20-60** |
-| **Total (Cloud Run + GKE)** | **~$235-275** |
+```
+| Component                      | Monthly Cost |
+|--------------------------------|--------------|
+| GKE Cluster                    | ~$75         |
+| GKE Nodes (2x e2-standard-2)   | ~$100        |
+| Cloud SQL                      | ~$10-50      |
+| Load Balancers (2)             | ~$40         |
+| Artifact Registry              | ~$1-5        |
+| Cloud Storage (audio)          | ~$1-5        |
+| Vertex AI (embeddings)         | ~$5-20       |
+| Firebase Auth                  | Free tier    |
+| **Total (GKE)**                | **~$230-295**|
+```
 
 ## Adding New Services
 
@@ -214,7 +240,7 @@ To get into the deplyment container:
 docker exec -it newsjuice-app-deployment bash
 ```
 
-# Winding down everthing:
+## Winding down everthing:
 
 Inside your deployment container:
 
@@ -225,7 +251,6 @@ pulumi destroy
 ```
 Type yes to confirm. This deletes:
 
-✅ Cloud Run services (loader + scraper)
 ✅ GKE cluster + nodes + pods
 ✅ Load balancers
 ✅ Service accounts + IAM bindings
@@ -254,28 +279,28 @@ exit
 cd /app
 pulumi up
 ```
-# Test schduler manually
 
+### Test schduler manually
 ```bash
 gcloud scheduler jobs run newsjuice-scraper-daily --location=us-central1
 gcloud scheduler jobs run newsjuice-loader-daily --location=us-central1
 ```
 
-Check logs
+### Check logs
 ```bash
 gcloud run services logs read newsjuice-scraper --region=us-central1 --limit=20
 gcloud run services logs read newsjuice-loader --region=us-central1 --limit=20
 ```
 
 
-HTTPS
+### HTTPS
 
 Check status (provisioning/active)
+```bash
 kubectl describe managedcertificate newsjuice-cert -n newsjuice | grep Status
+```
 
-
-
-EXPLORING KUBERNETES DEPLOYMENT
+# Exploring Kubernetes deployment
 
 ### Pods
 
@@ -284,12 +309,7 @@ root@e0d820fde2c9:/app# kubectl get pods -n newsjuice
 NAME                                  READY   STATUS    RESTARTS   AGE
 newsjuice-chatter-6fbcf5b8bd-d2v5f    2/2     Running   0          53m
 newsjuice-chatter-6fbcf5b8bd-vrkhk    2/2     Running   0          53m
-newsjuice-frontend-5bc9db886b-d6d77   2/2     Running   0          26m
-newsjuice-frontend-5bc9db886b-dnkvj   2/2     Running   0          26m
-newsjuice-loader-d57d94895-59579      2/2     Running   0          8h
-newsjuice-loader-d57d94895-vdxv4      2/2     Running   0          8h
-newsjuice-scraper-9f697bcf9-ljjdv     2/2     Running   0          26h
-newsjuice-scraper-9f697bcf9-qkqg4     2/2     Running   0          26h
+...
 ```
 ```bash
 kubectl logs -n newsjuice <pod-name> -c <container-name>
@@ -301,9 +321,7 @@ kubectl logs -n newsjuice <pod-name> -c <container-name>
 root@e0d820fde2c9:/app# kubectl get deployments -n newsjuice
 NAME                 READY   UP-TO-DATE   AVAILABLE   AGE
 newsjuice-chatter    2/2     2            2           8h
-newsjuice-frontend   2/2     2            2           6h17m
-newsjuice-loader     2/2     2            2           26h
-newsjuice-scraper    2/2     2            2           26h
+...
 ```
 
 ### Services
@@ -317,9 +335,7 @@ kubectl get svc -n newsjuice
 root@e0d820fde2c9:/app# kubectl get svc -n newsjuice
 NAME               TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
 chatter-service    LoadBalancer   34.118.238.5     136.113.170.71   80:32185/TCP   8h
-frontend-service   LoadBalancer   34.118.227.57    34.28.40.119     80:30662/TCP   6h18m
-loader-service     LoadBalancer   34.118.235.175   136.114.177.98   80:32501/TCP   26h
-scraper-service    LoadBalancer   34.118.228.50    34.72.210.252    80:32313/TCP   26h
+...
 ```
 
 ### Ingress
@@ -333,34 +349,7 @@ newsjuice-ingress   <none>   www.newsjuiceapp.com   136.110.164.121   80      59
 ```bash
 kubectl describe managedcertificate newsjuice-cert -n newsjuice
 ```
-```
-root@e0d820fde2c9:/app# kubectl describe managedcertificate newsjuice-cert -n newsjuice
-Name:         newsjuice-cert
-Namespace:    newsjuice
-Labels:       <none>
-Annotations:  <none>
-API Version:  networking.gke.io/v1
-Kind:         ManagedCertificate
-Metadata:
-  Creation Timestamp:  2025-12-05T22:43:21Z
-  Generation:          3
-  Resource Version:    1764975426564223020
-  UID:                 90bf5e05-5a56-48c5-8287-48416e7b51a4
-Spec:
-  Domains:
-    www.newsjuiceapp.com
-Status:
-  Certificate Name:    mcrt-a25004c9-72fc-4267-8b43-6796368f3946
-  Certificate Status:  Active
-  Domain Status:
-    Domain:     www.newsjuiceapp.com
-    Status:     Active
-  Expire Time:  2026-03-05T14:43:26.000-08:00
-Events:
-  Type    Reason  Age   From                            Message
-  ----    ------  ----  ----                            -------
-  Normal  Create  60m   managed-certificate-controller  Create SslCertificate mcrt-a25004c9-72fc-4267-8b43-6796368f3946
-```
+
 ### Watch pods in real time
 ```bash
  kubectl get pods -n newsjuice -w
@@ -370,64 +359,13 @@ Events:
 ```bash
 kubectl get all -n newsjuice
 ```
-```
-NAME                                      READY   STATUS    RESTARTS   AGE
-pod/newsjuice-chatter-6fbcf5b8bd-d2v5f    2/2     Running   0          62m
-pod/newsjuice-chatter-6fbcf5b8bd-vrkhk    2/2     Running   0          62m
-pod/newsjuice-frontend-5bc9db886b-d6d77   2/2     Running   0          36m
-pod/newsjuice-frontend-5bc9db886b-dnkvj   2/2     Running   0          36m
-pod/newsjuice-loader-d57d94895-59579      2/2     Running   0          9h
-pod/newsjuice-loader-d57d94895-vdxv4      2/2     Running   0          9h
-pod/newsjuice-scraper-9f697bcf9-ljjdv     2/2     Running   0          26h
-pod/newsjuice-scraper-9f697bcf9-qkqg4     2/2     Running   0          26h
 
-NAME                       TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
-service/chatter-service    LoadBalancer   34.118.238.5     136.113.170.71   80:32185/TCP   8h
-service/frontend-service   LoadBalancer   34.118.227.57    34.28.40.119     80:30662/TCP   6h23m
-service/loader-service     LoadBalancer   34.118.235.175   136.114.177.98   80:32501/TCP   26h
-service/scraper-service    LoadBalancer   34.118.228.50    34.72.210.252    80:32313/TCP   26h
-
-NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/newsjuice-chatter    2/2     2            2           8h
-deployment.apps/newsjuice-frontend   2/2     2            2           6h23m
-deployment.apps/newsjuice-loader     2/2     2            2           26h
-deployment.apps/newsjuice-scraper    2/2     2            2           26h
-
-NAME                                            DESIRED   CURRENT   READY   AGE
-replicaset.apps/newsjuice-chatter-58b6748d8b    0         0         0       4h32m
-replicaset.apps/newsjuice-chatter-59d7985d5d    0         0         0       8h
-replicaset.apps/newsjuice-chatter-64d4ddbc77    0         0         0       6h24m
-replicaset.apps/newsjuice-chatter-67f9bf5c87    0         0         0       8h
-replicaset.apps/newsjuice-chatter-6f956dfcf9    0         0         0       8h
-replicaset.apps/newsjuice-chatter-6fbcf5b8bd    2         2         2       62m
-replicaset.apps/newsjuice-chatter-7b447c8d5     0         0         0       8h
-replicaset.apps/newsjuice-chatter-8569c69bd4    0         0         0       7h47m
-replicaset.apps/newsjuice-chatter-bdcdcf4f5     0         0         0       4h31m
-replicaset.apps/newsjuice-chatter-c458f76c7     0         0         0       5h34m
-replicaset.apps/newsjuice-chatter-c854b888      0         0         0       5h1m
-replicaset.apps/newsjuice-frontend-54f9b46c8b   0         0         0       5h14m
-replicaset.apps/newsjuice-frontend-5bc9db886b   2         2         2       36m
-replicaset.apps/newsjuice-frontend-5c646f8c98   0         0         0       5h41m
-replicaset.apps/newsjuice-frontend-5db685777c   0         0         0       4h9m
-replicaset.apps/newsjuice-frontend-5f44fbffb9   0         0         0       4h18m
-replicaset.apps/newsjuice-frontend-6d86f99b8    0         0         0       6h4m
-replicaset.apps/newsjuice-frontend-767d574c6d   0         0         0       5h43m
-replicaset.apps/newsjuice-frontend-79bb8b7d86   0         0         0       4h17m
-replicaset.apps/newsjuice-frontend-7db8696c4    0         0         0       6h11m
-replicaset.apps/newsjuice-frontend-85c86b98b5   0         0         0       6h23m
-replicaset.apps/newsjuice-frontend-85cd545c8    0         0         0       5h13m
-replicaset.apps/newsjuice-loader-5847b79c4      0         0         0       26h
-replicaset.apps/newsjuice-loader-d57d94895      2         2         2       9h
-replicaset.apps/newsjuice-scraper-9f697bcf9     2         2         2       26h
-```
-
-## Testing CronJobs for scraper and loader
+### Testing CronJobs for scraper and loader
 
 1. List CronJobs
 ```bash
 kubectl get cronjobs -n newsjuice
 ```
-
 2. List Jobs (created by CronJobs)
 ```bash
 kubectl get jobs -n newsjuice
@@ -436,7 +374,7 @@ kubectl get jobs -n newsjuice
 ```bash
 kubectl get pods -n newsjuice
 ```
-Manually trigger a test
+4. Manually trigger a test
 ```bash
 kubectl create job --from=cronjob/newsjuice-scraper test-scraper3 -n newsjuice
 ```
@@ -448,6 +386,8 @@ kubectl get pods -n newsjuice -w
 ```bash
 kubectl logs -l job-name=test-scraper3 -n newsjuice -c scraper
 ```
+
+## Deployment diagrams
 
 
 ```
@@ -465,9 +405,10 @@ CronJobs (scheduled, not always-on):
   └── Loader  (7 AM UTC) ──→ Cloud SQL + Vertex AI
 ```
 
-```  
+```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                              NEWSJUICE DEPLOYMENT ARCHITECTURE                          │
+│                                  (with Firebase Auth)                                   │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 
                                     ┌──────────────┐
@@ -475,21 +416,42 @@ CronJobs (scheduled, not always-on):
                                     │   Browser    │
                                     └──────┬───────┘
                                            │
-                                           │ HTTPS
-                                           ▼
-                              ┌────────────────────────┐
-                              │  www.newsjuiceapp.com  │
-                              │     (DNS → GKE IP)     │
-                              │    136.110.164.121     │
-                              └────────────┬───────────┘
-                                           │
-                                           ▼
+                         ┌─────────────────┼─────────────────┐
+                         │                 │                 │
+                         ▼                 │                 │
+              ┌────────────────────┐       │                 │
+              │   FIREBASE AUTH    │       │                 │
+              │   (Google Cloud)   │       │                 │
+              │                    │       │                 │
+              │  - Google Sign-in  │       │                 │
+              │  - Email/Password  │       │                 │
+              │  - JWT Tokens      │       │                 │
+              └─────────┬──────────┘       │                 │
+                        │                  │                 │
+                        │ JWT Token        │                 │
+                        ▼                  │                 │
+              ┌────────────────────┐       │                 │
+              │  localStorage      │       │                 │
+              │  (auth_token)      │───────┘                 │
+              └────────────────────┘                         │
+                                                             │
+                                           │ HTTPS :443      │
+                                           │ + JWT Token     │
+                                           ▼                 │
+                              ┌────────────────────────┐     │
+                              │  www.newsjuiceapp.com  │     │
+                              │     (DNS → GKE IP)     │     │
+                              │    136.110.164.121     │     │
+                              └────────────┬───────────┘     │
+                                           │                 │
+                                           ▼                 │
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │                                    GOOGLE KUBERNETES ENGINE                              │
 │                                    (newsjuice-cluster)                                   │
 │  ┌────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                              GKE INGRESS (GCE Load Balancer)                       │  │
 │  │                         + Managed SSL Certificate (newsjuice-cert)                 │  │
+│  │                                   :443 (HTTPS/WSS)                                 │  │
 │  │  ┌──────────────────┬────────────────────────┬──────────────────────────────────┐  │  │
 │  │  │    /api/*        │        /ws/*           │            /*                    │  │  │
 │  │  │                  │    (WebSockets)        │                                  │  │  │
@@ -498,48 +460,48 @@ CronJobs (scheduled, not always-on):
 │              │                     │                              │                      │
 │              ▼                     ▼                              ▼                      │
 │  ┌─────────────────────────────────────────────┐    ┌─────────────────────────────────┐  │
-│  │           CHATTER SERVICE                   │    │      FRONTEND SERVICE           │  │
+│  │           CHATTER SERVICE :80               │    │      FRONTEND SERVICE :80       │  │
 │  │           (LoadBalancer)                    │    │      (LoadBalancer)             │  │
-│  │           Port 80 → 8080                    │    │      Port 80 → 8080             │  │
 │  │           + WebSocket BackendConfig         │    │                                 │  │
-│  └─────────────────┬───────────────────────────┘    └───────────────┬─────────────────┘  │
-│                    │                                                │                    │
-│                    ▼                                                ▼                    │
+│  └─────────────────┬───────────────────────────┘    └───────────────────┬─────────────┘  │
+│                    │                                                    │                │
+│                    ▼                                                    ▼                │
 │  ┌─────────────────────────────────────────────┐    ┌─────────────────────────────────┐  │
 │  │         CHATTER DEPLOYMENT                  │    │     FRONTEND DEPLOYMENT         │  │
 │  │         (2 replicas)                        │    │     (2 replicas)                │  │
 │  │  ┌───────────────────────────────────────┐  │    │  ┌───────────────────────────┐  │  │
-│  │  │ Pod                                   │  │    │  │ Pod                       │  │  │
+│  │  │ Pod :8080                             │  │    │  │ Pod :8080                 │  │  │
 │  │  │ ┌─────────────┐  ┌─────────────────┐  │  │    │  │ ┌─────────────────────┐   │  │  │
-│  │  │ │  FastAPI    │  │ Cloud SQL Proxy │  │  │    │  │ │   Nginx (8080)      │   │  │  │
+│  │  │ │  FastAPI    │  │ Cloud SQL Proxy │  │  │    │  │ │   Nginx             │   │  │  │
 │  │  │ │  Uvicorn    │  │   (sidecar)     │  │  │    │  │ │   Static files      │   │  │  │
-│  │  │ │  (8080)     │  │   (5432)        │  │  │    │  │ │   React SPA         │   │  │  │
-│  │  │ └──────┬──────┘  └────────┬────────┘  │  │    │  │ └─────────────────────┘   │  │  │
-│  │  └────────┼──────────────────┼───────────┘  │    │  └───────────────────────────┘  │  │
-│  └───────────┼──────────────────┼──────────────┘    └─────────────────────────────────┘  │
+│  │  │ │             │  │   :5432         │  │  │    │  │ │   React SPA         │   │  │  │
+│  │  │ │ ┌─────────┐ │  └────────┬────────┘  │  │    │  │ │   + Firebase SDK    │   │  │  │
+│  │  │ │ │Validates│ │           │           │  │    │  │ └─────────────────────┘   │  │  │
+│  │  │ │ │JWT Token│ │           │           │  │    │  └───────────────────────────┘  │  │
+│  │  │ │ └─────────┘ │           │           │  │    └─────────────────────────────────┘  │
+│  │  │ └──────┬──────┘           │           │  │                                         │
+│  │  └────────┼──────────────────┼───────────┘  │                                         │
+│  └───────────┼──────────────────┼──────────────┘                                         │
 │              │                  │                                                        │
 │              │                  │ ┌─────────────────────────────────────────────────────┐│
 │              │                  │ │              CRONJOBS (Scheduled)                   ││
 │              │                  │ │                                                     ││
 │              │                  │ │  ┌─────────────────────┐ ┌─────────────────────┐    ││
-│              │                  │ │  │  SCRAPER CRONJOB    │ │  LOADER CRONJOB     │    ││
+│              │                  │ │  │  SCRAPER CRONJOB    │ │  LOADER CRONJOB      │   ││
 │              │                  │ │  │  Schedule: 6AM UTC  │ │  Schedule: 7AM UTC  │    ││
-│              │                  │ │  │                     │ │                     │    ││
-│              │                  │ │  │  ┌───────────────┐  │ │  ┌───────────────┐  │    ││
-│              │                  │ │  │  │ Scraper Pod   │  │ │  │ Loader Pod    │  │    ││
-│              │                  │ │  │  │ + SQL Proxy   │──┼─┼──│ + SQL Proxy   │  │    ││
-│              │                  │ │  │  └───────────────┘  │ │  └───────────────┘  │    ││
-│              │                  │ │  └─────────────────────┘ └─────────────────────┘    ││
-│              │                  │ └──────────────────────────────────┬──────────────────┘│
-│              │                  │                                    │                   │
-└──────────────┼──────────────────┼────────────────────────────────────┼───────────────────┘
-               │                  │                                    │
-               │                  └────────────────┬───────────────────┘
-               │                                   │
-               │                                   ▼
+│              │                  │ │  │  Pod :8080          │ │  Pod :8080          │    ││
+│              │                  │ │  │  + SQL Proxy :5432  │ │  + SQL Proxy :5432  │    ││
+│              │                  │ │  └──────────┬──────────┘ └──────────┬──────────┘    ││
+│              │                  │ └─────────────┼────────────────────────┼──────────────┘│
+│              │                  │               │                        │               │
+└──────────────┼──────────────────┼───────────────┼────────────────────────┼───────────────┘
+               │                  │               │                        │
+               │                  └───────────────┼────────────────────────┘
+               │                                  │
+               │                                  ▼
                │                  ┌─────────────────────────────────────┐
                │                  │         CLOUD SQL (PostgreSQL)      │
-               │                  │         newsdb-instance             │
+               │                  │         newsdb-instance :5432       │
                │                  │         + pgvector extension        │
                └──────────────────│                                     │
                                   │  ┌─────────────┐  ┌──────────────┐  │
@@ -562,41 +524,87 @@ CronJobs (scheduled, not always-on):
 │  └─────────────────────┘  └─────────────────────┘  └─────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              AUTHENTICATION FLOW                                        │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+  ┌────────┐      ┌──────────────┐      ┌──────────────┐      ┌─────────────┐
+  │  User  │      │   Frontend   │      │ Firebase Auth│      │   Chatter   │
+  └───┬────┘      └──────┬───────┘      └──────┬───────┘      └──────┬──────┘
+      │                  │                     │                     │
+      │  1. Click Login  │                     │                     │
+      │─────────────────>│                     │                     │
+      │                  │                     │                     │
+      │                  │  2. Redirect to     │                     │
+      │                  │     Firebase        │                     │
+      │                  │────────────────────>│                     │
+      │                  │                     │                     │
+      │                  │  3. User signs in   │                     │
+      │                  │     (Google/Email)  │                     │
+      │<─────────────────────────────────────> │                     │
+      │                  │                     │                     │
+      │                  │  4. Return JWT      │                     │
+      │                  │<────────────────────│                     │
+      │                  │                     │                     │
+      │                  │  5. Store token in  │                     │
+      │                  │     localStorage    │                     │
+      │                  │                     │                     │
+      │  6. Connect WebSocket                  │                     │
+      │     wss://...?token=JWT                │                     │
+      │─────────────────────────────────────────────────────────────>│
+      │                  │                     │                     │
+      │                  │                     │  7. Validate JWT    │
+      │                  │                     │<────────────────────│
+      │                  │                     │────────────────────>│
+      │                  │                     │                     │
+      │  8. WebSocket connected (authenticated)│                     │
+      │<─────────────────────────────────────────────────────────────│
+      │                  │                     │                     │
+
+
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                                    DATA FLOW                                            │
-│                                                                                         │
-│  1. SCRAPER (6 AM UTC)                                                                  │
-│     └─→ Fetches articles from Harvard news sources                                      │
-│     └─→ Stores raw articles in PostgreSQL (articles table)                              │
-│                                                                                         │
-│  2. LOADER (7 AM UTC)                                                                   │
-│     └─→ Reads new articles from PostgreSQL                                              │
-│     └─→ Chunks text + generates embeddings via Vertex AI                                │
-│     └─→ Stores vectors in PostgreSQL (chunks_vector table with pgvector)                │
-│                                                                                         │
-│  3. CHATTER (On-demand)                                                                 │
-│     └─→ User sends voice/text via WebSocket                                             │
-│     └─→ Semantic search on chunks_vector (pgvector similarity)                          │
-│     └─→ RAG: Retrieved context + LLM generates response                                 │
-│     └─→ TTS generates audio → stored in Cloud Storage                                   │
-│     └─→ Audio URL returned to user                                                      │
-│                                                                                         │
-│  4. FRONTEND (Always-on)                                                                │
-│     └─→ React SPA served by Nginx                                                       │
-│     └─→ WebSocket connection to Chatter for real-time chat                              │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
+
+  1. SCRAPER (6 AM UTC)
+     └─→ Fetches articles from Harvard news sources
+     └─→ Stores raw articles in PostgreSQL (articles table)
+
+  2. LOADER (7 AM UTC)
+     └─→ Reads new articles from PostgreSQL
+     └─→ Chunks text + generates embeddings via Vertex AI
+     └─→ Stores vectors in PostgreSQL (chunks_vector table with pgvector)
+
+  3. CHATTER (On-demand, authenticated)
+     └─→ User connects via WebSocket with JWT token
+     └─→ Backend validates token with Firebase
+     └─→ User sends voice/text query
+     └─→ Semantic search on chunks_vector (pgvector similarity)
+     └─→ RAG: Retrieved context + LLM generates response
+     └─→ TTS generates audio → stored in Cloud Storage
+     └─→ Audio URL returned to user
+
+  4. FRONTEND (Always-on)
+     └─→ React SPA served by Nginx
+     └─→ Firebase SDK handles authentication UI
+     └─→ WebSocket connection to Chatter for real-time chat
+
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   PORTS SUMMARY                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+  | Component      | External Port | Internal Port |
+  |----------------|---------------|---------------|
+  | Ingress        | :443 (HTTPS)  | -             |
+  | Services       | :80           | :8080         |
+  | All containers | -             | :8080         |
+  | SQL Proxy      | -             | :5432         |
+  | Cloud SQL      | -             | :5432         |
+
 ```
-````
-─────────────────────────────────────────--------
-| Component      | External Port | Internal Port |
-|----------------|---------------|---------------|
-| Ingress        | :443 (HTTPS)  | -             |
-| Services       | :80           | :8080         |
-| All containers | -             | :8080         |
-| SQL Proxy      | -             | :5432         |
-| Cloud SQL      | -             | :5432         |
-─────────────────────────────────────────--------
-```
+
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -608,15 +616,32 @@ CronJobs (scheduled, not always-on):
                                     │    USERS     │
                                     └──────┬───────┘
                                            │
-                                           │ :443 (HTTPS)
-                                           │ :443 (WSS)
+                         ┌─────────────────┴─────────────────┐
+                         │                                   │
+                         ▼                                   │
+              ┌────────────────────┐                         │
+              │   FIREBASE AUTH    │                         │
+              │   (Google Cloud)   │                         │
+              │                    │                         │
+              │   Returns JWT      │                         │
+              └─────────┬──────────┘                         │
+                        │                                    │
+                        │ JWT Token                          │
+                        ▼                                    │
+              ┌────────────────────┐                         │
+              │  localStorage      │                         │
+              │  (auth_token)      │─────────────────────────┘
+              └────────────────────┘
+                                           │
+                                           │ :443 (HTTPS/WSS + JWT)
                                            ▼
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │                                GKE INGRESS                                               │
 │                          (Google Cloud Load Balancer)                                    │
+│                          + Managed SSL Certificate                                       │
 │                                                                                          │
 │   External IP: 136.110.164.121                                                           │
-│   Listening:   :443 (HTTPS/WSS) with managed SSL cert                                    │
+│   Listening:   :443 (HTTPS/WSS) ──→ SSL Termination                                      │
 │                :80  (HTTP → redirects to HTTPS)                                          │
 └────────────────────────────────────┬─────────────────────────────────────────────────────┘
                                      │
@@ -643,16 +668,21 @@ CronJobs (scheduled, not always-on):
 │  │   FastAPI + Uvicorn                     │ │    │  │   Nginx                       │  │
 │  │   Listening: :8080                      │ │    │  │   Listening: :8080            │  │
 │  │                                         │ │    │  │   (configured in nginx.conf)  │  │
+│  │   ┌─────────────────────────────────┐   │ │    │  │                               │  │
+│  │   │  JWT Validation (Firebase)      │   │ │    │  │   Serves:                     │  │
+│  │   │  on /api/* and /ws/* requests   │   │ │    │  │   - Static React files        │  │
+│  │   └─────────────────────────────────┘   │ │    │  │   - Firebase SDK              │  │
+│  │                                         │ │    │  │   - SPA routing (/* → index)  │  │
 │  │   Endpoints:                            │ │    │  │                               │  │
-│  │   - POST /api/chat                      │ │    │  │   Serves:                     │  │
-│  │   - WS   /ws/chat                       │ │    │  │   - Static React files        │  │
-│  │   - POST /process                       │ │    │  │   - SPA routing (/* → index)  │  │
-│  │   - GET  /health                        │ │    │  │                               │  │
-│  └────────────────────┬────────────────────┘ │    │  └───────────────────────────────┘  │
-│                       │                      │    │                                     │
-│                       │ localhost:5432       │    │  (No database connection)           │
-│                       ▼                      │    │                                     │
-│  ┌─────────────────────────────────────────┐ │    └─────────────────────────────────────┘
+│  │   - POST /api/chat                      │ │    │  └───────────────────────────────┘  │
+│  │   - WS   /ws/chat?token=JWT             │ │    │                                     │
+│  │   - POST /process                       │ │    └─────────────────────────────────────┘
+│  │   - GET  /health                        │ │
+│  └────────────────────┬────────────────────┘ │
+│                       │                      │
+│                       │ localhost:5432       │
+│                       ▼                      │
+│  ┌─────────────────────────────────────────┐ │
 │  │       CLOUD-SQL-PROXY CONTAINER         │ │
 │  │       (sidecar)                         │ │
 │  │                                         │ │
@@ -666,7 +696,7 @@ CronJobs (scheduled, not always-on):
                         ▼
 ┌──────────────────────────────────────────────┐
 │              CLOUD SQL                       │
-│              (PostgreSQL)                    │
+│              (PostgreSQL + pgvector)         │
 │                                              │
 │   Instance: newsdb-instance                  │
 │   Listening: :5432                           │
@@ -690,6 +720,10 @@ CronJobs (scheduled, not always-on):
 │  │   Triggered by:                         │ │    │  │   Triggered by:               │  │
 │  │   curl POST localhost:8080/process      │ │    │  │   curl POST localhost:8080/   │  │
 │  │                                         │ │    │  │        process                │  │
+│  │   Fetches articles from:                │ │    │  │                               │  │
+│  │   - Harvard Gazette                     │ │    │  │   Calls:                      │  │
+│  │   - Harvard Crimson                     │ │    │  │   - Vertex AI (embeddings)    │  │
+│  │   - Harvard Magazine etc.               │ │    │  │                               │  │
 │  └────────────────────┬────────────────────┘ │    │  └──────────────┬────────────────┘  │
 │                       │                      │    │                 │                   │
 │                       │ localhost:5432       │    │                 │ localhost:5432    │
@@ -715,42 +749,40 @@ CronJobs (scheduled, not always-on):
 │                              PORTS SUMMARY TABLE                                        │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────┬────────────┬────────────┬─────────────────────────────────────────┐
-│ Component           │ External   │ Internal   │ Notes                                   │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ GKE Ingress         │ :443/:80   │ -          │ SSL termination, routes to services     │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ chatter-service     │ :80        │ :8080      │ LoadBalancer → Pod                      │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ frontend-service    │ :80        │ :8080      │ LoadBalancer → Pod                      │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ Chatter container   │ -          │ :8080      │ FastAPI/Uvicorn                         │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ Frontend container  │ -          │ :8080      │ Nginx (nginx.conf: listen 8080)         │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ Scraper container   │ -          │ :8080      │ FastAPI/Uvicorn (CronJob)               │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ Loader container    │ -          │ :8080      │ FastAPI/Uvicorn (CronJob)               │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ Cloud SQL Proxy     │ -          │ :5432      │ Sidecar in each pod                     │
-├─────────────────────┼────────────┼────────────┼─────────────────────────────────────────┤
-│ Cloud SQL           │ -          │ :5432      │ PostgreSQL (private network)            │
-└─────────────────────┴────────────┴────────────┴─────────────────────────────────────────┘
+  | Component        | External Port  | Internal Port | Notes                            |
+  |------------------|----------------|---------------|----------------------------------|
+  | Firebase Auth    | :443 (HTTPS)   | -             | Google-managed                   |
+  | GKE Ingress      | :443/:80       | -             | SSL termination + routing        |
+  | chatter-service  | :80            | :8080         | LoadBalancer → Pod               |
+  | frontend-service | :80            | :8080         | LoadBalancer → Pod               |
+  | Chatter container| -              | :8080         | FastAPI + JWT validation         |
+  | Frontend container| -             | :8080         | Nginx + React + Firebase SDK     |
+  | Scraper container| -              | :8080         | FastAPI (CronJob)                |
+  | Loader container | -              | :8080         | FastAPI (CronJob)                |
+  | Cloud SQL Proxy  | -              | :5432         | Sidecar in each pod              |
+  | Cloud SQL        | -              | :5432         | PostgreSQL (private network)     |
+  | Vertex AI        | :443 (HTTPS)   | -             | Google-managed API               |
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              REQUEST FLOW WITH PORTS                                    │
+│                              REQUEST FLOWS WITH PORTS                                   │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 
-HTTPS Request (API):
-  User :443 → Ingress :443 → chatter-service :80 → chatter-pod :8080 → SQL-proxy :5432 → CloudSQL :5432
+Authentication:
+  User → Firebase :443 → JWT Token → localStorage
+
+HTTPS API Request:
+  User :443 + JWT → Ingress :443 → chatter-service :80 → chatter-pod :8080 (validate JWT) → SQL-proxy :5432 → CloudSQL :5432
 
 WebSocket Connection:
-  User :443 (wss) → Ingress :443 → chatter-service :80 → chatter-pod :8080 (upgrade to WS)
+  User :443 (wss + JWT) → Ingress :443 → chatter-service :80 → chatter-pod :8080 (validate JWT, upgrade to WS)
 
 Static Files:
   User :443 → Ingress :443 → frontend-service :80 → frontend-pod :8080 (nginx)
 
-CronJob (internal):
+CronJob Scraper (6 AM UTC):
   Scheduler → Create Pod → uvicorn :8080 & curl localhost:8080/process → SQL-proxy :5432 → CloudSQL :5432
+
+CronJob Loader (7 AM UTC):
+  Scheduler → Create Pod → uvicorn :8080 & curl localhost:8080/process → Vertex AI :443 + SQL-proxy :5432 → CloudSQL :5432
 ```
