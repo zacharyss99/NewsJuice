@@ -59,9 +59,9 @@ EMBEDDING_DIM = 768  # 256
 
 # Parameter for chunking
 CHUNK_SIZE_CHAR = 350
-CHUNK_OVERLAP_CHAR = 20
-CHUNK_SIZE_RECURSIVE = 350
-
+CHUNK_OVERLAP_CHAR = 50
+CHUNK_SIZE_RECURSIVE = 600
+CHUNK_OVERLAP_RECURSIVE = 50
 # ============== CHANGE 1: ADD LOGGING ==============
 import logging
 
@@ -224,7 +224,9 @@ def chunk_embed_load(method="char-split"):
 
         elif method == "recursive-split":
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=CHUNK_SIZE_RECURSIVE
+                chunk_size=CHUNK_SIZE_RECURSIVE,
+                chunk_overlap=CHUNK_OVERLAP_RECURSIVE,
+                separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""],
             )
             docs = text_splitter.create_documents([content or ""])
 
