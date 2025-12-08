@@ -29,8 +29,8 @@ from pgvector.psycopg import register_vector
 logger = logging.getLogger(__name__)
 
 # ============= CONFIGURATION =============
-ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles_test")
-VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector_test")
+ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles")
+VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector")
 DB_URL = os.environ["DATABASE_URL"]
 EMBEDDING_MODEL = "text-embedding-004"
 EMBEDDING_DIM = 768
@@ -405,7 +405,7 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
 def main():
     """Entry point for standalone execution"""
     logger.info("Starting loader main function")
-    result = chunk_embed_load("semantic-split")
+    result = chunk_embed_load("recursive-split")
     print(f"Final result: {result}")
     logger.info(f"Loader main function completed: {result}")
 

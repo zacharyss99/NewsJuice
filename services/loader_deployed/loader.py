@@ -377,7 +377,7 @@ def main():
     logger.info("Starting loader main function")
     # =======================================================
 
-    result = chunk_embed_load("semantic-split")
+    result = chunk_embed_load("recursive-split")
     print(f"Final result: {result}")
 
     # ============== CHANGE 17: LOG MAIN COMPLETE ==============
