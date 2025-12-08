@@ -24,13 +24,14 @@ from google.cloud import texttospeech
 
 
 # text_to_audio_stream converts text to audio using Google Cloud TTS and streams audio chunks to WebSocket
-async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
+async def text_to_audio_stream(text: str, websocket, voice_name: Optional[str] = None) -> Optional[str]:
     """
     Convert text to audio using Google Cloud Text-to-Speech API and stream audio chunks to WebSocket.
 
     Args:
         text: The podcast text to convert to audio (narrated EXACTLY as written)
         websocket: WebSocket connection to stream audio chunks to frontend
+        voice_name: Optional voice name (e.g., "en-US-Studio-O"). Defaults to "en-US-Studio-O" if not provided.
 
     Returns:
         Success message or None if failed
@@ -46,9 +47,14 @@ async def text_to_audio_stream(text: str, websocket) -> Optional[str]:
         synthesis_input = texttospeech.SynthesisInput(text=text)
 
         # Voice configuration - using a natural-sounding English voice
+        # Default to en-US-Chirp3-HD-Aoede if no voice preference is provided
+        default_voice = "en-US-Chirp3-HD-Aoede"
+        selected_voice = voice_name if voice_name else default_voice
+        print(f"[cloud-tts] Using voice: {selected_voice}")
+        
         voice = texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            name="en-US-Studio-O"  # High-quality Studio voice (natural podcaster sound)
+            name=selected_voice  # High-quality Studio voice (natural podcaster sound)
             # Note: Studio voices don't require ssml_gender parameter
         )
 
@@ -231,13 +237,14 @@ def _synthesize_chunk(client: texttospeech.TextToSpeechClient, text: str, voice:
         return None
 
 
-def text_to_audio_bytes(text: str) -> Optional[bytes]:
+def text_to_audio_bytes(text: str, voice_name: Optional[str] = None) -> Optional[bytes]:
     """
     Convert text to audio bytes (non-streaming version for daily brief).
     Handles long text by splitting into chunks and concatenating the audio.
     
     Args:
         text: The podcast text to convert to audio
+        voice_name: Optional voice name (e.g., "en-US-Studio-O"). Defaults to "en-US-Studio-O" if not provided.
     
     Returns:
         WAV audio file as bytes, or None if conversion fails
@@ -251,9 +258,14 @@ def text_to_audio_bytes(text: str) -> Optional[bytes]:
         client = texttospeech.TextToSpeechClient()
         
         # Voice configuration - using a natural-sounding English voice
+        # Default to en-US-Chirp3-HD-Aoede if no voice preference is provided
+        default_voice = "en-US-Chirp3-HD-Aoede"
+        selected_voice = voice_name if voice_name else default_voice
+        print(f"[cloud-tts] Using voice: {selected_voice}")
+        
         voice = texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            name="en-US-Studio-O"  # High-quality Studio voice (natural podcaster sound)
+            name=selected_voice  # High-quality Studio voice (natural podcaster sound)
             # Note: Studio voices don't require ssml_gender parameter
         )
         

@@ -60,6 +60,8 @@ from user_db import (
     save_user_preferences,
     save_audio_history,
     get_audio_history,
+    get_preferences_last_updated,
+    get_voice_preference_last_updated,
 )
 
 # importing helper functions
@@ -289,8 +291,15 @@ async def _retrieve_and_generate_podcast(
     # step4: convert podcast text to audio
     await websocket.send_json({"status": "converting_to_audio"})
     try:
+        # Get user's voice preference if authenticated
+        voice_preference = None
+        if user_id:
+            preferences = get_user_preferences(user_id)
+            voice_preference = preferences.get("voice_preference", "en-US-Studio-O")
+            print(f"[websocket] Using voice preference: {voice_preference}")
+        
         await websocket.send_json({"status": "streaming_audio"})
-        result = await text_to_audio_stream(podcast_text, websocket)
+        result = await text_to_audio_stream(podcast_text, websocket, voice_name=voice_preference)
 
         if not result:
             await websocket.send_json({"error": "Failed to generate audio stream"})
@@ -690,7 +699,11 @@ async def get_history_endpoint(request: Request, limit: int = 10):
 
 @app.post("/api/daily-brief")
 async def generate_daily_brief_endpoint(request: Request):
-    """Generate a personalized daily news briefing based on user preferences."""
+    """Generate a personalized daily news briefing based on user preferences.
+    
+    If only voice preference changed (not topics/sources), regenerates audio from existing transcript.
+    Otherwise, generates a new transcript and audio.
+    """
     try:
         user_id = request.state.user_id
         print(f"[daily-brief] Generating for user: {user_id}")
@@ -698,6 +711,129 @@ async def generate_daily_brief_endpoint(request: Request):
         # Load user preferences from user_preferences table in CloudSQL
         #  (this function comes from the user_db.py script)
         preferences = get_user_preferences(user_id)
+        
+        # Check if only voice preference changed (not topics/sources)
+        # We check by comparing when voice was updated vs when content preferences were updated
+        # If voice was updated more recently than content preferences, it's a voice-only change
+        content_prefs_updated = get_preferences_last_updated(user_id)
+        voice_pref_updated = get_voice_preference_last_updated(user_id)
+        
+        voice_only_change = False
+        if voice_pref_updated:
+            try:
+                voice_updated = datetime.fromisoformat(voice_pref_updated.replace('Z', '+00:00'))
+                
+                # If content preferences exist, compare timestamps
+                if content_prefs_updated:
+                    content_updated = datetime.fromisoformat(content_prefs_updated.replace('Z', '+00:00'))
+                    # Voice updated more recently than content = voice only change
+                    if voice_updated > content_updated:
+                        voice_only_change = True
+                        print(f"[daily-brief] Only voice preference changed (voice: {voice_updated}, content: {content_updated}), will regenerate audio from existing transcript")
+                else:
+                    # No content preferences exist, check if there's a recent brief to regenerate
+                    # If voice was updated and we have a brief from today, it's likely a voice-only change
+                    last_generated_str = preferences.get("last_daily_brief_generated")
+                    if last_generated_str:
+                        last_generated = datetime.fromisoformat(last_generated_str.replace('Z', '+00:00'))
+                        today = datetime.now(timezone.utc).date()
+                        last_date = last_generated.date()
+                        # If brief was generated today and voice was updated, assume voice-only change
+                        if last_date == today:
+                            voice_only_change = True
+                            print(f"[daily-brief] Voice preference changed (no content prefs, brief from today), will regenerate audio from existing transcript")
+            except (ValueError, AttributeError) as e:
+                print(f"[daily-brief] Error parsing timestamps: {e}")
+                pass
+        
+        # If only voice changed, get latest transcript and regenerate audio
+        if voice_only_change:
+            # Get the most recent daily brief transcript
+            history = get_audio_history(user_id, limit=50)
+            daily_briefs = [h for h in history if h.get("question_text") == "Daily Brief"]
+            
+            if daily_briefs and daily_briefs[0].get("podcast_text"):
+                latest_brief = daily_briefs[0]
+                
+                # Check if we've already regenerated audio for this voice change
+                # If the brief's created_at is after the voice preference was updated, we've already handled it
+                if voice_pref_updated and latest_brief.get("created_at"):
+                    try:
+                        voice_updated = datetime.fromisoformat(voice_pref_updated.replace('Z', '+00:00'))
+                        brief_created = datetime.fromisoformat(latest_brief.get("created_at").replace('Z', '+00:00'))
+                        
+                        # If brief was created after voice was updated, we've already regenerated it
+                        if brief_created >= voice_updated:
+                            print(f"[daily-brief] Audio already regenerated for current voice preference (brief: {brief_created}, voice updated: {voice_updated})")
+                            # Return the existing brief without regenerating
+                            return {
+                                "success": True,
+                                "podcast_text": latest_brief.get("podcast_text"),
+                                "audio_url": latest_brief.get("audio_url"),
+                                "created_at": latest_brief.get("created_at"),
+                                "voice_only_update": False,  # Already handled
+                                "already_regenerated": True
+                            }
+                    except (ValueError, AttributeError) as e:
+                        print(f"[daily-brief] Error comparing timestamps, proceeding with regeneration: {e}")
+                        pass
+                
+                podcast_text = latest_brief.get("podcast_text")
+                print(f"[daily-brief] Using existing transcript ({len(podcast_text)} chars)")
+                
+                # Regenerate audio with new voice
+                voice_preference = preferences.get("voice_preference", "en-US-Studio-O")
+                print(f"[daily-brief] Regenerating audio with voice: {voice_preference}")
+                audio_bytes = text_to_audio_bytes(podcast_text, voice_name=voice_preference)
+                
+                if not audio_bytes:
+                    raise HTTPException(status_code=500, detail="Failed to generate audio from text")
+                
+                # Upload new audio
+                audio_url = upload_audio_to_gcs(audio_bytes, user_id, filename_prefix="daily-brief")
+                
+                if not audio_url:
+                    raise HTTPException(status_code=500, detail="Failed to upload audio to storage")
+                
+                # Update the existing audio_history entry with new audio URL
+                # Note: We keep the same transcript but update the audio
+                # Since save_audio_history creates a new entry, we'll create a new entry
+                # but this is fine - it shows the voice change in history
+                source_chunks = latest_brief.get("source_chunks")
+                # Ensure source_chunks is a string (it might already be JSON string from DB)
+                if isinstance(source_chunks, dict):
+                    source_chunks = json.dumps(source_chunks)
+                elif source_chunks is None:
+                    source_chunks = None
+                # If it's already a string, use it as-is
+                
+                save_audio_history(
+                    user_id=user_id,
+                    question_text="Daily Brief",
+                    podcast_text=podcast_text,
+                    audio_url=audio_url,
+                    source_chunks=source_chunks  # Keep same chunks
+                )
+                
+                # Don't update last_daily_brief_generated timestamp for voice-only changes
+                # This allows subsequent calls to still detect voice-only changes
+                # We only update it for full regenerations
+                # Use the existing last_generated timestamp for the response
+                last_generated_str = preferences.get("last_daily_brief_generated")
+                
+                print(f"[daily-brief] Successfully regenerated audio with new voice")
+                return {
+                    "success": True,
+                    "podcast_text": podcast_text,
+                    "audio_url": audio_url,
+                    "created_at": last_generated_str or datetime.now(timezone.utc).isoformat(),
+                    "voice_only_update": True
+                }
+            else:
+                # Fall through to full generation if no existing brief found
+                print(f"[daily-brief] No existing transcript found, generating new brief")
+        
+        # Full generation path (new transcript + audio)
         """
         Example rows for a single user in user_preferences table is 
         ──────────┬────────────────────────────────┬─────────────────────────────────────────┬─────────────────────┐
@@ -848,7 +984,10 @@ Now generate your daily briefing:"""
         Convert them from PCM to WAV format with headers
         Complete WAV file as bytes
         """
-        audio_bytes = text_to_audio_bytes(podcast_text)
+        # Get user's voice preference
+        voice_preference = preferences.get("voice_preference", "en-US-Studio-O")
+        print(f"[daily-brief] Using voice preference: {voice_preference}")
+        audio_bytes = text_to_audio_bytes(podcast_text, voice_name=voice_preference)
 
         if not audio_bytes:
             raise HTTPException(status_code=500, detail="Failed to generate audio from text")
@@ -903,7 +1042,8 @@ Now generate your daily briefing:"""
             "success": True,
             "podcast_text": podcast_text,
             "audio_url": audio_url,
-            "created_at": current_time
+            "created_at": current_time,
+            "voice_only_update": False
         }
 
     except HTTPException:
@@ -922,7 +1062,7 @@ Now generate your daily briefing:"""
 #podcast page CHECKS this endpoint on load to avoid re-generating if already done today
 @app.get("/api/daily-brief/status")
 async def check_daily_brief_status_endpoint(request: Request):
-    """Check if daily brief was generated today."""
+    """Check if daily brief was generated today and if preferences have been updated since."""
     try:
         user_id = request.state.user_id
 
@@ -930,24 +1070,62 @@ async def check_daily_brief_status_endpoint(request: Request):
         preferences = get_user_preferences(user_id)
         last_generated_str = preferences.get("last_daily_brief_generated")
 
-        if not last_generated_str:
-            return {"generated_today": False}
+        # Get when preferences (topics/sources) were last updated
+        preferences_updated_str = get_preferences_last_updated(user_id)
+        voice_pref_updated_str = get_voice_preference_last_updated(user_id)
 
-        # Parse timestamp and check if it's today
-        try:
-            last_generated = datetime.fromisoformat(last_generated_str.replace('Z', '+00:00'))
-            today = datetime.now(timezone.utc).date()
-            last_date = last_generated.date()
+        generated_today = False
+        preferences_changed = False
+        voice_only_changed = False
 
-            generated_today = (last_date == today)
+        if last_generated_str:
+            # Parse timestamp and check if it's today
+            try:
+                last_generated = datetime.fromisoformat(last_generated_str.replace('Z', '+00:00'))
+                today = datetime.now(timezone.utc).date()
+                last_date = last_generated.date()
+                generated_today = (last_date == today)
 
-            return {
-                "generated_today": generated_today,
-                "last_generated": last_generated_str
-            }
+                # Check if content preferences (topics/sources) were updated after last brief
+                if preferences_updated_str:
+                    try:
+                        prefs_updated = datetime.fromisoformat(preferences_updated_str.replace('Z', '+00:00'))
+                        if prefs_updated > last_generated:
+                            preferences_changed = True
+                            print(f"[daily-brief-status] Content preferences updated after last brief: {prefs_updated} > {last_generated}")
+                    except (ValueError, AttributeError):
+                        pass
+                
+                # Check if only voice changed (voice updated but content preferences not)
+                if voice_pref_updated_str and preferences_updated_str:
+                    try:
+                        voice_updated = datetime.fromisoformat(voice_pref_updated_str.replace('Z', '+00:00'))
+                        content_updated = datetime.fromisoformat(preferences_updated_str.replace('Z', '+00:00'))
+                        if voice_updated > last_generated and content_updated <= last_generated:
+                            voice_only_changed = True
+                            print(f"[daily-brief-status] Only voice preference changed: {voice_updated} > {last_generated}, content unchanged")
+                    except (ValueError, AttributeError):
+                        pass
+                elif voice_pref_updated_str:
+                    # If voice was updated but we don't have content update time, check voice only
+                    try:
+                        voice_updated = datetime.fromisoformat(voice_pref_updated_str.replace('Z', '+00:00'))
+                        if voice_updated > last_generated:
+                            voice_only_changed = True
+                            print(f"[daily-brief-status] Voice preference changed: {voice_updated} > {last_generated}")
+                    except (ValueError, AttributeError):
+                        pass
 
-        except (ValueError, AttributeError):
-            return {"generated_today": False}
+            except (ValueError, AttributeError):
+                pass
+
+        return {
+            "generated_today": generated_today,
+            "preferences_changed": preferences_changed,
+            "voice_only_changed": voice_only_changed,
+            "last_generated": last_generated_str,
+            "preferences_updated": preferences_updated_str
+        }
 
     except AttributeError:
         raise HTTPException(status_code=401, detail="User not authenticated")

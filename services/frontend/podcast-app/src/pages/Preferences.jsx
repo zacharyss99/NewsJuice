@@ -6,6 +6,7 @@ function Preferences() {
   const navigate = useNavigate()
   const [selectedTopics, setSelectedTopics] = useState([])
   const [selectedSources, setSelectedSources] = useState([])
+  const [selectedVoice, setSelectedVoice] = useState('en-US-Chirp3-HD-Aoede')
   const [isSaving, setIsSaving] = useState(false)
 
   // Predefined topics (8 categories from plan)
@@ -87,6 +88,9 @@ function Preferences() {
             : prefs.sources
           setSelectedSources(sources)
         }
+        if (prefs.voice_preference) {
+          setSelectedVoice(prefs.voice_preference)
+        }
       }
     } catch (error) {
       console.error('[preferences] Error loading:', error)
@@ -128,7 +132,8 @@ function Preferences() {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           topics: selectedTopics,
-          sources: selectedSources
+          sources: selectedSources,
+          voice_preference: selectedVoice
         })
       })
 
@@ -238,6 +243,29 @@ function Preferences() {
 
           <p className="text-sm text-gray-500 mt-4">
             Selected: {selectedSources.length} {selectedSources.length === 1 ? 'source' : 'sources'}
+          </p>
+        </section>
+
+        {/* Voice Selection Section */}
+        <section>
+          <h2 className="text-2xl font-bold mb-2">Voice Preference</h2>
+          <p className="text-gray-400 mb-6">
+            Choose the voice for your podcast narration
+          </p>
+
+          <div className="max-w-md">
+            <select
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
+              className="w-full px-6 py-4 rounded-2xl bg-gray-800/50 text-gray-300 border border-gray-700 hover:bg-gray-700/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary-pink focus:border-transparent"
+            >
+              <option value="en-US-Chirp3-HD-Aoede">Female voice</option>
+              <option value="en-US-Chirp3-HD-Alnilam">Male voice</option>
+            </select>
+          </div>
+
+          <p className="text-sm text-gray-500 mt-4">
+            This voice will be used for all podcast narrations, including daily briefs and Q&A responses.
           </p>
         </section>
 
