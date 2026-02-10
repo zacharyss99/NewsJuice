@@ -1,0 +1,22 @@
+2026-01-02 19:10:40,309 - scrapers - INFO - Logging to file: logs/scraper_20260102_191040.log
+2026-01-02 19:10:40,310 - main - INFO - Logging to file: logs/scrapers_20260102_191040.log
+2026-01-02 19:12:46,541 - main - INFO - === Starting synchronous article scarping process ===
+2026-01-02 19:12:46,543 - scrapers - INFO - === Starting scrape_tag_load  ===
+2026-01-02 19:12:47,014 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/feed/ "HTTP/1.1 200 OK"
+2026-01-02 19:13:44,112 - scrapers - INFO - 
+✅ === SCRAPER COMPLETED ===
+2026-01-02 19:13:44,113 - scrapers - INFO - 
+✅ Inserted 0 new articles across all sources.
+2026-01-02 19:13:44,113 - scrapers - INFO - 
+✅ Total articles scraped: 0
+2026-01-02 19:13:44,113 - main - INFO - Processing by scrapers completed successfully: {'status': 'success', 'message': 'Inserted 0 new articles across all sources', 'processed': 0, 'total_found': 0}
+2026-01-02 19:15:26,200 - main - INFO - === Starting synchronous article scarping process ===
+2026-01-02 19:15:26,203 - scrapers - INFO - === Starting scrape_tag_load  ===
+2026-01-02 19:15:26,397 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/feed/ "HTTP/1.1 200 OK"
+2026-01-02 19:16:14,251 - scrapers - INFO - 
+✅ === SCRAPER COMPLETED ===
+2026-01-02 19:16:14,257 - scrapers - INFO - 
+✅ Inserted 0 new articles across all sources.
+2026-01-02 19:16:14,257 - scrapers - INFO - 
+✅ Total articles scraped: 0
+2026-01-02 19:16:14,258 - main - INFO - Processing by scrapers completed successfully: {'status': 'success', 'message': 'Inserted 0 new articles across all sources', 'processed': 0, 'total_found': 0}

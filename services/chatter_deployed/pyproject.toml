@@ -1,0 +1,34 @@
+[project]
+name = "chatter-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "openai>=1.0.0",
+  "google-cloud-storage>=2.10.0",
+  "google-auth>=2.20.0",
+  "requests>=2.31.0",
+  "httpx>=0.27.0",
+  "psycopg[binary]>=3.2.11",
+  "google-cloud-aiplatform>=1.122.0",
+  "pgvector>=0.4.1",
+  "python-dotenv>=1.1.1",
+  "google-genai",
+  "google-cloud-speech>=2.20.0",
+  "google-cloud-texttospeech>=2.14.0",
+  "firebase-admin>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black==24.1.1",
+  "flake8>=7.0.0",
+  "pytest>=7.4.4",
+  "pytest-cov>=4.1.0",
+  "pytest-asyncio>=0.23.3",
+]
+
+[tool.black]
+line-length = 120
+target-version = ["py311", "py312"]

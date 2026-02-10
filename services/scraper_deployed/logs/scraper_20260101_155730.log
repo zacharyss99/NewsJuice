@@ -1,0 +1,68 @@
+2026-01-01 15:57:30,652 - scrapers - INFO - Logging to file: logs/scraper_20260101_155730.log
+2026-01-01 15:57:30,661 - main - INFO - Logging to file: logs/scrapers_20260101_155730.log
+2026-01-01 16:02:04,931 - main - INFO - === Starting synchronous article scarping process ===
+2026-01-01 16:02:04,932 - scrapers - INFO - === Starting scrape_tag_load  ===
+2026-01-01 16:02:05,250 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/feed/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:05,609 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/a-tiny-limpet-reveals-big-secrets/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:05,982 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/digging-for-old-harvard/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:06,329 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/new-institute-to-strengthen-fundamental-physics-research-collaboration/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:06,692 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/it-just-feels-good-when-you-solve-the-hard-problems/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:07,032 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/how-to-pay-attention/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:07,399 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/seamus-heaneys-long-migration/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:07,771 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/hope-for-imminent-russia-ukraine-peace-is-out-of-touch-with-reality-expert-says/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:08,110 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/are-you-doing-enough-to-keep-your-brain-healthy/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:08,475 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/building-interfaith-community/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:08,822 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/depression-and-anxiety-linked-to-increased-risk-of-heart-attack-or-stroke/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:09,175 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/stopping-the-next-pandemic/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:09,521 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/is-cost-curbing-use-of-weight-loss-drugs/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:09,849 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/the-perils-of-perfectionism/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:10,204 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/social-media-detox-boosts-mental-health-but-nuances-stand-out/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:10,563 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/how-to-read-a-poem/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:10,919 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/new-research-finds-5-genetic-signatures-shared-by-14-psychiatric-disorders/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:11,257 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/who-needs-the-humanities/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:11,587 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/o-say-can-you-sing/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:11,931 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/garber-to-lead-harvard-beyond-2026-27-academic-year/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:12,290 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/at-a-loss-for-words/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:12,643 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/should-u-s-be-worried-about-ai-bubble/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:13,405 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/when-bad-things-happen-to-good-books/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:13,752 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/rethinking-and-reframing-superintelligence/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:14,478 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/break-in-the-case-for-long-covid-investigators/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:14,941 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/first-male-gets-heated-up-then-female-and-then-you-know/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:15,687 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/5-from-harvard-named-marshall-scholars/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:16,024 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/how-capitalism-came-to-rule-modern-life/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:16,376 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/wonder-director-senses-your-skepticism/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:17,090 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/consciousness/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:17,746 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/the-problem-with-school-smartphone-debate/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:18,088 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/why-self-appraisals-may-not-be-best-way-to-judge-job-performance/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:18,759 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/science-needs-contrarians-and-contrarians-need-support/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:19,198 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/does-work-from-anywhere-really-work/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:19,749 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/whats-working-not-on-front-lines-of-ai-in-classroom/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:20,448 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/just-who-gets-a-say-at-fda-public-drug-approval-hearings/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:21,094 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/your-digital-twin-might-save-your-life/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:21,723 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/time-to-legalize-psychedelics/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:22,076 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/how-a-toxin-from-the-gut-microbiome-may-help-spark-colorectal-cancer/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:22,764 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/a-life-spent-responding-to-emergencies-around-the-world/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:23,114 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/our-students-are-seeking-not-just-to-coexist-but-to-understand/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:23,466 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/a-call-for-corporate-america-to-step-up-on-homeless-crisis/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:24,157 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/writing-like-its-a-game-of-telephone/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:24,509 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/cracking-the-code-of-why-when-some-choose-to-self-handicap/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:25,224 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/how-memory-works-and-doesnt/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:25,968 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/roy-parviz-mottahedeh-84/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:26,307 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/karel-frederik-liem-73/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:26,955 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/anxious-about-retirement-savings-avoid-these-mistakes/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:27,580 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/youre-not-the-only-one-whos-bored/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:28,252 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/why-stress-can-make-your-hair-fall-out/ "HTTP/1.1 200 OK"
+2026-01-01 16:02:28,936 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/story/2025/12/nighttime-exposure-to-light-may-raise-cardiovascular-risk-by-up-to-50/ "HTTP/1.1 200 OK"
+2026-01-01 16:10:27,833 - main - ERROR - Processing failed: value too long for type character varying(255)
+Traceback (most recent call last):
+  File "/app/main.py", line 48, in process_sync
+    result = scrape_tag_load()
+             ^^^^^^^^^^^^^^^^^
+  File "/app/scrapers.py", line 123, in scrape_tag_load
+    inserted_count = db_manager.insert_records(db_records)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/db_manager.py", line 67, in insert_records
+    cur.execute(query, values)
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/cursor.py", line 97, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.StringDataRightTruncation: value too long for type character varying(255)

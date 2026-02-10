@@ -1,0 +1,12 @@
+encryptionsalt: v1:5gWtumNJAUk=:v1:1iyjKk3aMeiflwiS:Be0uGLSSTTpOaklM2ejCDxeww4eBFQ==
+config:
+  gcp:project: newsjuice-123456
+  newsjuice-loader:db_password:
+    secure: v1:e6WQHZSOOZ+lZIp7:mTQlw6yJrU1RjRh8QmO3IdEY3Oqztgc4wJMhlg==
+  newsjuice-loader:enable_gke: "true"
+  newsjuice-loader:enable_cloudrun: "true"
+  newsjuice-loader:gke_node_count: "2"
+  newsjuice-loader:gke_machine_type: e2-standard-2
+  newsjuice-loader:db_instance_name: newsdb-instance
+  newsjuice-loader:db_name: newsdb
+  newsjuice-loader:db_user: postgres

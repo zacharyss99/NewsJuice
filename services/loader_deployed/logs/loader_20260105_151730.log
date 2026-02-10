@@ -1,0 +1,18 @@
+2026-01-05 15:17:30,621 - main - INFO - Logging to file: logs/loader_20260105_151730.log
+2026-01-05 15:17:46,001 - main - INFO - === Starting synchronous article processing ===
+2026-01-05 15:17:46,002 - loader - INFO - === Starting chunk_embed_load - Method: recursive-split ===
+2026-01-05 15:17:46,002 - loader - INFO - Using tables - Articles: articles, Vectors: chunks_vector
+2026-01-05 15:17:46,015 - main - ERROR - Processing failed: [Errno -2] Name or service not known
+Traceback (most recent call last):
+  File "/app/main.py", line 47, in process_sync
+    result = chunk_embed_load(method="recursive-split")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/loader.py", line 121, in chunk_embed_load
+    conn = psycopg.connect(DB_URL, autocommit=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/connection.py", line 98, in connect
+    attempts = conninfo_attempts(params)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/_conninfo_attempts.py", line 53, in conninfo_attempts
+    raise e.OperationalError(str(last_exc))
+psycopg.OperationalError: [Errno -2] Name or service not known

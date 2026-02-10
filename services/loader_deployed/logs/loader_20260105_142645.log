@@ -1,0 +1,8 @@
+2026-01-05 14:26:45,823 - main - INFO - Logging to file: logs/loader_20260105_142645.log
+2026-01-05 14:33:36,961 - main - INFO - === Starting synchronous article processing ===
+2026-01-05 14:33:36,964 - loader - INFO - === Starting chunk_embed_load - Method: recursive-split ===
+2026-01-05 14:33:36,964 - loader - INFO - Using tables - Articles: articles, Vectors: chunks_vector
+2026-01-05 14:33:36,981 - loader - INFO - Connected to database
+2026-01-05 14:33:37,021 - loader - INFO - Fetched 0 articles with vflag=0
+2026-01-05 14:33:37,021 - loader - INFO - No new articles to process
+2026-01-05 14:33:37,022 - main - INFO - Processing completed successfully: {'status': 'success', 'message': 'No new articles to process', 'processed': 0}
