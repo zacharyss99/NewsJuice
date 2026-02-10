@@ -3,6 +3,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
+import Logo from '../components/Logo'
 
 "How this works"
 "1. User fills out registration form (on Registration.jsx) "
@@ -102,6 +103,9 @@ function Registration() {
       
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-12">
+          <div className="mb-6">
+            <Logo size="large" className="justify-center inline-block" />
+          </div>
           <h1 className="text-4xl font-bold mb-4">Registration</h1>
           <p className="text-gray-400">Please fill in the details to create your account.</p>
         </div>

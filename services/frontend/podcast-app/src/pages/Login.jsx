@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import Logo from '../components/Logo';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -75,6 +76,9 @@ function Login() {
       
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-12">
+          <div className="mb-6">
+            <Logo size="large" className="justify-center inline-block" />
+          </div>
           <h1 className="text-4xl font-bold mb-4">Login</h1>
           <p className="text-gray-400">Please enter your credentials to continue.</p>
         </div>
@@ -134,7 +138,7 @@ function Login() {
 
           <div className="text-center text-gray-400 text-sm">Or login with</div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
               className="py-3 px-6 bg-transparent border border-gray-700 rounded-full flex items-center justify-center gap-2 hover:border-gray-500 transition-colors"
@@ -156,7 +160,7 @@ function Login() {
               </svg>
               <span>Google</span>
             </button>
-          </div>
+          </div> */}
 
           <div className="text-center text-gray-400 text-sm">
             Don't have account?{' '}

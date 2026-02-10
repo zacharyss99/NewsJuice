@@ -4,12 +4,13 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBgsCjTT1B_qZUioacHrLHcs5v0tXcmr2c",
-  authDomain: "newsjuice-123456.firebaseapp.com",
-  projectId: "newsjuice-123456",
-  storageBucket: "newsjuice-123456.firebasestorage.app",
-  messagingSenderId: "919568151211",
-  appId: "1:919568151211:web:87459d5aabfe4d5ec8fdee"
+  apiKey: "AIzaSyAPqx7bjAe0p7sFrTeNacrwFcVkuQUBewE",
+  authDomain: "newsjuice-40a77.firebaseapp.com",
+  projectId: "newsjuice-40a77",
+  storageBucket: "newsjuice-40a77.firebasestorage.app",
+  messagingSenderId: "98363376964",
+  appId: "1:98363376964:web:5a4cb7efdc954d52b14311",
+  measurementId: "G-V61F0EJL1Y"
 };
 
 // Initialize Firebase

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import AnimatedOrb from '../components/AnimatedOrb'
 import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
 import { useVAD } from '../hooks/useVAD'
+import Logo from '../components/Logo'
 
 function Podcast() {
   const navigate = useNavigate()
@@ -1082,8 +1083,8 @@ function Podcast() {
 
           setTimeout(() => {
             setStatusMessage("Go ahead, I'm listening")
-          }, 3000)
-        }, 30000)  // 30 second timeout
+          }, 12000)
+        }, 120000)  // 120 second timeout
 
       } else {
         console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
@@ -1312,7 +1313,7 @@ function Podcast() {
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-lg font-semibold">AI Daily News Briefing</h1>
+        <Logo />
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/preferences')}

@@ -1,5 +1,6 @@
 import { ArrowLeft, Twitter, Linkedin, Github, Mail } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import Logo from '../components/Logo'
 
 function AboutUs() {
   const navigate = useNavigate()
@@ -60,7 +61,7 @@ function AboutUs() {
           >
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-xl font-semibold">About Us</h1>
+          <Logo />
           <div className="w-10"></div>
         </div>
       </div>

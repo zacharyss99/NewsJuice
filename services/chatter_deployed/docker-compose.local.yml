@@ -1,22 +1,26 @@
 version: '3.8'
 
 services:
-  # Cloud SQL Proxy - connects to your Cloud SQL instance
-  cloud-sql-proxy:
-    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
-    command:
-      - "--address=0.0.0.0"
-      - "--port=5432"
-      - "newsjuice-123456:us-central1:newsdb-instance"
-    volumes:
-      - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
+  # Local PostgreSQL Database (for development)
+  postgres:
+    image: pgvector/pgvector:pg15
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Newsjuice25+
+      - POSTGRES_DB=newsdb
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     restart: unless-stopped
     networks:
       - chatter-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Your Chatter API
   api:
@@ -29,25 +33,27 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - cloud-sql-proxy
+      postgres:
+        condition: service_healthy
     environment:
       # Database
-      - DATABASE_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
-      - DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
+      - DATABASE_URL=postgresql://postgres:Newsjuice25%2B@postgres:5432/newsdb
+      - DB_URL=postgresql://postgres:Newsjuice25%2B@postgres:5432/newsdb
       
       # OpenAI
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
       
       # Google Cloud
-      - GOOGLE_CLOUD_PROJECT=newsjuice-123456
+      - GOOGLE_CLOUD_PROJECT=famous-phalanx-471817-q2
       - GOOGLE_CLOUD_REGION=us-central1
       - GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
+      - FIREBASE_SERVICE_ACCOUNT_PATH=/app/firebase-admin-key.json
       - GEMINI_SERVICE_ACCOUNT_PATH=/secrets/gemini-service-account.json
       
       # Google AI API (for Live API - loaded from .env.local via env_file)
       
       # GCS
-      - AUDIO_BUCKET=ac215-audio-bucket
+      - AUDIO_BUCKET=newsjuice-local-audio
       - GCS_PREFIX=podcasts/
       - CACHE_CONTROL=public, max-age=3600
       
@@ -63,6 +69,7 @@ services:
     
     volumes:
       # Mount service account keys (read-only)
+      - ../../../secrets/firebase-admin-key.json:/app/firebase-admin-key.json:ro
       - ../../../secrets/sa-key.json:/app/sa-key.json:ro
       - ../../../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
       
@@ -86,3 +93,7 @@ services:
 networks:
   chatter-network:
     driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local

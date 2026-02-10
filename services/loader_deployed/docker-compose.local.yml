@@ -2,19 +2,19 @@
 
 services:
   # Cloud SQL Proxy - connects to your Cloud SQL instance
-  cloud-sql-proxy:
-    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
-    command:
-      - "--address=0.0.0.0"
-      - "--port=5432"
-      - "newsjuice-123456:us-central1:newsdb-instance"
-    volumes:
-      - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
+  # cloud-sql-proxy:
+  #   image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+  #   command:
+  #     - "--address=0.0.0.0"
+  #     - "--port=5432"
+  #     - "newsjuice-123456:us-central1:newsdb-instance"
+  #   volumes:
+  #     - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
+  #   environment:
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
+  #   ports:
+  #     - "5432:5432"
+  #   restart: unless-stopped
     #networks:
     #  - chatter-network
 
@@ -24,20 +24,20 @@ services:
       context: .
       #args:
       #  HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
-    ports:
-      - "8080:8080"
-    depends_on:
-      - cloud-sql-proxy
+    # ports:
+    #   - "8080:8080"
+    # depends_on:
+    #   - cloud-sql-proxy
     environment:
       # Database
-      - DATABASE_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
-      - DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
+      - DATABASE_URL=postgresql://postgres:Newsjuice25%2B@chatter_deployed-postgres-1:5432/newsdb
+      - DB_URL=postgresql://postgres:Newsjuice25%2B@chatter_deployed-postgres-1:5432/newsdb
       
       # OpenAI
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       
       # Google Cloud
-      - GOOGLE_CLOUD_PROJECT=newsjuice-123456
+      - GOOGLE_CLOUD_PROJECT=famous-phalanx-471817-q2
       - GOOGLE_CLOUD_REGION=us-central1
       - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/sa-key.json
       - GEMINI_SERVICE_ACCOUNT_PATH=/app/secrets/gemini-service-account.json
@@ -69,9 +69,11 @@ services:
       # - ./retriever.py:/app/retriever.py
     
     restart: unless-stopped
-    #networks:
-    #  - loader-network
+    networks:
+     - chatter-network
+         
 
-#networks:
-#  loader-network:
+networks:
+ chatter-network:
+   external: true
 #    driver: bridge

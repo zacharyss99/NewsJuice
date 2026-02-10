@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, Eye, EyeOff, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import Logo from '../components/Logo'
 
 function Settings() {
   const navigate = useNavigate()
@@ -51,6 +52,7 @@ function Settings() {
           >
             <ArrowLeft size={24} />
           </button>
+          <Logo />
           <div className="flex items-center gap-3">
             <span className="text-sm">Hello, Welcome 👋</span>
             <div className="w-10 h-10 bg-gradient-to-br from-primary-pink to-primary-purple rounded-full flex items-center justify-center">

@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NewsJuice - Preferences Redesign Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'primary-pink': '#FF3B9A',
+            'primary-purple': '#8B3A8F',
+            'primary-dark': '#1A1625',
+            'primary-darker': '#0F0B14',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .slide-up {
+      animation: slideUp 0.4s ease-out;
+    }
+
+    .toast {
+      animation: slideUp 0.3s ease-out;
+    }
+
+    /* Smooth transitions */
+    * {
+      transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+      transition-duration: 200ms;
+      transition-timing-function: ease-in-out;
+    }
+
+    /* Loading animation */
+    @keyframes shimmer {
+      0% { background-position: -1000px 0; }
+      100% { background-position: 1000px 0; }
+    }
+
+    .loading-shimmer {
+      background: linear-gradient(90deg, #FF3B9A 0%, #FF6BB5 50%, #FF3B9A 100%);
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1A1625;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #4B5563;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6B7280;
+    }
+  </style>
+</head>
+<body class="bg-primary-darker text-white font-sans antialiased">
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+  <!-- Header -->
+  <div class="sticky top-0 z-40 bg-primary-darker/80 backdrop-blur-lg border-b border-gray-800">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <button onclick="window.history.back()" class="p-2 hover:bg-gray-800 rounded-full transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+      </button>
+      <h1 class="text-xl font-bold">News Preferences</h1>
+      <div class="w-10"></div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    <div class="lg:flex lg:gap-8">
+
+      <!-- Left Column: Preferences -->
+      <div class="flex-1 space-y-10">
+
+        <!-- Progress Indicator -->
+        <div class="bg-blue-900/20 border border-blue-800/50 rounded-2xl p-6 slide-up">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-semibold">Setup Progress</span>
+            <span id="progress-text" class="text-sm text-gray-400">0/3 Complete</span>
+          </div>
+          <div class="w-full bg-gray-800 rounded-full h-2 mb-3">
+            <div id="progress-bar" class="bg-gradient-to-r from-primary-pink to-pink-500 h-2 rounded-full" style="width: 0%; transition: width 0.4s ease;"></div>
+          </div>
+          <div class="flex items-center gap-4 text-sm">
+            <span id="topics-check" class="text-gray-500">⏳ Select topics</span>
+            <span id="sources-check" class="text-gray-500">⏳ Choose sources</span>
+            <span id="voice-check" class="text-gray-500">⏳ Pick voice</span>
+          </div>
+        </div>
+
+        <!-- Quick Presets -->
+        <section class="fade-in">
+          <h2 class="text-2xl font-bold mb-4">Quick Setup</h2>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button onclick="applyPreset('recommended')" class="px-4 py-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded-2xl text-sm font-medium transition-all hover:border-primary-pink/50">
+              ✨ Recommended
+            </button>
+            <button onclick="applyPreset('all')" class="px-4 py-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded-2xl text-sm font-medium transition-all hover:border-primary-pink/50">
+              📚 Select All
+            </button>
+            <button onclick="applyPreset('minimal')" class="px-4 py-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded-2xl text-sm font-medium transition-all hover:border-primary-pink/50">
+              ⚡ Minimal Brief
+            </button>
+            <button onclick="applyPreset('student')" class="px-4 py-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded-2xl text-sm font-medium transition-all hover:border-primary-pink/50">
+              🎓 Student Focus
+            </button>
+          </div>
+        </section>
+
+        <!-- Topics Section -->
+        <section class="fade-in">
+          <h2 class="text-2xl font-bold mb-2">Topics</h2>
+          <p class="text-gray-400 mb-6">Select the topics you'd like to see in your daily briefing</p>
+
+          <div id="topics-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <!-- Populated by JavaScript -->
+          </div>
+
+          <p class="text-sm text-gray-500 mt-4">
+            Selected: <span id="topics-count" class="font-semibold text-white">0</span> topics
+          </p>
+          <div id="topics-hint" class="text-sm text-yellow-400 mt-2 hidden"></div>
+        </section>
+
+        <!-- Sources Section -->
+        <section class="fade-in">
+          <h2 class="text-2xl font-bold mb-2">News Sources</h2>
+          <p class="text-gray-400 mb-6">Choose which Harvard news sources to include</p>
+
+          <div id="sources-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Populated by JavaScript -->
+          </div>
+
+          <p class="text-sm text-gray-500 mt-4">
+            Selected: <span id="sources-count" class="font-semibold text-white">0</span> sources
+          </p>
+          <div id="sources-hint" class="text-sm text-yellow-400 mt-2 hidden"></div>
+        </section>
+
+        <!-- Voice Selection -->
+        <section class="fade-in">
+          <h2 class="text-2xl font-bold mb-2">Voice Preference</h2>
+          <p class="text-gray-400 mb-6">Choose the voice for your podcast narration</p>
+
+          <div id="voice-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+            <!-- Populated by JavaScript -->
+          </div>
+
+          <p class="text-sm text-gray-500 mt-4">
+            This voice will be used for all podcast narrations, including daily briefs and Q&A responses.
+          </p>
+        </section>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-4 pt-6">
+          <button
+            id="save-btn"
+            onclick="savePreferences()"
+            disabled
+            class="flex-1 py-4 bg-gradient-to-r from-primary-pink to-pink-500 rounded-full text-white font-semibold hover:shadow-lg hover:shadow-primary-pink/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+          >
+            Save Preferences
+          </button>
+          <button
+            onclick="resetPreferences()"
+            class="px-8 py-4 bg-transparent border border-gray-600 rounded-full text-gray-300 hover:border-gray-500 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+
+        <!-- Info Box -->
+        <div class="bg-blue-900/20 border border-blue-800/50 rounded-2xl p-6">
+          <h3 class="font-semibold mb-2 flex items-center gap-2">
+            <span>💡</span>
+            How it works
+          </h3>
+          <p class="text-sm text-gray-300">
+            Your daily briefing will be personalized based on these preferences.
+            You'll receive news from your selected sources that match your chosen topics.
+            You can update your preferences anytime.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Preview Panel (Desktop) -->
+      <div class="hidden lg:block lg:w-80 xl:w-96">
+        <div class="sticky top-24">
+          <div id="preview-panel" class="bg-gradient-to-br from-gray-800/30 to-gray-900/30 rounded-2xl p-6 border border-gray-700 slide-up">
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+              <span>👀</span>
+              Your Brief Preview
+            </h3>
+
+            <div id="preview-stats" class="mb-6 p-4 bg-primary-dark/50 rounded-xl">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-400">Articles</span>
+                <span id="preview-article-count" class="text-2xl font-bold text-primary-pink">0</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-400">Listen Time</span>
+                <span id="preview-listen-time" class="text-lg font-semibold">~0 min</span>
+              </div>
+            </div>
+
+            <div id="preview-headlines" class="space-y-3">
+              <p class="text-sm text-gray-500 text-center py-8">
+                Select topics and sources to see sample headlines
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Mobile Preview (Bottom Sheet) -->
+    <div class="lg:hidden mt-10">
+      <button onclick="toggleMobilePreview()" class="w-full px-6 py-4 bg-gradient-to-br from-gray-800/30 to-gray-900/30 rounded-2xl border border-gray-700 font-semibold flex items-center justify-between">
+        <span>👀 Preview Your Brief</span>
+        <svg id="mobile-preview-icon" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div id="mobile-preview-content" class="hidden mt-4 bg-gradient-to-br from-gray-800/30 to-gray-900/30 rounded-2xl p-6 border border-gray-700">
+        <div class="mb-6 p-4 bg-primary-dark/50 rounded-xl">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm text-gray-400">Articles</span>
+            <span id="mobile-preview-article-count" class="text-2xl font-bold text-primary-pink">0</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-400">Listen Time</span>
+            <span id="mobile-preview-listen-time" class="text-lg font-semibold">~0 min</span>
+          </div>
+        </div>
+        <div id="mobile-preview-headlines" class="space-y-3">
+          <p class="text-sm text-gray-500 text-center py-8">
+            Select topics and sources to see sample headlines
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Mock data
+    const topicsData = [
+      { id: 'politics', name: 'Politics', count: 24, trending: true },
+      { id: 'technology', name: 'Technology', count: 18, trending: false },
+      { id: 'health', name: 'Health', count: 12, trending: false },
+      { id: 'business', name: 'Business', count: 15, trending: false },
+      { id: 'sports', name: 'Sports', count: 8, trending: false },
+      { id: 'entertainment', name: 'Entertainment', count: 6, trending: false },
+      { id: 'campus-life', name: 'Campus Life', count: 22, trending: true },
+      { id: 'research', name: 'Research', count: 28, trending: true }
+    ];
+
+    const sourcesData = [
+      {
+        id: 'crimson',
+        name: 'Harvard Crimson',
+        description: 'Student-run newspaper covering campus news',
+        url: 'thecrimson.harvard.edu',
+        count: 18,
+        icon: '📰'
+      },
+      {
+        id: 'gazette',
+        name: 'Harvard Gazette',
+        description: 'Official news from Harvard University',
+        url: 'news.harvard.edu',
+        count: 24,
+        icon: '📜'
+      },
+      {
+        id: 'hms',
+        name: 'Harvard Medical School',
+        description: 'Medical research and health news',
+        url: 'hms.harvard.edu',
+        count: 12,
+        icon: '🏥'
+      },
+      {
+        id: 'seas',
+        name: 'Harvard SEAS',
+        description: 'Engineering and applied sciences',
+        url: 'seas.harvard.edu',
+        count: 15,
+        icon: '⚙️'
+      },
+      {
+        id: 'hls',
+        name: 'Harvard Law School',
+        description: 'Legal news and analysis',
+        url: 'hls.harvard.edu',
+        count: 10,
+        icon: '⚖️'
+      },
+      {
+        id: 'hbs',
+        name: 'Harvard Business School',
+        description: 'Business insights and research',
+        url: 'hbs.edu',
+        count: 14,
+        icon: '💼'
+      },
+      {
+        id: 'magazine',
+        name: 'Harvard Magazine',
+        description: 'In-depth stories from the Harvard community',
+        url: 'harvardmagazine.com',
+        count: 8,
+        icon: '📖'
+      },
+      {
+        id: 'hks',
+        name: 'Harvard Kennedy School',
+        description: 'Public policy and governance',
+        url: 'hks.harvard.edu',
+        count: 11,
+        icon: '🏛️'
+      }
+    ];
+
+    const voicesData = [
+      {
+        id: 'aoede',
+        name: 'Aoede',
+        gender: 'Female',
+        style: 'Natural & Warm',
+        description: 'A friendly, conversational voice perfect for daily news'
+      },
+      {
+        id: 'alnilam',
+        name: 'Alnilam',
+        gender: 'Male',
+        style: 'Professional & Clear',
+        description: 'A confident, authoritative voice for serious topics'
+      }
+    ];
+
+    const sampleHeadlines = {
+      'politics': [
+        'Harvard Study Reveals New Insights on Voter Behavior',
+        'Political Science Department Hosts International Summit',
+        'Student Government Elections See Record Turnout'
+      ],
+      'technology': [
+        'SEAS Researchers Develop Revolutionary AI Algorithm',
+        'Harvard-MIT Partnership Advances Quantum Computing',
+        'New Tech Startup Incubator Launches on Campus'
+      ],
+      'health': [
+        'HMS Study Links Sleep Patterns to Mental Health',
+        'New COVID-19 Research Published by Harvard Scientists',
+        'Harvard Health Initiative Expands Campus Wellness Programs'
+      ],
+      'business': [
+        'HBS Case Study Examines Tech Industry Disruption',
+        'Alumni-Founded Startup Reaches Unicorn Status',
+        'Business School Launches New Entrepreneurship Program'
+      ],
+      'sports': [
+        'Harvard Crew Team Claims Victory at National Championship',
+        'Athletic Department Unveils New Training Facility',
+        'Student Athletes Balance Academics and Competition'
+      ],
+      'entertainment': [
+        'Harvard Art Museums Debut Major New Exhibition',
+        'Student Film Wins Sundance Documentary Prize',
+        'ART Theater Season Opens with Acclaimed Production'
+      ],
+      'campus-life': [
+        'New Residential Hall Opens in Harvard Yard',
+        'Student Organizations Plan Record Number of Events',
+        'Campus Dining Introduces Sustainable Menu Options'
+      ],
+      'research': [
+        'Harvard Scientists Make Breakthrough in Cancer Treatment',
+        'Climate Research Team Publishes Landmark Study',
+        'Interdisciplinary Lab Receives $10M Federal Grant'
+      ]
+    };
+
+    // State
+    let state = {
+      selectedTopics: [],
+      selectedSources: [],
+      selectedVoice: 'aoede'
+    };
+
+    // Initialize
+    function init() {
+      renderTopics();
+      renderSources();
+      renderVoices();
+      updateUI();
+    }
+
+    // Render Topics
+    function renderTopics() {
+      const grid = document.getElementById('topics-grid');
+      grid.innerHTML = topicsData.map(topic => `
+        <button
+          onclick="toggleTopic('${topic.id}')"
+          id="topic-${topic.id}"
+          class="relative px-6 py-4 rounded-2xl font-medium transition-all bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 border border-gray-700"
+        >
+          <div class="flex items-center justify-between mb-1">
+            <span>${topic.name}</span>
+            <svg class="check-icon w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400">${topic.count} articles</span>
+            ${topic.trending ? '<span class="text-xs bg-primary-pink/20 text-primary-pink px-2 py-0.5 rounded-full">Trending</span>' : ''}
+          </div>
+        </button>
+      `).join('');
+    }
+
+    // Render Sources
+    function renderSources() {
+      const grid = document.getElementById('sources-grid');
+      grid.innerHTML = sourcesData.map(source => `
+        <button
+          onclick="toggleSource('${source.id}')"
+          id="source-${source.id}"
+          class="relative px-6 py-4 rounded-2xl font-medium text-left transition-all bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 border border-gray-700"
+        >
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">${source.icon}</span>
+              <div>
+                <p class="font-semibold">${source.name}</p>
+                <p class="text-xs text-gray-500">${source.url}</p>
+              </div>
+            </div>
+            <svg class="check-icon w-5 h-5 hidden flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <p class="text-xs text-gray-400">${source.description}</p>
+          <p class="text-xs text-primary-pink mt-2">${source.count} articles today</p>
+        </button>
+      `).join('');
+    }
+
+    // Render Voices
+    function renderVoices() {
+      const grid = document.getElementById('voice-grid');
+      grid.innerHTML = voicesData.map(voice => `
+        <button
+          onclick="selectVoice('${voice.id}')"
+          id="voice-${voice.id}"
+          class="relative px-6 py-6 rounded-2xl text-left transition-all border-2 ${voice.id === 'aoede' ? 'bg-gradient-to-br from-primary-pink to-pink-600 text-white border-primary-pink shadow-lg shadow-primary-pink/30' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 border-gray-700'}"
+        >
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-12 h-12 rounded-full bg-gray-700/50 flex items-center justify-center text-2xl">
+              ${voice.gender === 'Female' ? '👩' : '👨'}
+            </div>
+            <div>
+              <p class="font-semibold text-lg">${voice.name}</p>
+              <p class="text-xs opacity-70">${voice.gender} • ${voice.style}</p>
+            </div>
+          </div>
+          <p class="text-sm opacity-90 mb-3">${voice.description}</p>
+          <button
+            onclick="event.stopPropagation(); playVoiceSample('${voice.id}')"
+            class="w-full px-4 py-2 bg-gray-900/50 hover:bg-gray-900 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <span>🔊</span>
+            Preview Voice
+          </button>
+        </button>
+      `).join('');
+    }
+
+    // Toggle Topic
+    function toggleTopic(topicId) {
+      const index = state.selectedTopics.indexOf(topicId);
+      if (index > -1) {
+        state.selectedTopics.splice(index, 1);
+      } else {
+        state.selectedTopics.push(topicId);
+      }
+      updateUI();
+    }
+
+    // Toggle Source
+    function toggleSource(sourceId) {
+      const index = state.selectedSources.indexOf(sourceId);
+      if (index > -1) {
+        state.selectedSources.splice(index, 1);
+      } else {
+        state.selectedSources.push(sourceId);
+      }
+      updateUI();
+    }
+
+    // Select Voice
+    function selectVoice(voiceId) {
+      state.selectedVoice = voiceId;
+      updateUI();
+    }
+
+    // Apply Preset
+    function applyPreset(preset) {
+      switch(preset) {
+        case 'recommended':
+          state.selectedTopics = ['politics', 'technology', 'campus-life', 'research'];
+          state.selectedSources = ['crimson', 'gazette', 'seas', 'hbs'];
+          break;
+        case 'all':
+          state.selectedTopics = topicsData.map(t => t.id);
+          state.selectedSources = sourcesData.map(s => s.id);
+          break;
+        case 'minimal':
+          state.selectedTopics = ['campus-life', 'politics'];
+          state.selectedSources = ['crimson', 'gazette'];
+          break;
+        case 'student':
+          state.selectedTopics = ['campus-life', 'sports', 'entertainment'];
+          state.selectedSources = ['crimson', 'magazine'];
+          break;
+      }
+      updateUI();
+      showToast(`✨ Applied ${preset} preset`);
+    }
+
+    // Update UI
+    function updateUI() {
+      // Update topic buttons
+      topicsData.forEach(topic => {
+        const btn = document.getElementById(`topic-${topic.id}`);
+        const isSelected = state.selectedTopics.includes(topic.id);
+        if (isSelected) {
+          btn.classList.remove('bg-gray-800/50', 'text-gray-300', 'border-gray-700');
+          btn.classList.add('bg-gradient-to-br', 'from-primary-pink', 'to-pink-600', 'text-white', 'shadow-lg', 'shadow-primary-pink/30', 'border-primary-pink');
+          btn.querySelector('.check-icon').classList.remove('hidden');
+        } else {
+          btn.classList.add('bg-gray-800/50', 'text-gray-300', 'border-gray-700');
+          btn.classList.remove('bg-gradient-to-br', 'from-primary-pink', 'to-pink-600', 'text-white', 'shadow-lg', 'shadow-primary-pink/30', 'border-primary-pink');
+          btn.querySelector('.check-icon').classList.add('hidden');
+        }
+      });
+
+      // Update source buttons
+      sourcesData.forEach(source => {
+        const btn = document.getElementById(`source-${source.id}`);
+        const isSelected = state.selectedSources.includes(source.id);
+        if (isSelected) {
+          btn.classList.remove('bg-gray-800/50', 'text-gray-300', 'border-gray-700');
+          btn.classList.add('bg-gradient-to-br', 'from-primary-pink', 'to-pink-600', 'text-white', 'shadow-lg', 'shadow-primary-pink/30', 'border-primary-pink');
+          btn.querySelector('.check-icon').classList.remove('hidden');
+        } else {
+          btn.classList.add('bg-gray-800/50', 'text-gray-300', 'border-gray-700');
+          btn.classList.remove('bg-gradient-to-br', 'from-primary-pink', 'to-pink-600', 'text-white', 'shadow-lg', 'shadow-primary-pink/30', 'border-primary-pink');
+          btn.querySelector('.check-icon').classList.add('hidden');
+        }
+      });
+
+      // Update voice buttons
+      voicesData.forEach(voice => {
+        const btn = document.getElementById(`voice-${voice.id}`);
+        const isSelected = state.selectedVoice === voice.id;
+        if (isSelected) {
+          btn.classList.remove('bg-gray-800/50', 'text-gray-300', 'border-gray-700');
+          btn.classList.add('bg-gradient-to-br', 'from-primary-pink', 'to-pink-600', 'text-white', 'border-primary-pink', 'shadow-lg', 'shadow-primary-pink/30');
+        } else {
+          btn.classList.add('bg-gray-800/50', 'text-gray-300', 'border-gray-700');
+          btn.classList.remove('bg-gradient-to-br', 'from-primary-pink', 'to-pink-600', 'text-white', 'border-primary-pink', 'shadow-lg', 'shadow-primary-pink/30');
+        }
+      });
+
+      // Update counters
+      document.getElementById('topics-count').textContent = state.selectedTopics.length;
+      document.getElementById('sources-count').textContent = state.selectedSources.length;
+
+      // Update progress
+      updateProgress();
+
+      // Update hints
+      updateHints();
+
+      // Update preview
+      updatePreview();
+
+      // Update save button
+      const saveBtn = document.getElementById('save-btn');
+      const canSave = state.selectedTopics.length > 0 && state.selectedSources.length > 0;
+      saveBtn.disabled = !canSave;
+    }
+
+    // Update Progress
+    function updateProgress() {
+      let completed = 0;
+
+      if (state.selectedTopics.length > 0) {
+        completed++;
+        document.getElementById('topics-check').innerHTML = '✓ Select topics';
+        document.getElementById('topics-check').classList.remove('text-gray-500');
+        document.getElementById('topics-check').classList.add('text-green-400');
+      } else {
+        document.getElementById('topics-check').innerHTML = '⏳ Select topics';
+        document.getElementById('topics-check').classList.add('text-gray-500');
+        document.getElementById('topics-check').classList.remove('text-green-400');
+      }
+
+      if (state.selectedSources.length > 0) {
+        completed++;
+        document.getElementById('sources-check').innerHTML = '✓ Choose sources';
+        document.getElementById('sources-check').classList.remove('text-gray-500');
+        document.getElementById('sources-check').classList.add('text-green-400');
+      } else {
+        document.getElementById('sources-check').innerHTML = '⏳ Choose sources';
+        document.getElementById('sources-check').classList.add('text-gray-500');
+        document.getElementById('sources-check').classList.remove('text-green-400');
+      }
+
+      if (state.selectedVoice) {
+        completed++;
+        document.getElementById('voice-check').innerHTML = '✓ Pick voice';
+        document.getElementById('voice-check').classList.remove('text-gray-500');
+        document.getElementById('voice-check').classList.add('text-green-400');
+      } else {
+        document.getElementById('voice-check').innerHTML = '⏳ Pick voice';
+        document.getElementById('voice-check').classList.add('text-gray-500');
+        document.getElementById('voice-check').classList.remove('text-green-400');
+      }
+
+      const progress = (completed / 3) * 100;
+      document.getElementById('progress-bar').style.width = `${progress}%`;
+      document.getElementById('progress-text').textContent = `${completed}/3 Complete`;
+    }
+
+    // Update Hints
+    function updateHints() {
+      const topicsHint = document.getElementById('topics-hint');
+      const sourcesHint = document.getElementById('sources-hint');
+
+      if (state.selectedTopics.length === 0) {
+        topicsHint.textContent = '💡 Tip: Select 3-5 topics for a well-rounded brief';
+        topicsHint.classList.remove('hidden');
+      } else {
+        topicsHint.classList.add('hidden');
+      }
+
+      if (state.selectedSources.length > 0 && state.selectedSources.length <= 2) {
+        sourcesHint.textContent = '💡 Tip: Most users select 4-6 sources for better coverage';
+        sourcesHint.classList.remove('hidden');
+      } else {
+        sourcesHint.classList.add('hidden');
+      }
+    }
+
+    // Update Preview
+    function updatePreview() {
+      let totalArticles = 0;
+      let headlines = [];
+
+      // Calculate articles
+      state.selectedTopics.forEach(topicId => {
+        const topic = topicsData.find(t => t.id === topicId);
+        if (topic) {
+          totalArticles += Math.floor(topic.count * (state.selectedSources.length / sourcesData.length));
+          if (sampleHeadlines[topicId]) {
+            headlines = headlines.concat(sampleHeadlines[topicId].slice(0, 2));
+          }
+        }
+      });
+
+      // Limit headlines
+      headlines = headlines.slice(0, 6);
+
+      // Calculate listen time (approx 1.5 min per 3 articles)
+      const listenTime = Math.ceil((totalArticles * 1.5) / 3);
+
+      // Update desktop preview
+      document.getElementById('preview-article-count').textContent = totalArticles;
+      document.getElementById('preview-listen-time').textContent = totalArticles > 0 ? `~${listenTime} min` : '~0 min';
+
+      const headlinesContainer = document.getElementById('preview-headlines');
+      if (headlines.length > 0) {
+        headlinesContainer.innerHTML = `
+          <div class="text-xs text-gray-400 mb-2">Sample headlines:</div>
+          ${headlines.map(h => `
+            <div class="text-sm p-3 bg-primary-dark/50 rounded-lg border border-gray-700/50">
+              ${h}
+            </div>
+          `).join('')}
+        `;
+      } else {
+        headlinesContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Select topics and sources to see sample headlines</p>';
+      }
+
+      // Update mobile preview
+      document.getElementById('mobile-preview-article-count').textContent = totalArticles;
+      document.getElementById('mobile-preview-listen-time').textContent = totalArticles > 0 ? `~${listenTime} min` : '~0 min';
+
+      const mobileHeadlinesContainer = document.getElementById('mobile-preview-headlines');
+      if (headlines.length > 0) {
+        mobileHeadlinesContainer.innerHTML = `
+          <div class="text-xs text-gray-400 mb-2">Sample headlines:</div>
+          ${headlines.map(h => `
+            <div class="text-sm p-3 bg-primary-dark/50 rounded-lg border border-gray-700/50">
+              ${h}
+            </div>
+          `).join('')}
+        `;
+      } else {
+        mobileHeadlinesContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Select topics and sources to see sample headlines</p>';
+      }
+    }
+
+    // Toggle Mobile Preview
+    function toggleMobilePreview() {
+      const content = document.getElementById('mobile-preview-content');
+      const icon = document.getElementById('mobile-preview-icon');
+
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+      } else {
+        content.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    // Play Voice Sample
+    function playVoiceSample(voiceId) {
+      const voice = voicesData.find(v => v.id === voiceId);
+      showToast(`🔊 Playing ${voice.name} voice sample...`);
+    }
+
+    // Save Preferences
+    function savePreferences() {
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="loading-shimmer px-full py-full block rounded-full">Saving...</span>';
+
+      setTimeout(() => {
+        showToast('✅ Preferences saved successfully!', 'success');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Preferences';
+      }, 2000);
+    }
+
+    // Reset Preferences
+    function resetPreferences() {
+      state = {
+        selectedTopics: [],
+        selectedSources: [],
+        selectedVoice: 'aoede'
+      };
+      updateUI();
+      showToast('🔄 Preferences reset');
+    }
+
+    // Show Toast
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+
+      const bgColor = type === 'success' ? 'bg-green-600' : 'bg-gray-800';
+
+      toast.className = `toast ${bgColor} text-white px-6 py-3 rounded-full shadow-lg border border-gray-700`;
+      toast.textContent = message;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Initialize on load
+    init();
+  </script>
+
+</body>
+</html>

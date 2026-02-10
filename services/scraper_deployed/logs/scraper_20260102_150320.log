@@ -1,0 +1,28 @@
+2026-01-02 15:03:20,202 - scrapers - INFO - Logging to file: logs/scraper_20260102_150320.log
+2026-01-02 15:03:20,204 - main - INFO - Logging to file: logs/scrapers_20260102_150320.log
+2026-01-02 15:03:25,534 - main - INFO - === Starting synchronous article scarping process ===
+2026-01-02 15:03:25,535 - scrapers - INFO - === Starting scrape_tag_load  ===
+2026-01-02 15:03:26,481 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/feed/ "HTTP/1.1 200 OK"
+2026-01-02 15:11:38,662 - main - ERROR - Processing failed: value too long for type character varying(255)
+Traceback (most recent call last):
+  File "/app/main.py", line 48, in process_sync
+    result = scrape_tag_load()
+             ^^^^^^^^^^^^^^^^^
+  File "/app/scrapers.py", line 123, in scrape_tag_load
+    inserted_count = db_manager.insert_records(db_records)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/db_manager.py", line 67, in insert_records
+    cur.execute(query, values)
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/cursor.py", line 97, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.StringDataRightTruncation: value too long for type character varying(255)
+2026-01-02 15:30:52,808 - main - INFO - === Starting synchronous article scarping process ===
+2026-01-02 15:30:52,811 - scrapers - INFO - === Starting scrape_tag_load  ===
+2026-01-02 15:30:52,995 - httpx - INFO - HTTP Request: GET https://news.harvard.edu/gazette/feed/ "HTTP/1.1 200 OK"
+2026-01-02 16:16:41,600 - scrapers - INFO - 
+✅ === SCRAPER COMPLETED ===
+2026-01-02 16:16:41,604 - scrapers - INFO - 
+✅ Inserted 0 new articles across all sources.
+2026-01-02 16:16:41,605 - scrapers - INFO - 
+✅ Total articles scraped: 0
+2026-01-02 16:16:41,605 - main - INFO - Processing by scrapers completed successfully: {'status': 'success', 'message': 'Inserted 0 new articles across all sources', 'processed': 0, 'total_found': 0}

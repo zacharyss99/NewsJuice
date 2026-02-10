@@ -1,0 +1,52 @@
+2026-01-02 15:22:33,773 - main - INFO - Logging to file: logs/loader_20260102_152233.log
+2026-01-02 15:22:45,131 - main - INFO - === Starting synchronous article processing ===
+2026-01-02 15:22:45,132 - loader - INFO - === Starting chunk_embed_load - Method: recursive-split ===
+2026-01-02 15:22:45,132 - loader - INFO - Using tables - Articles: articles, Vectors: chunks_vector
+2026-01-02 15:22:45,151 - main - ERROR - Processing failed: [Errno -2] Name or service not known
+Traceback (most recent call last):
+  File "/app/main.py", line 47, in process_sync
+    result = chunk_embed_load(method="recursive-split")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/loader.py", line 121, in chunk_embed_load
+    conn = psycopg.connect(DB_URL, autocommit=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/connection.py", line 98, in connect
+    attempts = conninfo_attempts(params)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/_conninfo_attempts.py", line 53, in conninfo_attempts
+    raise e.OperationalError(str(last_exc))
+psycopg.OperationalError: [Errno -2] Name or service not known
+2026-01-02 15:23:55,381 - main - INFO - === Starting synchronous article processing ===
+2026-01-02 15:23:55,384 - loader - INFO - === Starting chunk_embed_load - Method: recursive-split ===
+2026-01-02 15:23:55,384 - loader - INFO - Using tables - Articles: articles, Vectors: chunks_vector
+2026-01-02 15:23:55,401 - main - ERROR - Processing failed: [Errno -2] Name or service not known
+Traceback (most recent call last):
+  File "/app/main.py", line 47, in process_sync
+    result = chunk_embed_load(method="recursive-split")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/loader.py", line 121, in chunk_embed_load
+    conn = psycopg.connect(DB_URL, autocommit=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/connection.py", line 98, in connect
+    attempts = conninfo_attempts(params)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/_conninfo_attempts.py", line 53, in conninfo_attempts
+    raise e.OperationalError(str(last_exc))
+psycopg.OperationalError: [Errno -2] Name or service not known
+2026-01-02 15:24:23,932 - main - INFO - === Starting synchronous article processing ===
+2026-01-02 15:24:23,934 - loader - INFO - === Starting chunk_embed_load - Method: recursive-split ===
+2026-01-02 15:24:23,934 - loader - INFO - Using tables - Articles: articles, Vectors: chunks_vector
+2026-01-02 15:24:23,957 - main - ERROR - Processing failed: [Errno -2] Name or service not known
+Traceback (most recent call last):
+  File "/app/main.py", line 47, in process_sync
+    result = chunk_embed_load(method="recursive-split")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/loader.py", line 121, in chunk_embed_load
+    conn = psycopg.connect(DB_URL, autocommit=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/connection.py", line 98, in connect
+    attempts = conninfo_attempts(params)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/app/.venv/lib/python3.12/site-packages/psycopg/_conninfo_attempts.py", line 53, in conninfo_attempts
+    raise e.OperationalError(str(last_exc))
+psycopg.OperationalError: [Errno -2] Name or service not known

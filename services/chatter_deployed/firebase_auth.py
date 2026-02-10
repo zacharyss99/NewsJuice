@@ -1,6 +1,7 @@
 import firebase_admin
-from firebase_admin import auth
+from firebase_admin import auth, credentials
 from typing import Dict
+import os
 
 """Firebase Admin SDK initialization and token verification."""
 
@@ -20,24 +21,18 @@ def initialize_firebase_admin():
         print("[firebase-admin] Already initialized")
         return
 
-    # service account JSON file for the local development
-    # [CM] strange that his works? the path in .env.local seems a dummy
-    # [Z] we do not need this code below, it works because when the backend
-    # is deployed on Cloud Run, we do not use the
-    # service account (which is a dummy path),
-    # so the Firebase falls back on the Application Default Credentials (ADC)
-    # AKA the firebase service account file inside our GCP IAM
-    # service accounts folder
-    # that is what the firebase_admin.initialize_app() does.
+    # Try to use Firebase-specific service account first (for local development)
+    service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
+    if service_account_path and os.path.exists(service_account_path):
+        try:
+            cred = credentials.Certificate(service_account_path)
+            firebase_admin.initialize_app(cred)
+            print(f"[firebase-admin] Initialized with service account file: {service_account_path}")
+            return
+        except Exception as e:
+            print(f"[firebase-admin-warning] Failed to init with service account: {e}")
 
-    # service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
-    # if service_account_path and os.path.exists(service_account_path):
-    #     cred = credentials.Certificate(service_account_path)
-    #     firebase_admin.initialize_app(cred)
-    #     print("[firebase-admin] Initialized with service account file")
-    #     return
-
-    # this is firebase authorization for the cloud deployment
+    # Fallback to default credentials (for cloud deployment)
     try:
         firebase_admin.initialize_app()
         print("[firebase-admin] Initialized with default credentials")
